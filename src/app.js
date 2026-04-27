@@ -195,18 +195,6 @@ function pageTitle() {
   return "Compliance event list";
 }
 
-function viewMeta() {
-  if (state.view === "dashboard") {
-    return { title: "Dashboard", summary: "Operations summary and next actions" };
-  }
-
-  if (state.view === "calendar") {
-    return { title: "Calendar", summary: "Month view with due-date blocks" };
-  }
-
-  return { title: "Event List", summary: `${filteredEvents().length} filtered compliance items` };
-}
-
 function dashboardStats() {
   const openEvents = state.events.filter((event) => event.lifecycle !== "Complete");
   const dueSoonEvents = openEvents.filter((event) => daysUntil(event.dueDate) >= 0 && daysUntil(event.dueDate) <= 30);
@@ -320,7 +308,7 @@ function renderMainView() {
       ? renderDashboard()
       : `${renderControls()}${state.view === "calendar" ? renderCalendar() : renderEventTable()}`;
 
-  return `${renderViewBanner()}${content}`;
+  return content;
 }
 
 function renderSidebar() {
@@ -408,19 +396,6 @@ function renderTopbar() {
         </button>
       </div>
     </header>
-  `;
-}
-
-function renderViewBanner() {
-  const meta = viewMeta();
-  return `
-    <div class="view-banner" data-current-view="${state.view}">
-      <div>
-        <p class="section-label">Current view</p>
-        <strong>${meta.title}</strong>
-      </div>
-      <span>${meta.summary}</span>
-    </div>
   `;
 }
 
