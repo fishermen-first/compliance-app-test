@@ -190,9 +190,9 @@ function canUpdateStatus() {
 }
 
 function pageTitle() {
-  if (state.view === "dashboard") return "Compliance dashboard";
+  if (state.view === "dashboard") return "FF Compliance dashboard";
   if (state.view === "calendar") return "FF Compliance calendar";
-  return "Compliance event list";
+  return "FF Compliance event list";
 }
 
 function dashboardStats() {
