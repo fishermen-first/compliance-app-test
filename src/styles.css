@@ -119,7 +119,8 @@ svg {
   min-width: 0;
 }
 
-.brand-user-switcher {
+.brand-user-switcher,
+.topbar-user-switcher {
   width: 180px;
   min-height: 34px;
   padding: 6px 30px 6px 10px;
@@ -130,6 +131,10 @@ svg {
   font-size: 13px;
   font-weight: 700;
   flex: 0 0 auto;
+}
+
+.brand-user-switcher {
+  display: none;
 }
 
 .eyebrow,
@@ -258,8 +263,12 @@ svg {
   align-items: center;
   justify-content: flex-start;
   gap: 10px;
-  flex: 0 0 auto;
+  width: 100%;
   white-space: nowrap;
+}
+
+.topbar-user-switcher {
+  margin-left: auto;
 }
 
 .user-switcher {
@@ -1313,6 +1322,14 @@ textarea {
     display: grid;
     grid-template-columns: 1fr;
     padding: 16px 20px;
+  }
+
+  .brand-user-switcher {
+    display: block;
+  }
+
+  .topbar-user-switcher {
+    display: none;
   }
 
   .side-nav {

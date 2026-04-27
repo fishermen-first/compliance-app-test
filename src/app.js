@@ -383,6 +383,11 @@ function renderTopbar() {
           ${icon("plus")}
           <span>New Event</span>
         </button>
+        <select class="topbar-user-switcher" data-current-user aria-label="Current office user">
+          ${company.officeUsers
+            .map((user) => `<option value="${user.id}" ${selected(state.currentUserId, user.id)}>${user.name}</option>`)
+            .join("")}
+        </select>
       </div>
     </header>
   `;
