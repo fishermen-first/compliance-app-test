@@ -254,32 +254,63 @@ svg {
 
 .next-due {
   display: grid;
-  align-content: center;
-  width: 245px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 320px;
   min-height: 42px;
-  padding: 6px 12px;
+  padding: 6px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
 }
 
-.next-due span,
-.next-due strong {
+.next-due-date,
+.next-due-detail {
   display: block;
+  min-width: 0;
 }
 
-.next-due span {
+.next-due-date {
+  padding-right: 10px;
+  border-right: 1px solid var(--line);
+}
+
+.next-due-date span,
+.next-due-detail span {
   color: var(--muted);
   font-size: 11px;
-  font-weight: 850;
+  font-weight: 800;
+}
+
+.next-due-date span {
+  display: block;
   text-transform: uppercase;
 }
 
-.next-due strong {
+.next-due-date strong {
+  display: block;
+  margin-top: 1px;
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.next-due-detail strong,
+.next-due-detail span {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.next-due-detail strong {
   font-size: 13px;
+  line-height: 1.15;
+}
+
+.next-due-detail span {
+  margin-top: 2px;
 }
 
 .primary-button,
@@ -809,6 +840,7 @@ textarea {
 }
 
 .status-chip,
+.lifecycle-chip,
 .due-chip,
 .type-badge {
   display: inline-flex;
@@ -825,6 +857,31 @@ textarea {
 .status-chip {
   background: var(--panel-soft);
   color: #42514c;
+}
+
+.lifecycle-chip {
+  background: #e8f4ec;
+  color: #25623a;
+}
+
+.lifecycle-chip.waiting-on-vessel {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.lifecycle-chip.office-review {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.lifecycle-chip.draft {
+  background: var(--panel-soft);
+  color: #42514c;
+}
+
+.lifecycle-chip.complete {
+  background: var(--teal-soft);
+  color: var(--teal);
 }
 
 .due-chip {
@@ -880,6 +937,163 @@ textarea {
   line-height: 1.1;
 }
 
+.lifecycle-tracker {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfc;
+}
+
+.lifecycle-owner {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.lifecycle-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.lifecycle-step {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+.lifecycle-step i {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.lifecycle-step strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.lifecycle-step.done i {
+  border-color: var(--teal);
+  background: var(--teal);
+  color: #fff;
+}
+
+.lifecycle-step.current {
+  color: var(--ink);
+}
+
+.lifecycle-step.current i {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.reference-link {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+}
+
+.reference-link span,
+.reference-link small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reference-link span {
+  font-weight: 800;
+}
+
+.reference-link small {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 11px;
+}
+.recurrence-card {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfc;
+}
+
+.recurrence-card > strong {
+  display: block;
+  font-size: 14px;
+}
+
+.recurrence-card .section-header span,
+.recurrence-builder .section-header span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.occurrence-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.occurrence-list span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  color: #42514c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.form-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfc;
+}
+
+.recurrence-option.hidden,
+[data-end-panel].hidden {
+  display: none;
+}
+
+.recurrence-options,
+.recurrence-end {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
 .detail-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1120,6 +1334,11 @@ textarea {
 }
 
 @media (max-width: 860px) {
+  .recurrence-options,
+  .recurrence-end {
+    grid-template-columns: 1fr;
+  }
+
   .workspace {
     padding: 16px;
   }
@@ -1197,6 +1416,7 @@ textarea {
   }
 
   .status-chip,
+  .lifecycle-chip,
   .due-chip {
     justify-self: start;
     grid-column: 2;

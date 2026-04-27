@@ -8,7 +8,7 @@ const company = {
   ],
 };
 
-const statusOptions = ["Not started", "Needs prep", "Draft started", "Scheduled", "In progress", "Submitted", "Waiting on fee", "Vendor contacted", "Planned", "Completed"];
+const lifecycleStages = ["Draft", "Active", "Waiting on Vessel", "Office Review", "Complete"];
 
 const eventTypes = [
   { id: "audit", label: "Audit", color: "teal" },
@@ -27,6 +27,9 @@ const seedEvents = [
     vessel: "F/V Arctic Fjord",
     owner: "Emma Scalisi",
     status: "Needs prep",
+    lifecycle: "Waiting on Vessel",
+    referenceLink: "https://arcticstorm.example/sharepoint/uscg-safety-inspection",
+    recurrence: { type: "annually", interval: 1, end: { type: "never" } },
     priority: "High",
     reminders: [30, 14, 7, 1],
     recipients: ["Sarah Nayani", "Emma Scalisi"],
@@ -42,6 +45,9 @@ const seedEvents = [
     vessel: "F/V Arctic Storm",
     owner: "Sarah Nayani",
     status: "Draft started",
+    lifecycle: "Office Review",
+    referenceLink: "https://arcticstorm.example/sharepoint/noaa-landing-report",
+    recurrence: { type: "monthly-date", interval: 1, monthDay: 10, end: { type: "after", count: 12 } },
     priority: "Medium",
     reminders: [14, 7, 2],
     recipients: ["Sarah Nayani", "Meagan Anderson"],
@@ -57,6 +63,9 @@ const seedEvents = [
     vessel: "F/V Arctic Storm",
     owner: "Meagan Anderson",
     status: "Scheduled",
+    lifecycle: "Active",
+    referenceLink: "https://arcticstorm.example/sharepoint/msc-chain-of-custody",
+    recurrence: { type: "monthly-weekday", interval: 3, ordinal: 3, weekday: 1, end: { type: "by", date: "2027-12-31" } },
     priority: "High",
     reminders: [30, 14, 7],
     recipients: ["Meagan Anderson", "Sarah Nayani"],
@@ -72,6 +81,9 @@ const seedEvents = [
     vessel: "F/V Arctic Storm",
     owner: "Sarah Nayani",
     status: "Not started",
+    lifecycle: "Draft",
+    referenceLink: "https://arcticstorm.example/sharepoint/observer-registration",
+    recurrence: { type: "annually", interval: 1, end: { type: "never" } },
     priority: "Medium",
     reminders: [30, 14, 3],
     recipients: ["Sarah Nayani", "Emma Scalisi"],
@@ -87,6 +99,9 @@ const seedEvents = [
     vessel: "F/V Arctic Storm",
     owner: "Meagan Anderson",
     status: "Planned",
+    lifecycle: "Active",
+    referenceLink: "https://arcticstorm.example/sharepoint/haccp-refresher",
+    recurrence: { type: "monthly-weekday", interval: 6, ordinal: 1, weekday: 2, end: { type: "never" } },
     priority: "Low",
     reminders: [21, 7, 1],
     recipients: ["Meagan Anderson"],
@@ -102,6 +117,9 @@ const seedEvents = [
     vessel: "F/V Sea Storm",
     owner: "Emma Scalisi",
     status: "Vendor contacted",
+    lifecycle: "Waiting on Vessel",
+    referenceLink: "https://arcticstorm.example/sharepoint/vms-certification",
+    recurrence: { type: "custom", interval: 90, anchorDate: "2026-06-08", end: { type: "never" } },
     priority: "Medium",
     reminders: [30, 14, 7, 1],
     recipients: ["Emma Scalisi"],
@@ -117,6 +135,9 @@ const seedEvents = [
     vessel: "F/V Arctic Storm",
     owner: "Sarah Nayani",
     status: "Waiting on fee",
+    lifecycle: "Active",
+    referenceLink: "https://arcticstorm.example/sharepoint/processor-license",
+    recurrence: { type: "annually", interval: 1, end: { type: "never" } },
     priority: "High",
     reminders: [45, 30, 14, 7],
     recipients: ["Sarah Nayani", "Meagan Anderson"],
@@ -131,7 +152,10 @@ const seedEvents = [
     dueDate: "2026-06-20",
     vessel: "F/V Arctic Fjord",
     owner: "Meagan Anderson",
-    status: "Not started",
+    status: "Needs prep",
+    lifecycle: "Draft",
+    referenceLink: "https://arcticstorm.example/sharepoint/gear-marking-review",
+    recurrence: { type: "weekly", interval: 2, weekdays: [1, 4], end: { type: "after", count: 10 } },
     priority: "Low",
     reminders: [30, 10],
     recipients: ["Meagan Anderson", "Emma Scalisi"],
@@ -184,7 +208,7 @@ function viewMeta() {
 }
 
 function dashboardStats() {
-  const openEvents = state.events.filter((event) => event.status !== "Completed");
+  const openEvents = state.events.filter((event) => event.lifecycle !== "Complete");
   const dueSoonEvents = openEvents.filter((event) => daysUntil(event.dueDate) >= 0 && daysUntil(event.dueDate) <= 30);
   const dueTwoWeeksEvents = openEvents.filter((event) => daysUntil(event.dueDate) >= 0 && daysUntil(event.dueDate) <= 14);
   const highOpenEvents = openEvents.filter((event) => event.priority === "High");
@@ -194,6 +218,8 @@ function dashboardStats() {
     dueTwoWeeks: dueTwoWeeksEvents.length,
     highSoon: dueSoonEvents.filter((event) => event.priority === "High").length,
     highOpen: highOpenEvents.length,
+    waitingOnVessel: openEvents.filter((event) => event.lifecycle === "Waiting on Vessel").length,
+    officeReview: openEvents.filter((event) => event.lifecycle === "Office Review").length,
     overdue: openEvents.filter((event) => daysUntil(event.dueDate) < 0).length,
     open: openEvents.length,
   };
@@ -246,11 +272,11 @@ function filteredEvents() {
     .filter((event) => {
       const matchesType = state.filters.type === "all" || event.type === state.filters.type;
       const matchesVessel = state.filters.vessel === "all" || event.vessel === state.filters.vessel;
-      const matchesStatus = state.filters.status !== "open" || event.status !== "Completed";
+      const matchesStatus = state.filters.status !== "open" || event.lifecycle !== "Complete";
       const search = state.filters.search.trim().toLowerCase();
       const matchesSearch =
         !search ||
-        [event.title, event.vessel, event.owner, event.status, event.notes]
+        [event.title, event.vessel, event.owner, event.lifecycle, event.notes]
           .join(" ")
           .toLowerCase()
           .includes(search);
@@ -335,6 +361,7 @@ function renderSidebar() {
 }
 function renderTopbar() {
   const next = filteredEvents()[0];
+  const nextDays = next ? daysUntil(next.dueDate) : null;
 
   return `
     <header class="topbar">
@@ -344,8 +371,25 @@ function renderTopbar() {
       </div>
       <div class="topbar-actions">
         <div class="next-due">
-          <span>Next due</span>
-          <strong>${next ? `${next.title} in ${daysUntil(next.dueDate)} days` : "Nothing scheduled"}</strong>
+          ${
+            next
+              ? `
+                <div class="next-due-date">
+                  <span>Next due</span>
+                  <strong>${formatDate(next.dueDate, { short: true })}</strong>
+                </div>
+                <div class="next-due-detail">
+                  <strong>${next.title}</strong>
+                  <span>${next.vessel} · ${nextDays} days away</span>
+                </div>
+              `
+              : `
+                <div class="next-due-detail">
+                  <strong>Nothing scheduled</strong>
+                  <span>No open compliance dates</span>
+                </div>
+              `
+          }
         </div>
         <label class="user-switcher">
           <span>Signed in as</span>
@@ -396,19 +440,19 @@ function renderDashboard() {
           <small>${stats.highSoon} high priority</small>
         </div>
         <div class="metric-card">
-          <span>Due in 14 days</span>
-          <strong>${stats.dueTwoWeeks}</strong>
-          <small>Needs immediate prep</small>
+          <span>Waiting on Vessel</span>
+          <strong>${stats.waitingOnVessel}</strong>
+          <small>Vessel response needed</small>
+        </div>
+        <div class="metric-card">
+          <span>Office Review</span>
+          <strong>${stats.officeReview}</strong>
+          <small>Ready for confirmation</small>
         </div>
         <div class="metric-card">
           <span>High priority</span>
           <strong>${stats.highOpen}</strong>
           <small>Open compliance items</small>
-        </div>
-        <div class="metric-card">
-          <span>Overdue</span>
-          <strong>${stats.overdue}</strong>
-          <small>${stats.overdue === 0 ? "Nothing late" : "Needs review"}</small>
         </div>
       </div>
 
@@ -457,7 +501,7 @@ function renderDashboard() {
                     <span class="type-dot ${typeFor(event.type).color}"></span>
                     <span>
                       <strong>${event.title}</strong>
-                      <small>${event.status} · ${event.priority} priority · ${event.owner}</small>
+                      <small>${event.lifecycle} · ${event.priority} priority · ${event.owner}</small>
                     </span>
                     <em class="due-chip ${due <= 14 ? "urgent" : ""}">${due} days</em>
                   </button>
@@ -597,7 +641,7 @@ function renderEventTable() {
                   <strong>${event.title}</strong>
                   <small>${event.vessel} · ${event.owner}</small>
                 </span>
-                <span class="status-chip">${event.status}</span>
+                <span class="lifecycle-chip ${lifecycleClass(event.lifecycle)}">${event.lifecycle}</span>
                 <span class="due-chip ${due <= 14 ? "urgent" : ""}">${due} days</span>
               </button>
             `;
@@ -608,6 +652,144 @@ function renderEventTable() {
   `;
 }
 
+const weekdayLabels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const weekdayShortLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const ordinalLabels = { 1: "1st", 2: "2nd", 3: "3rd", 4: "4th", "-1": "last" };
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function addMonthsClamped(date, months, day = date.getDate()) {
+  const next = new Date(date.getFullYear(), date.getMonth() + months, 1, 12);
+  const lastDay = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+  next.setDate(Math.min(day, lastDay));
+  return next;
+}
+
+function nthWeekdayOfMonth(year, month, weekday, ordinal) {
+  if (ordinal === -1) {
+    const last = new Date(year, month + 1, 0, 12);
+    const diff = (last.getDay() - weekday + 7) % 7;
+    last.setDate(last.getDate() - diff);
+    return last;
+  }
+  const first = new Date(year, month, 1, 12);
+  const offset = (weekday - first.getDay() + 7) % 7;
+  return new Date(year, month, 1 + offset + (ordinal - 1) * 7, 12);
+}
+
+function recurrenceEndSummary(end = { type: "never" }) {
+  if (end.type === "after") return "Ends after " + end.count + " occurrences";
+  if (end.type === "by") return "Ends by " + formatDate(end.date, { year: true });
+  return "Never ends";
+}
+
+function recurrenceSummary(event) {
+  const rule = event.recurrence;
+  if (!rule || rule.type === "none") return "Does not repeat";
+  const intervalText = rule.interval > 1 ? "Every " + rule.interval : "Every";
+  if (rule.type === "daily") return intervalText + " " + (rule.interval > 1 ? "days" : "day");
+  if (rule.type === "weekly") return intervalText + " " + (rule.interval > 1 ? "weeks" : "week") + " on " + rule.weekdays.map((day) => weekdayShortLabels[day]).join(" and ");
+  if (rule.type === "monthly-date") return intervalText + " " + (rule.interval > 1 ? "months" : "month") + " on day " + rule.monthDay;
+  if (rule.type === "monthly-weekday") return intervalText + " " + (rule.interval > 1 ? "months" : "month") + " on the " + ordinalLabels[rule.ordinal] + " " + weekdayLabels[rule.weekday];
+  if (rule.type === "annually") return intervalText + " " + (rule.interval > 1 ? "years" : "year") + " on " + formatDate(event.dueDate);
+  if (rule.type === "custom") return "Every " + rule.interval + " days from " + formatDate(rule.anchorDate || event.dueDate, { year: true });
+  return "Does not repeat";
+}
+
+function generateOccurrences(event, limit = 5) {
+  const rule = event.recurrence;
+  const start = toDate(rule?.anchorDate || event.dueDate);
+  if (!rule || rule.type === "none") return [start];
+  const max = rule.end?.type === "after" ? Math.min(limit, rule.end.count) : limit;
+  const endDate = rule.end?.type === "by" ? toDate(rule.end.date) : null;
+  const dates = [];
+  let cursor = start;
+  let attempts = 0;
+  while (dates.length < max && attempts < 120) {
+    attempts += 1;
+    if (!endDate || cursor <= endDate) dates.push(new Date(cursor));
+    if (endDate && cursor >= endDate) break;
+    if (rule.type === "daily") cursor = addDays(cursor, rule.interval);
+    else if (rule.type === "weekly") {
+      const candidates = [];
+      const weekStart = addDays(cursor, -cursor.getDay());
+      for (let week = 0; week <= rule.interval; week += 1) rule.weekdays.forEach((day) => candidates.push(addDays(weekStart, week * 7 + day)));
+      cursor = candidates.filter((date) => date > cursor).sort((a, b) => a - b)[0] || addDays(cursor, rule.interval * 7);
+    } else if (rule.type === "monthly-date") cursor = addMonthsClamped(cursor, rule.interval, rule.monthDay);
+    else if (rule.type === "monthly-weekday") {
+      const base = addMonthsClamped(cursor, rule.interval, 1);
+      cursor = nthWeekdayOfMonth(base.getFullYear(), base.getMonth(), rule.weekday, rule.ordinal);
+    } else if (rule.type === "annually") cursor = addMonthsClamped(cursor, rule.interval * 12, start.getDate());
+    else if (rule.type === "custom") cursor = addDays(cursor, rule.interval);
+    else break;
+  }
+  return dates;
+}
+
+function renderRecurrenceSummary(event) {
+  const dates = generateOccurrences(event, 5);
+  return `
+    <section class="detail-section recurrence-card">
+      <div class="section-header">
+        <p class="section-label">Recurrence</p>
+        <span>${recurrenceEndSummary(event.recurrence?.end)}</span>
+      </div>
+      <strong>${recurrenceSummary(event)}</strong>
+      <div class="occurrence-list">
+        ${dates.map((date) => `<span>${date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>`).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function readRecurrenceFromForm(form, dueDate) {
+  const type = String(form.get("recurrenceType") || "none");
+  const endType = String(form.get("recurrenceEnd") || "never");
+  const end = endType === "after" ? { type: "after", count: Number(form.get("endAfter") || 12) } : endType === "by" ? { type: "by", date: String(form.get("endBy") || "2027-12-31") } : { type: "never" };
+  const interval = Math.max(1, Number(form.get("recurrenceInterval") || 1));
+  if (type === "none") return { type: "none", end };
+  if (type === "daily") return { type, interval, end };
+  if (type === "weekly") return { type, interval, weekdays: [1, 4], end };
+  if (type === "monthly-date") return { type, interval, monthDay: Number(form.get("monthDay") || toDate(dueDate).getDate()), end };
+  if (type === "monthly-weekday") return { type, interval, ordinal: Number(form.get("ordinal") || 2), weekday: Number(form.get("weekday") || 2), end };
+  if (type === "annually") return { type, interval, end };
+  if (type === "custom") return { type, interval: Math.max(1, Number(form.get("customDays") || 45)), anchorDate: dueDate, end };
+  return { type: "none", end };
+}
+function lifecycleClass(stage) {
+  return stage.toLowerCase().replace(/\s+/g, "-");
+}
+
+function renderLifecycleStepper(event) {
+  const currentIndex = lifecycleStages.indexOf(event.lifecycle);
+
+  return `
+    <section class="lifecycle-tracker" aria-label="Lifecycle tracker">
+      <div class="section-header">
+        <p class="section-label">Lifecycle</p>
+        <span class="lifecycle-owner">${event.lifecycle === "Waiting on Vessel" ? "Vessel owns next step" : event.lifecycle === "Office Review" ? "Office confirmation needed" : "Office managed"}</span>
+      </div>
+      <div class="lifecycle-steps">
+        ${lifecycleStages
+          .map((stage, index) => {
+            const isDone = index < currentIndex || event.lifecycle === "Complete";
+            const isCurrent = stage === event.lifecycle;
+            return `
+              <span class="lifecycle-step ${isDone ? "done" : ""} ${isCurrent ? "current" : ""}">
+                <i>${index + 1}</i>
+                <strong>${stage}</strong>
+              </span>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
 function renderDetails() {
   const event = selectedEvent();
   if (!event) return "";
@@ -633,6 +815,9 @@ function renderDetails() {
         <strong>${due} days away</strong>
       </div>
 
+      ${renderLifecycleStepper(event)}
+      ${renderRecurrenceSummary(event)}
+
       <div class="detail-grid">
         <div>
           <span>Vessel/site</span>
@@ -643,12 +828,12 @@ function renderDetails() {
           <strong>${event.owner}</strong>
         </div>
         <div class="status-field">
-          <span>Status</span>
+          <span>Lifecycle</span>
           ${canUpdateStatus()
-            ? `<select class="status-select" data-status-select>${statusOptions
-                .map((status) => `<option value="${status}" ${selected(event.status, status)}>${status}</option>`)
+            ? `<select class="status-select" data-lifecycle-select>${lifecycleStages
+                .map((stage) => `<option value="${stage}" ${selected(event.lifecycle, stage)}>${stage}</option>`)
                 .join("")}</select>`
-            : `<strong>${event.status}</strong><small>View only for ${currentUser().name}</small>`}
+            : `<strong>${event.lifecycle}</strong><small>View only for ${currentUser().name}</small>`}
         </div>
         <div>
           <span>Priority</span>
@@ -688,10 +873,12 @@ function renderDetails() {
       </section>
 
       <section class="detail-section">
-        <p class="section-label">Documents</p>
-        <div class="document-list">
-          ${event.documents.map((doc) => `<button type="button">${icon("file")}<span>${doc}</span></button>`).join("")}
-        </div>
+        <p class="section-label">Reference Link</p>
+        <button class="reference-link" type="button" data-toast="SharePoint link previewed">
+          ${icon("file")}
+          <span>Open SharePoint folder</span>
+          <small>${event.referenceLink}</small>
+        </button>
       </section>
 
       <div class="email-status">
@@ -805,8 +992,8 @@ function renderNewEventForm() {
           </select>
         </label>
         <label>
-          <span>Due date</span>
-          <input name="dueDate" type="date" required value="2026-06-28" />
+          <span>First due date</span>
+          <input name="dueDate" type="date" required value="2026-06-28" data-recurrence-input />
         </label>
       </div>
       <div class="form-grid">
@@ -823,6 +1010,45 @@ function renderNewEventForm() {
           </select>
         </label>
       </div>
+      <section class="form-section recurrence-builder">
+        <div class="section-header">
+          <div>
+            <p class="section-label">Recurrence</p>
+            <strong>Repeat schedule</strong>
+          </div>
+          <span data-recurrence-preview>Annual event, never ends</span>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span>Pattern</span>
+            <select name="recurrenceType" data-recurrence-type>
+              <option value="none">Does not repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly-date">Monthly by date</option>
+              <option value="monthly-weekday">Monthly by weekday</option>
+              <option value="annually" selected>Annually</option>
+              <option value="custom">Custom interval</option>
+            </select>
+          </label>
+          <label>
+            <span>Every</span>
+            <input name="recurrenceInterval" type="number" min="1" value="1" data-recurrence-input />
+          </label>
+        </div>
+        <div class="recurrence-options">
+          <label class="recurrence-option" data-panel="weekly"><span>Weekly days</span><select name="weeklyDays" data-recurrence-input><option>Monday and Thursday</option><option>Tuesday</option><option>Friday</option></select></label>
+          <label class="recurrence-option" data-panel="monthly-date"><span>Day of month</span><input name="monthDay" type="number" min="1" max="31" value="15" data-recurrence-input /></label>
+          <label class="recurrence-option" data-panel="monthly-weekday"><span>Weekday rule</span><select name="ordinal" data-recurrence-input><option value="1">1st</option><option value="2" selected>2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="-1">Last</option></select></label>
+          <label class="recurrence-option" data-panel="monthly-weekday"><span>Weekday</span><select name="weekday" data-recurrence-input>${weekdayLabels.map((day, index) => `<option value="${index}" ${index === 2 ? "selected" : ""}>${day}</option>`).join("")}</select></label>
+          <label class="recurrence-option" data-panel="custom"><span>Custom days</span><input name="customDays" type="number" min="1" value="45" data-recurrence-input /></label>
+        </div>
+        <div class="form-grid recurrence-end">
+          <label><span>Ends</span><select name="recurrenceEnd" data-recurrence-input><option value="never" selected>Never ends</option><option value="after">After N occurrences</option><option value="by">By date</option></select></label>
+          <label class="recurrence-option" data-end-panel="after"><span>After</span><input name="endAfter" type="number" min="1" value="12" data-recurrence-input /></label>
+          <label class="recurrence-option" data-end-panel="by"><span>End by</span><input name="endBy" type="date" value="2027-12-31" data-recurrence-input /></label>
+        </div>
+      </section>
       <label>
         <span>Reminder days</span>
         <input name="reminders" value="30, 14, 7, 1" />
@@ -858,12 +1084,12 @@ function bindEvents() {
     });
   });
 
-  document.querySelectorAll("[data-status-select]").forEach((field) => {
+  document.querySelectorAll("[data-lifecycle-select]").forEach((field) => {
     field.addEventListener("change", () => {
       const event = selectedEvent();
       if (!event || !canUpdateStatus()) return;
-      event.status = field.value;
-      showToast(`${event.title} status updated`);
+      event.lifecycle = field.value;
+      showToast(`${event.title} moved to ${event.lifecycle}`);
       render();
     });
   });
@@ -919,6 +1145,29 @@ function focusCurrentView() {
 }
 
 function bindModalEvents() {
+  const recurrenceForm = document.querySelector("[data-new-event-form]");
+  const refreshRecurrencePreview = () => {
+    if (!recurrenceForm) return;
+    const form = new FormData(recurrenceForm);
+    const fakeEvent = {
+      dueDate: String(form.get("dueDate") || "2026-06-28"),
+      recurrence: readRecurrenceFromForm(form, String(form.get("dueDate") || "2026-06-28")),
+    };
+    const preview = recurrenceForm.querySelector("[data-recurrence-preview]");
+    if (preview) preview.textContent = `${recurrenceSummary(fakeEvent)} · ${recurrenceEndSummary(fakeEvent.recurrence.end)}`;
+    recurrenceForm.querySelectorAll("[data-panel]").forEach((panel) => {
+      panel.classList.toggle("hidden", panel.dataset.panel !== fakeEvent.recurrence.type);
+    });
+    recurrenceForm.querySelectorAll("[data-end-panel]").forEach((panel) => {
+      panel.classList.toggle("hidden", panel.dataset.endPanel !== fakeEvent.recurrence.end.type);
+    });
+  };
+
+  document.querySelectorAll("[data-recurrence-input], [data-recurrence-type]").forEach((field) => {
+    field.addEventListener("change", refreshRecurrencePreview);
+    field.addEventListener("input", refreshRecurrencePreview);
+  });
+  refreshRecurrencePreview();
   document.querySelectorAll("[data-close-modal]").forEach((element) => {
     element.addEventListener("click", (event) => {
       if (element.classList.contains("modal-backdrop") && event.target !== element) return;
@@ -948,7 +1197,10 @@ function bindModalEvents() {
       dueDate: String(form.get("dueDate")),
       vessel: String(form.get("vessel")),
       owner: String(form.get("owner")),
-      status: "Not started",
+      status: "Needs prep",
+      lifecycle: "Draft",
+      referenceLink: "https://arcticstorm.example/sharepoint/new-event",
+      recurrence: readRecurrenceFromForm(form, String(form.get("dueDate"))),
       priority: "Medium",
       reminders,
       recipients: [String(form.get("owner")), "Sarah Nayani"],
@@ -1005,8 +1257,8 @@ function handleAction(action) {
       showToast("You do not have access to update status");
       return;
     }
-    event.status = event.status === "Completed" ? "Needs prep" : "Completed";
-    showToast(`${event.title} marked ${event.status.toLowerCase()}`);
+    event.lifecycle = event.lifecycle === "Complete" ? "Active" : "Complete";
+    showToast(`${event.title} moved to ${event.lifecycle}`);
     render();
     return;
   }
