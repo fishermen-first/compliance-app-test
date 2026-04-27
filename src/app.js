@@ -191,7 +191,7 @@ function canUpdateStatus() {
 
 function pageTitle() {
   if (state.view === "dashboard") return "Compliance dashboard";
-  if (state.view === "calendar") return "Compliance calendar";
+  if (state.view === "calendar") return "FF Compliance calendar";
   return "Compliance event list";
 }
 
@@ -317,7 +317,7 @@ function renderSidebar() {
       <div class="brand-block">
         <div class="brand-mark">AS</div>
         <div>
-          <p class="eyebrow">Compliance Calendar</p>
+          <p class="eyebrow">FF Compliance</p>
           <h1>${company.name}</h1>
         </div>
       </div>

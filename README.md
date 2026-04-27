@@ -1,6 +1,6 @@
-# Arctic Storm Compliance Calendar Mockup
+# Arctic Storm FF Compliance Mockup
 
-Static front-end prototype for a small fishing company compliance calendar. Open `index.html` in a browser to use it.
+Static front-end prototype for FF Compliance, a compliance workflow app for smaller fishing companies. Open `index.html` in a browser to use it.
 
 ## What is mocked
 
