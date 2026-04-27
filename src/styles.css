@@ -69,11 +69,19 @@ svg {
 }
 
 .brand-block {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 10px;
+}
+
+.brand-identity {
   display: grid;
   grid-template-columns: 48px 1fr;
   align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
+  min-width: 0;
 }
 
 .brand-mark,
@@ -103,6 +111,25 @@ svg {
 .brand-block h1 {
   font-size: 17px;
   line-height: 1.2;
+}
+
+.brand-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.brand-user-switcher {
+  width: 180px;
+  min-height: 34px;
+  padding: 6px 30px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background-color: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  flex: 0 0 auto;
 }
 
 .eyebrow,
@@ -214,8 +241,8 @@ svg {
 
 .topbar {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-start;
   gap: 18px;
   margin-bottom: 18px;
 }
@@ -228,8 +255,8 @@ svg {
 
 .topbar-actions {
   display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: flex-start;
   gap: 10px;
   flex: 0 0 auto;
   white-space: nowrap;
@@ -1388,7 +1415,15 @@ textarea {
 
 @media (max-width: 560px) {
   .brand-block {
+    display: grid;
+  }
+
+  .brand-identity {
     grid-template-columns: 42px 1fr;
+  }
+
+  .brand-user-switcher {
+    width: 100%;
   }
 
   .brand-mark {

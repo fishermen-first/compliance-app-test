@@ -189,12 +189,6 @@ function canUpdateStatus() {
   return Boolean(currentUser()?.canUpdateStatus);
 }
 
-function pageTitle() {
-  if (state.view === "dashboard") return "FF Compliance dashboard";
-  if (state.view === "calendar") return "FF Compliance calendar";
-  return "FF Compliance event list";
-}
-
 function dashboardStats() {
   const openEvents = state.events.filter((event) => event.lifecycle !== "Complete");
   const dueSoonEvents = openEvents.filter((event) => daysUntil(event.dueDate) >= 0 && daysUntil(event.dueDate) <= 30);
@@ -315,11 +309,18 @@ function renderSidebar() {
   return `
     <aside class="sidebar compact-sidebar">
       <div class="brand-block">
-        <div class="brand-mark">AS</div>
-        <div>
-          <p class="eyebrow">FF Compliance</p>
-          <h1>${company.name}</h1>
+        <div class="brand-identity">
+          <div class="brand-mark">AS</div>
+          <div class="brand-copy">
+            <p class="eyebrow">FF Compliance</p>
+            <h1>${company.name}</h1>
+          </div>
         </div>
+        <select class="brand-user-switcher" data-current-user aria-label="Current office user">
+          ${company.officeUsers
+            .map((user) => `<option value="${user.id}" ${selected(state.currentUserId, user.id)}>${user.name}</option>`)
+            .join("")}
+        </select>
       </div>
 
       <nav class="side-nav" aria-label="Main navigation">
@@ -353,10 +354,6 @@ function renderTopbar() {
 
   return `
     <header class="topbar">
-      <div>
-        <p class="eyebrow">Today is Apr 26, 2026</p>
-        <h2>${pageTitle()}</h2>
-      </div>
       <div class="topbar-actions">
         <div class="next-due">
           ${
@@ -379,14 +376,6 @@ function renderTopbar() {
               `
           }
         </div>
-        <label class="user-switcher">
-          <span>Signed in as</span>
-          <select data-current-user>
-            ${company.officeUsers
-              .map((user) => `<option value="${user.id}" ${selected(state.currentUserId, user.id)}>${user.name}</option>`)
-              .join("")}
-          </select>
-        </label>
         <button class="icon-button" type="button" title="Show email queue" data-action="mock-reminders">
           ${icon("mail")}
         </button>
