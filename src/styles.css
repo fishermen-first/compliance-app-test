@@ -369,7 +369,8 @@ svg {
   white-space: nowrap;
 }
 
-.primary-button span {
+.primary-button span,
+.email-queue-button span {
   white-space: nowrap;
 }
 
@@ -1377,6 +1378,7 @@ textarea {
   .user-switcher,
   .next-due,
   .primary-button,
+  .email-queue-button,
   .topbar-actions .icon-button {
     width: 100%;
     min-width: 0;

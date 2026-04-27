@@ -376,8 +376,9 @@ function renderTopbar() {
               `
           }
         </div>
-        <button class="icon-button" type="button" title="Show email queue" data-action="mock-reminders">
+        <button class="ghost-button email-queue-button" type="button" data-action="mock-reminders">
           ${icon("mail")}
+          <span>Email Queue</span>
         </button>
         <button class="primary-button" type="button" data-action="new-event">
           ${icon("plus")}
