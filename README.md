@@ -1,20 +1,36 @@
-# Arctic Storm FF Compliance Mockup
+# FF Compliance
 
-Static front-end prototype for FF Compliance, a compliance workflow app for smaller fishing companies. Open `index.html` in a browser to use it.
+Production app for FF Compliance, a maritime compliance workflow system for fishing companies.
 
-## What is mocked
+## Current state
 
-- Calendar and list views for audits, inspections, permits, reports, and training
-- Fake vessels/sites, office users, event owners, due dates, statuses, documents, and notes
-- Reminder schedules such as 30, 14, 7, and 1 day before the due date
-- Email queue preview
-- Default reminder rules by event type
-- New event form with in-memory mock save
+This repo has been converted from the static prototype into a Next.js + TypeScript app. The original static mockup is preserved in `/mockup` for reference.
 
-## Backend questions this helps surface
+## Stack
 
-- Should reminder rules live globally, by event type, or per event?
-- Do reminders go to users, free-form emails, role groups, or all three?
-- Do events need recurrence, attachments, approval status, and audit history?
-- Should email delivery status be stored per recipient and per reminder?
-- Who can create, edit, complete, or archive compliance events?
+- Next.js + TypeScript
+- Supabase for auth, database, row-level security, and future storage
+- Resend for reminder emails
+- Vercel for hosting and scheduled jobs
+
+## Local setup
+
+```bash
+npm install
+npm run dev
+```
+
+Copy `.env.example` to `.env.local` when Supabase and Resend keys are ready.
+
+## MVP scope
+
+- Companies and roles
+- Vessels and vessel contacts
+- Compliance events with lifecycle statuses
+- Recurrence and reminder rules
+- Email queue and audit trail
+- SharePoint link tracking for documents
+
+## Prototype
+
+The static proof of concept remains available at `/mockup/index.html`.
