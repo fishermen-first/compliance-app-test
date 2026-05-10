@@ -1699,7 +1699,17 @@ svg {
 }
 
 .owner-mapping-list-admin .owner-mapping-form {
-  grid-column: 3 / -1;
+  display: contents;
+}
+
+.owner-mapping-list-admin .owner-mapping-form input {
+  grid-column: 3;
+}
+
+.owner-mapping-list-admin .owner-mapping-form button {
+  grid-column: 4;
+  width: 100%;
+  padding: 0;
 }
 
 .owner-mapping-form input {
@@ -3078,8 +3088,9 @@ svg {
     display: none;
   }
 
-  .owner-mapping-list-admin .owner-mapping-form {
-    grid-column: auto;
+  .owner-mapping-list-admin .owner-mapping-form input,
+  .owner-mapping-list-admin .owner-mapping-form button {
+    grid-column: 1;
   }
 
   .admin-setup-hero {
