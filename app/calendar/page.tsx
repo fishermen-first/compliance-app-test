@@ -92,6 +92,15 @@ export default async function CalendarPage() {
           ) : null}
 
           <div className="agenda-list">
+            {agenda.length > 0 ? (
+              <div className="agenda-table-head" aria-hidden="true">
+                <span>Date type</span>
+                <span>Event date</span>
+                <span>Item</span>
+                <span>Relative</span>
+                <span>Status</span>
+              </div>
+            ) : null}
             {Object.entries(grouped).map(([month, events]) => (
               <section key={month}>
                 <h3>{month}</h3>

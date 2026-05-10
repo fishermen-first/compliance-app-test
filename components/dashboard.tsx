@@ -169,16 +169,7 @@ export function Dashboard({
               </div>
             </div>
 
-            <div className="work-table" role="table" aria-label="Actionable compliance items">
-              <div className="work-table-row queue-table-row work-table-head" role="row">
-                <span>Owner</span>
-                <span>Vessel</span>
-                <span>Item</span>
-                <span>Status</span>
-                <span>Notes</span>
-                <span>Start</span>
-                <span>Expiration</span>
-              </div>
+            <div className="queue-list" aria-label="Actionable compliance items">
               {actionableItems.length === 0 ? (
                 <div className="empty-state">
                   <CheckCircle2 aria-hidden="true" />
@@ -186,14 +177,29 @@ export function Dashboard({
                   <p>{isUnmappedRegularUser ? 'Your queue will appear after a Customer Admin maps your login to an owner code.' : 'Items will appear here when their start-working date arrives, or when they are in progress, submitted, or overdue.'}</p>
                 </div>
               ) : actionableItems.slice(0, 12).map((item) => (
-                <Link className="work-table-row queue-table-row" href={`/items/${item.id}`} role="row" key={item.id}>
-                  <span>{item.owner_current ?? 'Unassigned'}</span>
-                  <span>{itemVessel(item)}</span>
-                  <strong>{item.item_name}<small>{item.agency_type ?? 'No agency'} · {item.compliance_area ?? 'Other'}</small></strong>
-                  <span className={`status-chip state-${stateClassName(displayState(item))}`}>{displayState(item)}</span>
-                  <span className="notes-cell">{item.status_notes || 'No notes'}</span>
-                  <span>{shortDate(item.start_working_on)}</span>
-                  <span>{shortDate(item.expiration_date)}</span>
+                <Link className="queue-item-row" href={`/items/${item.id}`} key={item.id}>
+                  <div className="queue-item-main">
+                    <div className="queue-item-kicker">
+                      <span>{item.owner_current ?? 'Unassigned'}</span>
+                      <span>{itemVessel(item)}</span>
+                      <span>{item.agency_type ?? 'No agency'} · {item.compliance_area ?? 'Other'}</span>
+                    </div>
+                    <strong>{item.item_name}</strong>
+                    <p>{item.status_notes || 'No notes'}</p>
+                  </div>
+                  <div className="queue-item-side">
+                    <span className={`status-chip state-${stateClassName(displayState(item))}`}>{displayState(item)}</span>
+                    <dl className="queue-item-dates">
+                      <div>
+                        <dt>Start</dt>
+                        <dd>{shortDate(item.start_working_on)}</dd>
+                      </div>
+                      <div>
+                        <dt>Expiration</dt>
+                        <dd>{shortDate(item.expiration_date)}</dd>
+                      </div>
+                    </dl>
+                  </div>
                 </Link>
               ))}
             </div>
