@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { CalendarDays, ClipboardList, Gauge, Mail, ShieldCheck, Settings } from 'lucide-react';
+import { CalendarDays, ClipboardList, Gauge, LogOut, Mail, ShieldCheck, Settings } from 'lucide-react';
+import { signOut } from '@/app/actions/auth';
 
 const navItems = [
   { label: 'Dashboard', icon: Gauge, href: '/' },
@@ -49,6 +50,12 @@ export function AppSidebar({ companyName, userRole, isAppAdmin = false, activePa
           <small>v0.1.0 · connected to Supabase</small>
         </div>
       </div>
+      <form action={signOut}>
+        <button className="sidebar-logout" type="submit">
+          <LogOut aria-hidden="true" />
+          <span>Log out</span>
+        </button>
+      </form>
     </aside>
   );
 }

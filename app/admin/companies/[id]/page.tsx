@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { ArrowLeft, AlertTriangle, ClipboardList, MailWarning, Ship, Users } from 'lucide-react';
+import { signOut } from '@/app/actions/auth';
 import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
@@ -117,6 +118,9 @@ export default async function CompanyAdminPage({ params }: CompanyAdminPageProps
         <div className="admin-rail-footer">
           <span>Support view</span>
           <strong>{company.name}</strong>
+          <form action={signOut}>
+            <button className="admin-logout" type="submit">Log out</button>
+          </form>
         </div>
       </aside>
 

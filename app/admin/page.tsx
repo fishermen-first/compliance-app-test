@@ -10,6 +10,7 @@ import {
   UserPlus,
   Users
 } from 'lucide-react';
+import { signOut } from '@/app/actions/auth';
 import { createInvitation } from '@/app/actions/invitations';
 import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
@@ -169,6 +170,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         <div className="admin-rail-footer">
           <span>Signed in</span>
           <strong>{userData.user.email}</strong>
+          <form action={signOut}>
+            <button className="admin-logout" type="submit">Log out</button>
+          </form>
         </div>
       </aside>
 

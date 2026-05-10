@@ -60,7 +60,7 @@ svg {
   position: sticky;
   top: 0;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr auto auto;
   min-height: 100vh;
   padding: 28px 26px;
   border-right: 1px solid var(--line);
@@ -170,6 +170,27 @@ svg {
 .sidebar-status small {
   margin-top: 6px;
   font-size: 14px;
+}
+
+.sidebar-logout,
+.admin-logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 42px;
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  color: var(--ink);
+  font-weight: 850;
+}
+
+.sidebar-logout:hover {
+  border-color: rgba(18, 120, 109, 0.34);
+  color: var(--teal-dark);
 }
 
 .workspace {
@@ -1219,6 +1240,16 @@ svg {
   min-width: 0;
   overflow-wrap: anywhere;
   font-size: 13px;
+}
+
+.admin-logout {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fffefa;
+}
+
+.admin-logout:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .admin-workspace {
