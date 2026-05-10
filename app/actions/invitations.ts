@@ -5,7 +5,8 @@ import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
-const allowedRoles = ['owner', 'office_admin', 'office_user'] as const;
+const companyRoles = ['owner', 'office_admin', 'office_user'] as const;
+const allowedRoles = ['app_admin', ...companyRoles] as const;
 
 function requiredString(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? '').trim();
@@ -42,13 +43,14 @@ async function provisionAuthUser(email: string) {
 }
 
 export async function createInvitation(formData: FormData) {
-  const companyId = requiredString(formData, 'companyId');
+  const companyId = String(formData.get('companyId') ?? '').trim();
   const email = requiredString(formData, 'email').toLowerCase();
   const role = requiredString(formData, 'role');
   const supabase = createClient();
+  const supabaseAdmin = createAdminClient();
 
   if (!allowedRoles.includes(role as (typeof allowedRoles)[number])) {
-    throw new Error('Invalid role');
+    redirect('/admin?message=Choose%20a%20valid%20role.');
   }
 
   const { data: userData } = await supabase.auth.getUser();
@@ -63,13 +65,36 @@ export async function createInvitation(formData: FormData) {
     throw new Error('Only FF admins can invite demo users right now.');
   }
 
-  const { error } = await supabase
+  if (role === 'app_admin') {
+    const { error } = await supabaseAdmin
+      .from('app_admins')
+      .upsert({ email }, { onConflict: 'email' });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const authUserStatus = await provisionAuthUser(email);
+
+    revalidatePath('/admin');
+    const message =
+      authUserStatus === 'created'
+        ? 'FF admin created. User can request a login link.'
+        : 'FF admin saved. Existing user can request a login link.';
+    redirect(`/admin?message=${encodeURIComponent(message)}`);
+  }
+
+  if (!companyId) {
+    redirect('/admin?message=Choose%20a%20company%20for%20company%20roles.');
+  }
+
+  const { error } = await supabaseAdmin
     .from('company_invitations')
     .upsert(
       {
         company_id: companyId,
         email,
-        role,
+        role: role as (typeof companyRoles)[number],
         accepted_at: null
       },
       { onConflict: 'company_id,email' }

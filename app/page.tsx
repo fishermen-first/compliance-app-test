@@ -3,7 +3,6 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { AuthScreen } from '@/components/auth-screen';
 import { Dashboard } from '@/components/dashboard';
 import { NoAccessScreen } from '@/components/no-access-screen';
-import { WorkspaceSetup } from '@/components/workspace-setup';
 import { type ComplianceItem } from '@/lib/compliance';
 import { createClient } from '@/lib/supabase/server';
 
@@ -61,6 +60,12 @@ export default async function Home({ searchParams }: HomeProps) {
     return <AuthScreen message={searchParams?.message} />;
   }
 
+  const { data: isAppAdmin } = await supabase.rpc('is_app_admin');
+
+  if (isAppAdmin) {
+    redirect('/admin');
+  }
+
   const { data: membership } = await supabase
     .from('company_memberships')
     .select('company_id, role')
@@ -69,23 +74,16 @@ export default async function Home({ searchParams }: HomeProps) {
     .maybeSingle();
 
   if (!membership) {
-    const [{ data: acceptedCompanyId }, { data: isAppAdmin }] = await Promise.all([
-      supabase.rpc('accept_company_invite', { full_name: userData.user.email?.split('@')[0] ?? 'User' }),
-      supabase.rpc('is_app_admin')
-    ]);
+    const { data: acceptedCompanyId } = await supabase.rpc('accept_company_invite', { full_name: userData.user.email?.split('@')[0] ?? 'User' });
 
     if (acceptedCompanyId) {
       redirect('/');
     }
 
-    if (isAppAdmin) {
-      return <WorkspaceSetup step="company" email={userData.user.email} />;
-    }
-
     return <NoAccessScreen email={userData.user.email} />;
   }
 
-  const [{ data: company }, { data: profile }, { data: rawItems }, { data: isAppAdmin }] = await Promise.all([
+  const [{ data: company }, { data: profile }, { data: rawItems }] = await Promise.all([
     supabase.from('companies').select('name').eq('id', membership.company_id).single(),
     supabase.from('profiles').select('full_name').eq('id', userData.user.id).maybeSingle(),
     supabase
@@ -93,8 +91,7 @@ export default async function Home({ searchParams }: HomeProps) {
       .select('*, vessels(name)')
       .eq('company_id', membership.company_id)
       .order('start_working_on', { ascending: true, nullsFirst: false })
-      .order('expiration_date', { ascending: true, nullsFirst: false }),
-    supabase.rpc('is_app_admin')
+      .order('expiration_date', { ascending: true, nullsFirst: false })
   ]);
 
   const currentUserName = profile?.full_name ?? userData.user.email ?? 'User';
@@ -107,7 +104,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={titleCase(membership.role)} isAppAdmin={Boolean(isAppAdmin)} />
+      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={titleCase(membership.role)} />
       <Dashboard
         companyName={company?.name ?? 'FF Compliance'}
         items={items}
