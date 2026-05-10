@@ -9,3 +9,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.tsbuildinfo
+# Local client source files
+*.xlsx
+*.xls
+*.csv
+tmp/
