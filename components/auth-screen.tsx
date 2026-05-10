@@ -6,13 +6,13 @@ export function AuthScreen({ message }: { message?: string }) {
       <section className="auth-panel">
         <div className="brand-mark">FF</div>
         <p className="eyebrow">FF Compliance</p>
-        <h1>Sign in to your compliance workspace.</h1>
-        <p className="auth-copy">Use a magic link while we build the first production version. No password needed.</p>
+        <h1>Log in to your compliance workspace.</h1>
+        <p className="auth-copy">Only invited users can receive a login link. No password needed.</p>
         {message ? <p className="form-message">{message}</p> : null}
         <form action={signInWithMagicLink} className="auth-form">
           <label htmlFor="email">Email address</label>
           <input id="email" name="email" type="email" placeholder="ops@company.com" required />
-          <button type="submit">Send sign-in link</button>
+          <button type="submit">Send login link</button>
         </form>
       </section>
     </main>

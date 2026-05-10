@@ -15,15 +15,16 @@ export async function signInWithMagicLink(formData: FormData) {
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${env.appBaseUrl}/auth/callback`
+      emailRedirectTo: `${env.appBaseUrl}/auth/callback`,
+      shouldCreateUser: false
     }
   });
 
   if (error) {
-    redirect(`/?message=${encodeURIComponent(error.message)}`);
+    redirect('/?message=This%20email%20is%20not%20invited%20yet.%20Ask%20an%20FF%20admin%20to%20add%20you%20first.');
   }
 
-  redirect('/?message=Check%20your%20email%20for%20the%20sign-in%20link');
+  redirect('/?message=Check%20your%20email%20for%20the%20login%20link');
 }
 
 export async function signOut() {

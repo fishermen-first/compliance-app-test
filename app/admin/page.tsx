@@ -41,7 +41,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         <div className="setup-brand-row"><span className="brand-mark">FF</span><span>FF Compliance</span></div>
         <p className="eyebrow">Admin</p>
         <h1>Invite demo users.</h1>
-        <p>Create access for company admins and office users. Invited users will join the right workspace automatically after magic-link sign-in.</p>
+        <p>Create access for company admins and office users. Invited users receive an auth invite and can then log in by email link.</p>
         {searchParams?.message ? <p className="form-message">{searchParams.message}</p> : null}
 
         <form action={createInvitation} className="event-form-grid">
@@ -71,7 +71,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
           <div className="form-actions wide-field">
             <a className="secondary-link" href="/">Back to dashboard</a>
-            <button type="submit">Save invite</button>
+            <button type="submit">Send invite</button>
           </div>
         </form>
 
