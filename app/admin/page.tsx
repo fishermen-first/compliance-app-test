@@ -1,73 +1,81 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import {
-  AlertTriangle,
-  ArrowUpRight,
-  Building2,
-  ClipboardList,
-  MailWarning,
-  ShieldCheck,
-  UserPlus,
-  Users
-} from 'lucide-react';
+import { ArrowUpRight, Building2, CheckCircle2, ClipboardList, Database, LogOut, UserPlus } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
 import { createCompany } from '@/app/actions/companies';
-import { createInvitation } from '@/app/actions/invitations';
-import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
 type AdminPageProps = {
-  searchParams?: { message?: string; companyId?: string };
+  searchParams?: { message?: string };
 };
 
-type CompanyHealth = {
+type CompanySetup = {
   id: string;
   name: string;
   vessels: number;
-  customerUsers: number;
+  users: number;
   totalItems: number;
-  openItems: number;
-  overdueItems: number;
-  dueSoonItems: number;
-  reminderRules: number;
   ownerCodes: number;
+  mappedOwnerCodes: number;
   pendingInvites: number;
-  failedEmails: number;
 };
-
-function formatDate(value?: string | null) {
-  if (!value) return 'Not set';
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
-}
-
-function isOpenItem(status: string) {
-  return status !== 'complete' && status !== 'discontinued';
-}
 
 function relation<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] : value;
-}
-
-function companyName(row: any) {
-  return relation(row.companies)?.name ?? 'Unknown company';
-}
-
-function profileName(row: any) {
-  const profile = relation(row.profiles);
-  return profile?.full_name ?? profile?.email ?? 'Unknown user';
 }
 
 function profileEmail(row: any) {
   return relation(row.profiles)?.email ?? 'Profile pending';
 }
 
-function setupStatus(company: CompanyHealth) {
-  const hasData = company.totalItems > 0 || company.vessels > 0 || company.reminderRules > 0;
+function setupStage(company: CompanySetup) {
+  if (company.totalItems === 0 && company.vessels === 0) {
+    return {
+      label: 'Workspace created',
+      detail: 'Import the customer workbook next.',
+      action: 'Import workbook',
+      href: `/admin/companies/${company.id}#import`,
+      tone: 'blocked'
+    };
+  }
 
-  if (hasData && company.customerUsers === 0) return 'Data loaded, no users';
-  if (!hasData && company.customerUsers === 0) return 'Empty workspace';
-  if (!hasData && company.customerUsers > 0) return 'Users invited, setup needed';
-  return 'Active workspace';
+  if (company.ownerCodes === 0) {
+    return {
+      label: 'Data needs review',
+      detail: 'No owner codes were detected yet.',
+      action: 'Review import',
+      href: `/admin/companies/${company.id}#import`,
+      tone: 'blocked'
+    };
+  }
+
+  if (company.mappedOwnerCodes < company.ownerCodes) {
+    return {
+      label: 'Map owners',
+      detail: `${company.ownerCodes - company.mappedOwnerCodes} owner codes still unmapped.`,
+      action: 'Map owners',
+      href: `/admin/companies/${company.id}#mapping`,
+      tone: 'attention'
+    };
+  }
+
+  if (company.users === 0 && company.pendingInvites === 0) {
+    return {
+      label: 'Ready for invites',
+      detail: 'Owner mapping is ready. Invite the customer team.',
+      action: 'Invite users',
+      href: `/admin/companies/${company.id}#access`,
+      tone: 'ready'
+    };
+  }
+
+  return {
+    label: 'Customer access started',
+    detail: `${company.users} active users · ${company.pendingInvites} pending invites.`,
+    action: 'View workspace',
+    href: `/admin/companies/${company.id}`,
+    tone: 'ready'
+  };
 }
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
@@ -84,11 +92,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     redirect('/');
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const twoWeeksFromNow = new Date(today);
-  twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
-
   const [
     { data: companies },
     { data: memberships },
@@ -96,196 +99,169 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     { data: appAdmins },
     { data: vessels },
     { data: items },
-	    { data: reminderRules },
-	    { data: ownerCodes },
-	    { data: reminderLogs },
-	    { data: emailQueue }
+    { data: ownerCodes }
   ] = await Promise.all([
-    supabase.from('companies').select('id, name, timezone, created_at').order('name'),
+    supabase.from('companies').select('id, name, timezone, created_at').order('created_at', { ascending: true }),
     supabase
       .from('company_memberships')
-      .select('company_id, user_id, role, created_at, profiles(email, full_name), companies(name)')
+      .select('company_id, user_id, role, created_at, profiles(email, full_name)')
       .order('created_at', { ascending: false }),
     supabase
       .from('company_invitations')
-      .select('email, role, accepted_at, created_at, company_id, companies(name)')
-      .order('created_at', { ascending: false })
-      .limit(40),
-    supabase.from('app_admins').select('email, created_at').order('created_at', { ascending: false }),
+      .select('email, role, accepted_at, created_at, company_id')
+      .order('created_at', { ascending: false }),
+    supabase.from('app_admins').select('email, created_at'),
     supabase.from('vessels').select('id, company_id, active'),
-    supabase
-      .from('compliance_items')
-      .select('id, company_id, item_name, owner_current, expiration_date, start_working_on, status, companies(name), vessels(name)')
-      .order('expiration_date', { ascending: true, nullsFirst: false })
-      .limit(400),
-    supabase.from('compliance_item_reminder_rules').select('id, company_id'),
-    supabase.from('company_owner_codes').select('id, company_id'),
-    supabase
-      .from('reminder_send_log')
-      .select('company_id, recipient_email, subject, status, scheduled_for, sent_at, failure_reason, companies(name)')
-      .order('created_at', { ascending: false })
-      .limit(75),
-    supabase
-      .from('email_queue')
-      .select('company_id, recipient_email, subject, status, scheduled_for, failure_reason, companies(name)')
-      .order('created_at', { ascending: false })
-      .limit(75)
+    supabase.from('compliance_items').select('id, company_id'),
+    supabase.from('company_owner_codes').select('id, company_id, user_id, pending_email')
   ]);
 
   const companyRows = companies ?? [];
-  const membershipRows = memberships ?? [];
-  const invitationRows = invitations ?? [];
-  const appAdminRows = appAdmins ?? [];
-  const vesselRows = vessels ?? [];
-  const itemRows = items ?? [];
-  const reminderRuleRows = reminderRules ?? [];
-  const ownerCodeRows = ownerCodes ?? [];
-  const appAdminEmailSet = new Set(appAdminRows.map((admin) => admin.email.toLowerCase()));
-  const customerMembershipRows = membershipRows.filter((membership) => !appAdminEmailSet.has(profileEmail(membership).toLowerCase()));
-  const message = searchParams?.message;
-  const pendingInvites = invitationRows.filter((invite) => !invite.accepted_at);
-  const openItems = itemRows.filter((item) => isOpenItem(item.status));
-  const overdueItems = openItems.filter((item) => item.expiration_date && new Date(item.expiration_date) < today);
-  const dueSoonItems = openItems.filter((item) => {
-    if (!item.expiration_date) return false;
-    const date = new Date(item.expiration_date);
-    return date >= today && date <= twoWeeksFromNow;
-  });
-  const emailRows = [...(reminderLogs ?? []), ...(emailQueue ?? [])];
-  const failedEmails = emailRows.filter((row) => row.status === 'failed');
-  const queuedEmails = emailRows.filter((row) => ['queued', 'scheduled'].includes(row.status));
+  const appAdminEmailSet = new Set((appAdmins ?? []).map((admin) => admin.email.toLowerCase()));
+  const customerMembershipRows = (memberships ?? []).filter((membership) => !appAdminEmailSet.has(profileEmail(membership).toLowerCase()));
+  const pendingInvites = (invitations ?? []).filter((invite) => !invite.accepted_at);
 
-  const companyHealth: CompanyHealth[] = companyRows.map((company) => {
-    const companyItems = openItems.filter((item) => item.company_id === company.id);
+  const companySetup: CompanySetup[] = companyRows.map((company) => {
+    const companyOwnerCodes = (ownerCodes ?? []).filter((owner) => owner.company_id === company.id);
     return {
       id: company.id,
       name: company.name,
-      vessels: vesselRows.filter((vessel) => vessel.company_id === company.id && vessel.active).length,
-      customerUsers: customerMembershipRows.filter((membership) => membership.company_id === company.id).length,
-      totalItems: itemRows.filter((item) => item.company_id === company.id).length,
-      openItems: companyItems.length,
-      overdueItems: companyItems.filter((item) => item.expiration_date && new Date(item.expiration_date) < today).length,
-      dueSoonItems: companyItems.filter((item) => {
-        if (!item.expiration_date) return false;
-        const date = new Date(item.expiration_date);
-        return date >= today && date <= twoWeeksFromNow;
-      }).length,
-      reminderRules: reminderRuleRows.filter((rule) => rule.company_id === company.id).length,
-      ownerCodes: ownerCodeRows.filter((owner) => owner.company_id === company.id).length,
-      pendingInvites: pendingInvites.filter((invite) => invite.company_id === company.id).length,
-      failedEmails: failedEmails.filter((row) => row.company_id === company.id).length
+      vessels: (vessels ?? []).filter((vessel) => vessel.company_id === company.id && vessel.active).length,
+      users: customerMembershipRows.filter((membership) => membership.company_id === company.id).length,
+      totalItems: (items ?? []).filter((item) => item.company_id === company.id).length,
+      ownerCodes: companyOwnerCodes.length,
+      mappedOwnerCodes: companyOwnerCodes.filter((owner) => owner.user_id || owner.pending_email).length,
+      pendingInvites: pendingInvites.filter((invite) => invite.company_id === company.id).length
     };
   });
-  const attentionCompanies = companyHealth.filter((company) => company.overdueItems > 0 || company.failedEmails > 0);
-  const recentCustomerUsers = customerMembershipRows.slice(0, 10);
-  const urgentItems = [...overdueItems, ...dueSoonItems].slice(0, 8);
+
+  const blockedCount = companySetup.filter((company) => setupStage(company).tone === 'blocked').length;
+  const readyCount = companySetup.filter((company) => setupStage(company).label === 'Ready for invites').length;
+  const nextCompany = companySetup.find((company) => setupStage(company).tone !== 'ready') ?? companySetup[0];
+  const nextStage = nextCompany ? setupStage(nextCompany) : null;
 
   return (
-    <main className="admin-console">
+    <main className="admin-console admin-setup-console">
       <aside className="admin-rail">
         <div className="admin-mark">FF</div>
-        <nav className="admin-rail-nav" aria-label="Admin console sections">
-          <a href="#companies"><Building2 aria-hidden="true" /><span>Companies</span></a>
-          <a href="#setup"><ClipboardList aria-hidden="true" /><span>Setup</span></a>
-          <a href="#access"><Users aria-hidden="true" /><span>Access</span></a>
-          <a href="#health"><MailWarning aria-hidden="true" /><span>Health</span></a>
+        <nav className="admin-rail-nav" aria-label="Admin setup sections">
+          <a href="#workspaces"><Building2 aria-hidden="true" /><span>Workspaces</span></a>
+          <a href="#new-workspace"><ClipboardList aria-hidden="true" /><span>New setup</span></a>
         </nav>
         <div className="admin-rail-footer">
           <span>Signed in</span>
           <strong>{userData.user.email}</strong>
           <form action={signOut}>
-            <button className="admin-logout" type="submit">Log out</button>
+            <button className="admin-logout" type="submit"><LogOut aria-hidden="true" /> Log out</button>
           </form>
         </div>
       </aside>
 
       <section className="admin-workspace">
-        <header className="admin-topbar">
+        <header className="admin-topbar admin-setup-topbar">
           <div>
-            <p className="eyebrow">Internal operations</p>
-            <h1>FF Admin Console</h1>
+            <p className="eyebrow">Private FF workspace</p>
+            <h1>Customer setup</h1>
           </div>
-          <span className="admin-subtle-pill">FF Admin</span>
+          <span className="admin-subtle-pill">Solo admin</span>
         </header>
 
-        {message ? <p className="form-message admin-message">{message}</p> : null}
+        {searchParams?.message ? <p className="form-message admin-message">{searchParams.message}</p> : null}
 
-        <section className="admin-stat-grid" aria-label="Platform summary">
+        <section className="admin-setup-hero" aria-label="Setup overview">
+          <div>
+            <span>Next action</span>
+            <h2>{nextCompany && nextStage ? `${nextStage.action} for ${nextCompany.name}` : 'Create your first customer workspace'}</h2>
+            <p>{nextStage?.detail ?? 'Start with the customer name, then import the compliance workbook before inviting anyone.'}</p>
+          </div>
+          {nextCompany && nextStage ? (
+            <Link href={nextStage.href}>
+              {nextStage.action}
+              <ArrowUpRight aria-hidden="true" />
+            </Link>
+          ) : (
+            <a href="#new-workspace">Create workspace</a>
+          )}
+        </section>
+
+        <section className="admin-setup-summary" aria-label="Customer setup summary">
           <article>
-            <Building2 aria-hidden="true" />
-            <span>Workspaces</span>
-            <strong>{companyRows.length}</strong>
-            <p>{attentionCompanies.length} need attention</p>
+            <span>Customer workspaces</span>
+            <strong>{companySetup.length}</strong>
           </article>
           <article>
-            <Users aria-hidden="true" />
-            <span>Customer users</span>
-            <strong>{customerMembershipRows.length}</strong>
-            <p>{pendingInvites.length} pending invites</p>
+            <span>Blocked setup</span>
+            <strong>{blockedCount}</strong>
           </article>
           <article>
-            <ClipboardList aria-hidden="true" />
-            <span>Open items</span>
-            <strong>{openItems.length}</strong>
-            <p>{overdueItems.length} overdue · {dueSoonItems.length} due soon</p>
+            <span>Ready for invites</span>
+            <strong>{readyCount}</strong>
           </article>
           <article>
-            <ShieldCheck aria-hidden="true" />
-            <span>FF admins</span>
-            <strong>{appAdminRows.length}</strong>
-            <p>{failedEmails.length} failed emails · {queuedEmails.length} queued</p>
+            <span>Pending customer invites</span>
+            <strong>{pendingInvites.length}</strong>
           </article>
         </section>
 
-        <section className="admin-grid-main">
-          <section className="panel admin-panel" id="companies">
+        <section className="admin-grid-main admin-onboarding-grid">
+          <section className="panel admin-panel" id="workspaces">
             <div className="admin-panel-heading">
               <div>
-                <span>Companies</span>
-                <h2>Customer workspaces</h2>
+                <span>Customer workspaces</span>
+                <h2>Setup status</h2>
               </div>
             </div>
-            <div className="admin-company-list">
-              {companyHealth.map((company) => (
-                <article key={company.id}>
-                  <div className="admin-company-name">
-                    <div>
-                      <strong>{company.name}</strong>
-                    </div>
-                    <span className={company.overdueItems || company.failedEmails ? 'risk-chip risk-chip-hot' : 'risk-chip'}>
-                      {company.overdueItems || company.failedEmails ? 'Attention' : 'Normal'}
-                    </span>
-                  </div>
-                  <div className="admin-company-metrics">
-                    <span className="admin-company-metric">{setupStatus(company)}</span>
-                    <span className="admin-company-metric">{company.customerUsers} users</span>
-                    <span className="admin-company-metric">{company.totalItems} items</span>
-                    <span className="admin-company-metric">{company.reminderRules} reminders</span>
-                  </div>
-                  <div className="admin-row-actions">
-                    <Link href={`/admin/companies/${company.id}`}>
-                      View workspace
-                      <ArrowUpRight aria-hidden="true" />
-                    </Link>
-                  </div>
-                </article>
-              ))}
-            </div>
+            {companySetup.length === 0 ? (
+              <div className="admin-empty-state">
+                <Building2 aria-hidden="true" />
+                <h3>No customer workspaces yet</h3>
+                <p>Create the customer workspace first. After that, the detail page will walk you through import, owner mapping, and invites.</p>
+                <a href="#new-workspace">Create customer workspace</a>
+              </div>
+            ) : (
+              <div className="admin-workspace-list">
+                {companySetup.map((company) => {
+                  const stage = setupStage(company);
+                  return (
+                    <article key={company.id}>
+                      <div className="admin-workspace-primary">
+                        <strong>{company.name}</strong>
+                        <span className={`setup-chip setup-chip-${stage.tone}`}>{stage.label}</span>
+                      </div>
+                      <div className="admin-workspace-checks" aria-label={`${company.name} setup checks`}>
+                        <span className={company.totalItems > 0 ? 'complete' : ''}><Database aria-hidden="true" /> {company.totalItems} items</span>
+                        <span className={company.ownerCodes > 0 && company.mappedOwnerCodes === company.ownerCodes ? 'complete' : ''}>
+                          <CheckCircle2 aria-hidden="true" /> {company.mappedOwnerCodes}/{company.ownerCodes} owners mapped
+                        </span>
+                        <span className={company.users > 0 || company.pendingInvites > 0 ? 'complete' : ''}>
+                          <UserPlus aria-hidden="true" /> {company.users} users · {company.pendingInvites} pending
+                        </span>
+                      </div>
+                      <p>{stage.detail}</p>
+                      <Link href={stage.href}>
+                        {stage.action}
+                        <ArrowUpRight aria-hidden="true" />
+                      </Link>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
-          <div className="admin-side-stack">
+          <aside className="admin-side-stack" id="new-workspace">
             <section className="panel admin-panel">
               <div className="admin-panel-heading">
                 <div>
-                  <span>New company</span>
+                  <span>Start here</span>
                   <h2>Create workspace</h2>
                 </div>
                 <Building2 aria-hidden="true" />
               </div>
               <form action={createCompany} className="admin-role-form">
                 <label>
-                  Company name
-                  <input name="companyName" placeholder="Company name" required />
+                  Customer company name
+                  <input name="companyName" placeholder="Arctic Storm Management Group" required />
                 </label>
                 <label className="wide-admin-field">
                   Timezone
@@ -295,162 +271,26 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     <option value="America/New_York">Eastern Time</option>
                   </select>
                 </label>
-                <button type="submit">Create company</button>
+                <button type="submit">Create customer workspace</button>
               </form>
             </section>
 
-            <section className="panel admin-panel" id="access">
+            <section className="panel admin-panel admin-personal-note">
               <div className="admin-panel-heading">
                 <div>
-                  <span>Access</span>
-                  <h2>Invite after owner mapping</h2>
+                  <span>Workflow</span>
+                  <h2>Order matters</h2>
                 </div>
-                <UserPlus aria-hidden="true" />
               </div>
-              <p className="admin-flow-note">Use this after company creation, data import, and owner-code mapping. Optional owner codes can be comma-separated.</p>
-              <form action={createInvitation} className="admin-role-form">
-                <label>
-                  Email
-                  <input name="email" type="email" placeholder="name@company.com" required />
-                </label>
-                <label>
-                  Role
-                  <select name="role" defaultValue="office_user">
-                    <option value="owner">Customer Admin</option>
-                    <option value="office_admin">Office Admin</option>
-                    <option value="office_user">Office User</option>
-                    <option value="app_admin">FF Admin</option>
-                  </select>
-                </label>
-                <label>
-                  Company
-                  <select name="companyId" defaultValue={searchParams?.companyId ?? ''}>
-                    <option value="">FF admin only</option>
-                    {companyRows.map((company) => (
-                      <option value={company.id} key={company.id}>{company.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="wide-admin-field">
-                  Owner codes
-                  <input name="ownerCodes" placeholder="ES, SN/BJ" />
-                </label>
-                <button type="submit">Save access</button>
-              </form>
+              <ol>
+                <li>Create the customer workspace.</li>
+                <li>Import the workbook they sent.</li>
+                <li>Review detected vessels, items, and owner codes.</li>
+                <li>Map owner codes to real users.</li>
+                <li>Invite the customer only after mapping is ready.</li>
+              </ol>
             </section>
-          </div>
-        </section>
-
-        <section className="panel admin-panel" id="setup">
-          <div className="admin-panel-heading">
-            <div>
-              <span>Company setup</span>
-              <h2>Where each workspace stands</h2>
-            </div>
-          </div>
-          <div className="admin-setup-list">
-            {companyHealth.map((company) => (
-              <article key={company.id}>
-                <div>
-                  <strong>{company.name}</strong>
-                  <span>{setupStatus(company)}</span>
-                </div>
-                <span>{company.vessels} vessels</span>
-                <span>{company.totalItems} imported items</span>
-                <span>{company.ownerCodes} owner codes</span>
-                <Link href={`/admin/companies/${company.id}`}>View workspace</Link>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="admin-grid-secondary" id="health">
-          <section className="panel admin-panel">
-            <div className="admin-panel-heading">
-              <div>
-                <span>Customer users</span>
-                <h2>Recent memberships</h2>
-              </div>
-            </div>
-            <div className="admin-user-table">
-              {recentCustomerUsers.map((membership) => (
-                <article key={`${membership.user_id}-${membership.company_id}`}>
-                  <div>
-                    <strong>{profileName(membership)}</strong>
-                    <span>{profileEmail(membership)}</span>
-                  </div>
-                  <span>{accessRoleLabel(membership.role)}</span>
-                  <span>{companyName(membership)}</span>
-                </article>
-              ))}
-              {recentCustomerUsers.length === 0 ? <p className="muted-panel-copy">No customer memberships yet.</p> : null}
-            </div>
-          </section>
-
-          <section className="panel admin-panel">
-            <div className="admin-panel-heading">
-              <div>
-                <span>Internal admins</span>
-                <h2>FF access</h2>
-              </div>
-            </div>
-            <div className="admin-admin-list">
-              {appAdminRows.map((admin) => (
-                <article key={admin.email}>
-                  <ShieldCheck aria-hidden="true" />
-                  <div>
-                    <strong>{admin.email}</strong>
-                    <span>{formatDate(admin.created_at)}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="panel admin-panel">
-            <div className="admin-panel-heading">
-              <div>
-                <span>Compliance health</span>
-                <h2>Near-term risk</h2>
-              </div>
-            </div>
-            <div className="admin-risk-list">
-              {urgentItems.map((item) => (
-                <article key={item.id}>
-                  <AlertTriangle aria-hidden="true" />
-                  <div>
-                    <strong>{item.item_name}</strong>
-                    <span>{companyName(item)} · {item.owner_current ?? 'Unassigned'} · {formatDate(item.expiration_date)}</span>
-                  </div>
-                  <span className={item.expiration_date && new Date(item.expiration_date) < today ? 'risk-chip risk-chip-hot' : 'risk-chip'}>
-                    {item.expiration_date && new Date(item.expiration_date) < today ? 'Overdue' : 'Due soon'}
-                  </span>
-                </article>
-              ))}
-              {urgentItems.length === 0 ? <p className="muted-panel-copy">No overdue or near-term items.</p> : null}
-            </div>
-          </section>
-
-          <section className="panel admin-panel">
-            <div className="admin-panel-heading">
-              <div>
-                <span>Invites</span>
-                <h2>Pending access</h2>
-              </div>
-            </div>
-            <div className="admin-invite-list">
-              {pendingInvites.slice(0, 10).map((invite) => (
-                <article key={`${invite.email}-${invite.company_id}`}>
-                  <div>
-                    <strong>{invite.email}</strong>
-                    <span>{accessRoleLabel(invite.role)} · {companyName(invite)}</span>
-                  </div>
-                  <span>{formatDate(invite.created_at)}</span>
-                </article>
-              ))}
-              {pendingInvites.length === 0 ? <p className="muted-panel-copy">No pending invitations.</p> : null}
-            </div>
-          </section>
+          </aside>
         </section>
       </section>
     </main>

@@ -44,7 +44,7 @@ export async function createCompany(formData: FormData) {
   }
 
   if (existing) {
-    redirect(`/admin?companyId=${existing.id}&message=${encodeURIComponent(`${existing.name} already exists.`)}#companies`);
+    redirect(`/admin/companies/${existing.id}?message=${encodeURIComponent(`${existing.name} already exists.`)}`);
   }
 
   const { data: company, error } = await admin
@@ -58,5 +58,5 @@ export async function createCompany(formData: FormData) {
   }
 
   revalidatePath('/admin');
-  redirect(`/admin?companyId=${company.id}&message=${encodeURIComponent('Company created. Add setup data before inviting customer users.')}#companies`);
+  redirect(`/admin/companies/${company.id}?message=${encodeURIComponent('Workspace created. Import the compliance workbook next.')}#import`);
 }

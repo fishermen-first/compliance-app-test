@@ -42,13 +42,21 @@ async function provisionAuthUser(email: string) {
   throw new Error(`Invitation saved, but Supabase could not provision the auth user: ${error.message}`);
 }
 
-function parseOwnerCodes(value: FormDataEntryValue | null) {
+function parseOwnerCodes(formData: FormData) {
+  const values = formData.getAll('ownerCodes');
   return Array.from(new Set(
-    String(value ?? '')
-      .split(',')
+    values
+      .flatMap((value) => String(value ?? '').split(','))
       .map((code) => code.trim())
       .filter(Boolean)
   ));
+}
+
+function safeRedirectPath(value: FormDataEntryValue | null) {
+  const path = String(value ?? '').trim();
+  if (path === '/admin') return path;
+  if (/^\/admin\/companies\/[0-9a-f-]+$/i.test(path)) return path;
+  return '/admin';
 }
 
 async function assignPendingOwnerCodes(companyId: string, email: string, ownerCodes: string[]) {
@@ -110,7 +118,8 @@ export async function createInvitation(formData: FormData) {
   const companyId = String(formData.get('companyId') ?? '').trim();
   const email = requiredString(formData, 'email').toLowerCase();
   const role = requiredString(formData, 'role');
-  const ownerCodes = parseOwnerCodes(formData.get('ownerCodes'));
+  const ownerCodes = parseOwnerCodes(formData);
+  const redirectTo = safeRedirectPath(formData.get('redirectTo'));
   const supabase = createClient();
   const supabaseAdmin = createAdminClient();
 
@@ -178,5 +187,5 @@ export async function createInvitation(formData: FormData) {
     authUserStatus === 'created'
       ? 'Invitation saved. User can request a login link.'
       : 'Invitation saved. Existing user can request a login link.';
-  redirect(`/admin?message=${encodeURIComponent(message)}`);
+  redirect(`${redirectTo}?message=${encodeURIComponent(message)}#access`);
 }

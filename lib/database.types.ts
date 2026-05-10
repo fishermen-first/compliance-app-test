@@ -928,6 +928,14 @@ export type Database = {
         Args: { target_company_id: string }
         Returns: boolean
       }
+      import_compliance_workbook_records: {
+        Args: {
+          records: Json
+          target_company_id: string
+          target_sheet: string
+        }
+        Returns: number
+      }
       save_initial_vessels: {
         Args: { vessel_names: string[] }
         Returns: undefined
