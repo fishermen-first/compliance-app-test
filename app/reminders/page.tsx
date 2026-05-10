@@ -37,6 +37,7 @@ export default async function RemindersPage() {
       .eq('company_id', membership.company_id),
     supabase.rpc('is_app_admin')
   ]);
+  const canManageReminders = ['owner', 'office_admin'].includes(membership.role);
 
   return (
     <div className="app-shell">
@@ -48,15 +49,24 @@ export default async function RemindersPage() {
             <h1>Email reminder queue</h1>
             <p>Queue due owner/additional-recipient reminders, then send scheduled emails through Resend.</p>
           </div>
-          <div className="header-action-row">
-            <form action={queueTodaysReminders}>
-              <button className="secondary-action" type="submit">Queue today</button>
-            </form>
-            <form action={sendQueuedReminders}>
-              <button className="primary-action" type="submit">Send queued</button>
-            </form>
-          </div>
+          {canManageReminders ? (
+            <div className="header-action-row">
+              <form action={queueTodaysReminders}>
+                <button className="secondary-action" type="submit">Queue today</button>
+              </form>
+              <form action={sendQueuedReminders}>
+                <button className="primary-action" type="submit">Send queued</button>
+              </form>
+            </div>
+          ) : null}
         </header>
+
+        {!canManageReminders ? (
+          <section className="owner-notice-panel setup-warning-panel">
+            <strong>Read only</strong>
+            <span>Customer Admins manage reminder scheduling for this workspace.</span>
+          </section>
+        ) : null}
 
         <section className="metric-strip" aria-label="Reminder summary">
           <article>

@@ -16,11 +16,91 @@ function requiredString(formData: FormData, name: string) {
   return value;
 }
 
-async function requireMembership() {
+function checkboxValue(formData: FormData, name: string) {
+  return formData.get(name) === 'on';
+}
+
+function optionalInteger(formData: FormData, name: string) {
+  const value = optionalString(formData, name);
+  if (!value) return null;
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) throw new Error(`${name} must be a whole number`);
+  return parsed;
+}
+
+function requireEmail(value: string) {
+  const email = value.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error(`Invalid recipient email: ${value}`);
+  }
+  return email;
+}
+
+function addRecipient(recipients: Map<string, { recipient_name: string | null; recipient_email: string }>, name: string | null, email: string) {
+  const recipientEmail = requireEmail(email);
+  if (!recipients.has(recipientEmail)) {
+    recipients.set(recipientEmail, {
+      recipient_name: name?.trim() || null,
+      recipient_email: recipientEmail
+    });
+  }
+}
+
+function parseAdditionalRecipients(formData: FormData) {
+  const recipients = new Map<string, { recipient_name: string | null; recipient_email: string }>();
+  const names = formData.getAll('additionalRecipientName');
+  const emails = formData.getAll('additionalRecipientEmail');
+  const rowCount = Math.max(names.length, emails.length);
+
+  for (let index = 0; index < rowCount; index += 1) {
+    const name = String(names[index] ?? '').trim();
+    const email = String(emails[index] ?? '').trim();
+
+    if (!name && !email) continue;
+    if (!email) throw new Error('Additional recipient email is required when a name is provided');
+
+    addRecipient(recipients, name, email);
+  }
+
+  const bulkRecipients = optionalString(formData, 'additionalRecipients');
+  if (bulkRecipients) {
+    for (const line of bulkRecipients.split(/\r?\n/)) {
+      const value = line.trim();
+      if (!value) continue;
+
+      const match = value.match(/^(.*?)<([^<>]+)>$/);
+      if (match) {
+        addRecipient(recipients, match[1].trim(), match[2].trim());
+      } else {
+        addRecipient(recipients, null, value);
+      }
+    }
+  }
+
+  return Array.from(recipients.values());
+}
+
+function itemPathPrefix(formData: FormData) {
+  const value = optionalString(formData, 'itemPathPrefix');
+  if (value === '/items' || value?.startsWith('/admin/companies/')) return value;
+  return '/items';
+}
+
+function itemDetailPath(formData: FormData, itemId: string) {
+  return `${itemPathPrefix(formData)}/${itemId}`;
+}
+
+async function requireMembership(options: { allowAppAdmin?: boolean } = {}) {
   const supabase = createClient();
   const { data: userData } = await supabase.auth.getUser();
 
   if (!userData.user) redirect('/');
+
+  if (options.allowAppAdmin) {
+    const { data: isAppAdmin } = await supabase.rpc('is_app_admin');
+    if (isAppAdmin) return { supabase, membership: null };
+  }
 
   const { data: membership } = await supabase
     .from('company_memberships')
@@ -38,6 +118,7 @@ async function requireMembership() {
 
 export async function createComplianceItem(formData: FormData) {
   const { supabase, membership } = await requireMembership();
+  if (!membership) redirect('/');
   const ownerRaw = optionalString(formData, 'ownerRaw');
   const frequencyLabel = optionalString(formData, 'frequencyLabel');
   const recurrence = inferRecurrence(frequencyLabel);
@@ -72,7 +153,7 @@ export async function updateComplianceItemStatus(formData: FormData) {
   const itemId = requiredString(formData, 'itemId');
   const status = requiredString(formData, 'status');
   const notes = optionalString(formData, 'notes');
-  const { supabase } = await requireMembership();
+  const { supabase } = await requireMembership({ allowAppAdmin: true });
 
   const { error } = await supabase.rpc('update_compliance_item_status', {
     target_item_id: itemId,
@@ -85,11 +166,13 @@ export async function updateComplianceItemStatus(formData: FormData) {
   revalidatePath('/');
   revalidatePath('/items');
   revalidatePath(`/items/${itemId}`);
+  revalidatePath(itemDetailPath(formData, itemId));
+  redirect(itemDetailPath(formData, itemId));
 }
 
 export async function completeComplianceItem(formData: FormData) {
   const itemId = requiredString(formData, 'itemId');
-  const { supabase } = await requireMembership();
+  const { supabase } = await requireMembership({ allowAppAdmin: true });
   const shouldCreateNext = formData.get('createNext') === 'on';
 
   const { data: newItemId, error } = await supabase.rpc('complete_compliance_item', {
@@ -106,7 +189,49 @@ export async function completeComplianceItem(formData: FormData) {
   revalidatePath('/');
   revalidatePath('/items');
   revalidatePath(`/items/${itemId}`);
+  revalidatePath(itemDetailPath(formData, itemId));
 
-  if (newItemId) redirect(`/items/${newItemId}`);
-  redirect(`/items/${itemId}`);
+  if (newItemId) redirect(itemDetailPath(formData, newItemId));
+  redirect(itemDetailPath(formData, itemId));
+}
+
+export async function saveComplianceItemReminders(formData: FormData) {
+  const itemId = requiredString(formData, 'itemId');
+  const { supabase } = await requireMembership({ allowAppAdmin: true });
+  const expirationRuleActive = checkboxValue(formData, 'expirationRuleActive');
+  const repeatRuleActive = checkboxValue(formData, 'repeatRuleActive');
+  const expirationDaysBefore = optionalInteger(formData, 'expirationDaysBefore') ?? 14;
+  const repeatEveryDays = optionalInteger(formData, 'repeatEveryDays');
+
+  if (expirationDaysBefore < 0) {
+    throw new Error('expirationDaysBefore must be zero or greater');
+  }
+
+  if (repeatEveryDays !== null && repeatEveryDays <= 0) {
+    throw new Error('repeatEveryDays must be greater than zero');
+  }
+
+  if (repeatRuleActive && (!repeatEveryDays || repeatEveryDays <= 0)) {
+    throw new Error('repeatEveryDays is required when repeat reminders are active');
+  }
+
+  const { error } = await supabase.rpc('save_compliance_item_reminders', {
+    target_item_id: itemId,
+    item_instructions: optionalString(formData, 'instructions'),
+    start_rule_active: checkboxValue(formData, 'startRuleActive'),
+    expiration_rule_active: expirationRuleActive,
+    expiration_days_before: expirationDaysBefore,
+    repeat_rule_active: repeatRuleActive,
+    repeat_every_days: repeatEveryDays,
+    additional_recipients: parseAdditionalRecipients(formData)
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/');
+  revalidatePath('/items');
+  revalidatePath(`/items/${itemId}`);
+  revalidatePath(itemDetailPath(formData, itemId));
+  revalidatePath('/reminders');
+  redirect(itemDetailPath(formData, itemId));
 }

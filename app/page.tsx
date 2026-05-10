@@ -52,18 +52,19 @@ export default async function Home({ searchParams }: HomeProps) {
   const currentUserName = profile?.full_name ?? userData.user.email ?? 'User';
   const requestedOwner = searchParams?.owner;
   const mappedOwnerCodes = ownerCodes.filter((owner) => owner.user_id === userData.user?.id).map((owner) => owner.code);
+  const isCustomerAdmin = ['owner', 'office_admin'].includes(membership.role);
   const requestedOwnerCode = requestedOwner && requestedOwner !== 'all' ? decodeURIComponent(requestedOwner) : null;
   const validOwnerCodes = new Set([
     ...ownerCodes.map((owner) => owner.code),
     ...items.map((item) => item.owner_current).filter(Boolean) as string[]
   ]);
-  const showAllOwners = requestedOwner === 'all' || (!requestedOwner && mappedOwnerCodes.length === 0);
+  const showAllOwners = requestedOwner === 'all' || (!requestedOwner && mappedOwnerCodes.length === 0 && isCustomerAdmin);
   const selectedOwnerCodes = requestedOwnerCode && validOwnerCodes.has(requestedOwnerCode)
     ? [requestedOwnerCode]
     : showAllOwners
       ? []
       : mappedOwnerCodes;
-  const canCreateItems = ['owner', 'office_admin', 'office_user'].includes(membership.role);
+  const canCreateItems = isCustomerAdmin || mappedOwnerCodes.length > 0;
 
   return (
     <div className="app-shell">

@@ -862,6 +862,10 @@ export type Database = {
     }
     Functions: {
       accept_company_invite: { Args: { full_name?: string }; Returns: string }
+      can_manage_compliance_item: {
+        Args: { target_item_id: string }
+        Returns: boolean
+      }
       complete_compliance_item: {
         Args: {
           completion_date: string
@@ -940,8 +944,21 @@ export type Database = {
         Args: { vessel_names: string[] }
         Returns: undefined
       }
+      save_compliance_item_reminders: {
+        Args: {
+          additional_recipients: Json
+          expiration_days_before: number
+          expiration_rule_active: boolean
+          item_instructions: string | null
+          repeat_every_days: number | null
+          repeat_rule_active: boolean
+          start_rule_active: boolean
+          target_item_id: string
+        }
+        Returns: undefined
+      }
       schedule_due_reminders: {
-        Args: { target_run_date?: string }
+        Args: { target_company_id: string; target_run_date?: string }
         Returns: number
       }
       update_compliance_item_status: {

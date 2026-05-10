@@ -10,6 +10,12 @@ import { createClient } from '@/lib/supabase/server';
 const senderEmail = process.env.RESEND_FROM_EMAIL ?? 'FF Compliance <alerts@fishermenfirst.org>';
 const sendLimit = 25;
 
+function requiredString(formData: FormData, name: string) {
+  const value = String(formData.get(name) ?? '').trim();
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
 async function requireReminderAccess() {
   const supabase = createClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -23,19 +29,40 @@ async function requireReminderAccess() {
     .limit(1)
     .maybeSingle();
 
-  if (!membership || !['owner', 'office_admin', 'office_user'].includes(membership.role)) redirect('/');
+  if (!membership || !['owner', 'office_admin'].includes(membership.role)) redirect('/');
 
   return { supabase, membership };
 }
 
 export async function queueTodaysReminders() {
-  const { supabase } = await requireReminderAccess();
+  const { supabase, membership } = await requireReminderAccess();
 
-  const { error } = await supabase.rpc('schedule_due_reminders', { target_run_date: todayIso() });
+  const { error } = await supabase.rpc('schedule_due_reminders', {
+    target_company_id: membership.company_id,
+    target_run_date: todayIso()
+  });
 
   if (error) throw new Error(error.message);
 
   revalidatePath('/reminders');
+}
+
+export async function queueCompanyReminders(formData: FormData) {
+  const companyId = requiredString(formData, 'companyId');
+  const supabase = createClient();
+  const { data: userData } = await supabase.auth.getUser();
+
+  if (!userData.user) redirect('/');
+
+  const { error } = await supabase.rpc('schedule_due_reminders', {
+    target_company_id: companyId,
+    target_run_date: todayIso()
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/reminders');
+  revalidatePath(`/admin/companies/${companyId}`);
 }
 
 export async function sendQueuedReminders() {

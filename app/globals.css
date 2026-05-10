@@ -1281,7 +1281,8 @@ svg {
 }
 
 .queue-table-row {
-  grid-template-columns: 82px minmax(118px, 0.55fr) minmax(0, 1fr) 82px 104px;
+  grid-template-columns: 72px minmax(108px, 0.55fr) minmax(180px, 1.15fr) minmax(96px, 0.45fr) minmax(130px, 0.72fr) 78px 96px;
+  gap: 12px;
 }
 
 .all-items-table .work-table-row {
@@ -1332,6 +1333,21 @@ svg {
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.queue-table-row .status-chip {
+  justify-self: start;
+  max-width: 100%;
+  padding: 6px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.notes-cell {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.25;
 }
 
 .status-chip.state-upcoming { background: #ece9df; color: #635d4f; }
@@ -1595,6 +1611,12 @@ svg {
   color: var(--teal-dark);
 }
 
+.setup-warning-panel {
+  border-color: rgba(185, 47, 47, 0.22);
+  background: #fff4f1;
+  color: #9b2f2f;
+}
+
 .owner-notice-panel strong {
   white-space: nowrap;
 }
@@ -1604,6 +1626,19 @@ svg {
   color: var(--muted);
   font-weight: 750;
   overflow-wrap: anywhere;
+}
+
+.risk-count-panel li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.risk-count-panel strong {
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1;
 }
 
 .owner-mapping-list {
@@ -2732,6 +2767,25 @@ svg {
   font-weight: 900;
 }
 
+.admin-inline-action-form {
+  padding: 0 18px 18px;
+}
+
+.admin-inline-action-form button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.admin-inline-action-form button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 .admin-guard-note {
   margin: 0;
   padding: 14px 18px 0;
@@ -2854,8 +2908,19 @@ svg {
 }
 
 .support-item-table article > div > strong,
+.support-item-table article > div > a,
 .support-item-table article > div > span {
   display: block;
+}
+
+.support-item-table article > div > a {
+  color: var(--ink);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.support-item-table article > div > a:hover {
+  color: var(--teal-dark);
 }
 
 .support-vessel-list article {
@@ -2989,6 +3054,82 @@ svg {
   font: inherit;
 }
 
+.status-form button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--teal);
+  color: #fff;
+  font-weight: 900;
+}
+
+.item-access-notice {
+  margin-top: 20px;
+}
+
+.reminder-summary-list {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.reminder-summary-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.reminder-summary-list strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+}
+
+.reminder-editor-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.reminder-editor-form h2 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.reminder-rule-grid {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr) minmax(120px, 0.7fr) minmax(170px, 1fr) minmax(130px, 0.75fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.recipient-editor-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.recipient-editor-grid > span {
+  display: none;
+}
+
+.recipient-editor-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.7fr) minmax(220px, 1fr);
+  gap: 10px;
+}
+
+.recipient-editor-row input {
+  min-width: 0;
+}
+
 .checkbox-row {
   grid-template-columns: auto 1fr;
   align-items: center;
@@ -3031,6 +3172,8 @@ svg {
   .detail-grid,
   .detail-two-col,
   .workflow-steps,
+  .reminder-rule-grid,
+  .recipient-editor-row,
   .customer-summary-grid,
   .vessel-card-grid,
   .settings-grid,

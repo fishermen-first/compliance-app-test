@@ -5,6 +5,7 @@ import { signOut } from '@/app/actions/auth';
 import { importComplianceWorkbook } from '@/app/actions/imports';
 import { createInvitation } from '@/app/actions/invitations';
 import { saveOwnerCodeMapping } from '@/app/actions/owner-codes';
+import { queueCompanyReminders } from '@/app/actions/reminders';
 import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
@@ -233,6 +234,10 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
               </label>
               <button type="submit">{hasData ? 'Re-import workbook' : 'Import workbook'}</button>
             </form>
+            <form action={queueCompanyReminders} className="admin-inline-action-form">
+              <input type="hidden" name="companyId" value={companyId} />
+              <button type="submit" disabled={!hasData}>Queue due reminders</button>
+            </form>
             <p className="admin-flow-note">Re-importing updates rows from the same sheet and row number. It will not add users or notify anyone.</p>
           </section>
 
@@ -384,7 +389,7 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
             {openItems.slice(0, 10).map((item) => (
               <article key={item.id}>
                 <div>
-                  <strong>{item.item_name}</strong>
+                  <Link href={`/admin/companies/${companyId}/items/${item.id}`}>{item.item_name}</Link>
                   <span>{vesselName(item)} · {item.compliance_area ?? 'Other'} · {item.owner_current ?? 'Unassigned'}</span>
                 </div>
                 <span>{formatDate(item.start_working_on)}</span>
