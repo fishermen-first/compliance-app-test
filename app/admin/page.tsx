@@ -41,7 +41,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         <div className="setup-brand-row"><span className="brand-mark">FF</span><span>FF Compliance</span></div>
         <p className="eyebrow">Admin</p>
         <h1>Invite demo users.</h1>
-        <p>Create access for company admins and office users. Invited users receive an auth invite and can then log in by email link.</p>
+        <p>Create access for company admins and office users. Invited users can then request a login link from the first screen.</p>
         {searchParams?.message ? <p className="form-message">{searchParams.message}</p> : null}
 
         <form action={createInvitation} className="event-form-grid">

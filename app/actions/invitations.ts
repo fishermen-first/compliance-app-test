@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { env } from '@/lib/env';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
@@ -24,21 +23,22 @@ function isExistingAuthUserError(message: string) {
   return normalized.includes('already') && (normalized.includes('registered') || normalized.includes('exists'));
 }
 
-async function sendAuthInvite(email: string) {
+async function provisionAuthUser(email: string) {
   const supabaseAdmin = createAdminClient();
-  const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${env.appBaseUrl}/auth/callback`
+  const { error } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    email_confirm: true
   });
 
   if (!error) {
-    return 'sent';
+    return 'created';
   }
 
   if (isExistingAuthUserError(error.message)) {
     return 'existing';
   }
 
-  throw new Error(`Invitation saved, but Supabase could not send the auth invite: ${error.message}`);
+  throw new Error(`Invitation saved, but Supabase could not provision the auth user: ${error.message}`);
 }
 
 export async function createInvitation(formData: FormData) {
@@ -79,12 +79,12 @@ export async function createInvitation(formData: FormData) {
     throw new Error(error.message);
   }
 
-  const authInviteStatus = await sendAuthInvite(email);
+  const authUserStatus = await provisionAuthUser(email);
 
   revalidatePath('/admin');
   const message =
-    authInviteStatus === 'sent'
-      ? 'Invitation saved and login email sent'
+    authUserStatus === 'created'
+      ? 'Invitation saved. User can request a login link.'
       : 'Invitation saved. Existing user can request a login link.';
   redirect(`/admin?message=${encodeURIComponent(message)}`);
 }
