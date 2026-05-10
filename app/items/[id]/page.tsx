@@ -1,64 +1,25 @@
 import Link from 'next/link';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { completeComplianceItem, updateComplianceItemStatus } from '@/app/actions/items';
+import { AppSidebar } from '@/components/app-sidebar';
 import {
-  type ComplianceItem,
   displayState,
   formatDate,
   proposedNextDates,
   stateClassName,
   todayIso
 } from '@/lib/compliance';
-import { createClient } from '@/lib/supabase/server';
+import { getCustomerContext, itemVessel, mapComplianceItem } from '@/lib/customer-data';
+import { accessRoleLabel } from '@/lib/roles';
 
 type ItemDetailPageProps = { params: { id: string } };
-
-function mapComplianceItem(row: any): ComplianceItem {
-  return {
-    id: row.id,
-    company_id: row.company_id,
-    vessel_id: row.vessel_id,
-    vessel_name: row.vessels?.name ?? null,
-    owner_raw: row.owner_raw,
-    owner_current: row.owner_current,
-    item_name: row.item_name,
-    item_number: row.item_number,
-    agency_type: row.agency_type,
-    compliance_area: row.compliance_area,
-    frequency_label: row.frequency_label,
-    recurrence_unit: row.recurrence_unit,
-    recurrence_interval: row.recurrence_interval,
-    start_working_on: row.start_working_on,
-    expiration_date: row.expiration_date,
-    status: row.status,
-    status_notes: row.status_notes,
-    instructions: row.instructions,
-    sharepoint_url: row.sharepoint_url,
-    completed_at: row.completed_at,
-    discontinued_at: row.discontinued_at,
-    source_row_number: row.source_row_number,
-    previous_item_id: row.previous_item_id
-  };
-}
 
 function statusOptionLabel(value: string) {
   return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
-  const supabase = createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) redirect('/');
-
-  const { data: membership } = await supabase
-    .from('company_memberships')
-    .select('company_id, role')
-    .eq('user_id', userData.user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership) redirect('/');
+  const { supabase, membership, company, isAppAdmin } = await getCustomerContext({ allowAppAdmin: true });
 
   const [{ data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }] = await Promise.all([
     supabase
@@ -92,12 +53,14 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
   const canCreateNext = Boolean(nextDates.nextExpirationDate);
 
   return (
-    <main className="form-page item-detail-page">
-      <section className="form-panel detail-panel">
+    <div className="app-shell">
+      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} isAppAdmin={isAppAdmin} activePath="/" />
+      <main className="workspace list-workspace item-detail-page">
+      <section className="panel detail-panel">
         <div className="detail-header">
           <div>
-            <Link className="secondary-link" href="/items">Back to all items</Link>
-            <p className="eyebrow">{item.vessel_name ?? 'Company-wide'} · {item.owner_raw ?? 'Unassigned'}</p>
+            <Link className="secondary-link" href="/">Back to work queue</Link>
+            <p className="eyebrow">{itemVessel(item)} · {item.owner_raw ?? 'Unassigned'}</p>
             <h1>{item.item_name}</h1>
           </div>
           <span className={`status-chip state-${stateClassName(state)}`}>{state}</span>
@@ -120,6 +83,20 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
             <span>Agency / Area</span>
             <strong>{item.agency_type ?? 'None'} · {item.compliance_area ?? 'Other'}</strong>
           </article>
+        </section>
+
+        <section className="workflow-steps" aria-label="Compliance workflow">
+          {[
+            ['not_started', 'Not started', 'Waiting for the start-working date or owner pickup.'],
+            ['in_progress', 'In progress', 'Renewal, filing, audit, or exercise is being worked.'],
+            ['submitted', 'Submitted', 'Waiting on agency, auditor, certifier, or confirmation.'],
+            ['complete', 'Complete', 'Evidence saved and next recurrence created if needed.']
+          ].map(([value, label, copy]) => (
+            <article className={item.status === value ? 'active' : ''} key={value}>
+              <strong>{label}</strong>
+              <p>{copy}</p>
+            </article>
+          ))}
         </section>
 
         <section className="detail-two-col">
@@ -207,6 +184,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
           </ul>
         </section>
       </section>
-    </main>
+      </main>
+    </div>
   );
 }

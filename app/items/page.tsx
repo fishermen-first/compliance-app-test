@@ -1,72 +1,16 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { AppSidebar } from '@/components/app-sidebar';
-import { type ComplianceItem, displayState, formatDate, stateClassName } from '@/lib/compliance';
+import { displayState, formatDate, stateClassName } from '@/lib/compliance';
+import { getCustomerContext, getCustomerItems, titleCase } from '@/lib/customer-data';
 import { accessRoleLabel } from '@/lib/roles';
-import { createClient } from '@/lib/supabase/server';
 
 type ItemsPageProps = {
   searchParams?: { status?: string; owner?: string; vessel?: string; area?: string };
 };
 
-function mapComplianceItem(row: any): ComplianceItem {
-  return {
-    id: row.id,
-    company_id: row.company_id,
-    vessel_id: row.vessel_id,
-    vessel_name: row.vessels?.name ?? null,
-    owner_raw: row.owner_raw,
-    owner_current: row.owner_current,
-    item_name: row.item_name,
-    item_number: row.item_number,
-    agency_type: row.agency_type,
-    compliance_area: row.compliance_area,
-    frequency_label: row.frequency_label,
-    recurrence_unit: row.recurrence_unit,
-    recurrence_interval: row.recurrence_interval,
-    start_working_on: row.start_working_on,
-    expiration_date: row.expiration_date,
-    status: row.status,
-    status_notes: row.status_notes,
-    instructions: row.instructions,
-    sharepoint_url: row.sharepoint_url,
-    completed_at: row.completed_at,
-    discontinued_at: row.discontinued_at,
-    source_row_number: row.source_row_number,
-    previous_item_id: row.previous_item_id
-  };
-}
-
-function titleCase(value: string) {
-  return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
 export default async function ItemsPage({ searchParams }: ItemsPageProps) {
-  const supabase = createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) redirect('/');
-
-  const { data: membership } = await supabase
-    .from('company_memberships')
-    .select('company_id, role')
-    .eq('user_id', userData.user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership) redirect('/');
-
-  const [{ data: company }, { data: rawItems }, { data: isAppAdmin }] = await Promise.all([
-    supabase.from('companies').select('name').eq('id', membership.company_id).single(),
-    supabase
-      .from('compliance_items')
-      .select('*, vessels(name)')
-      .eq('company_id', membership.company_id)
-      .order('expiration_date', { ascending: true, nullsFirst: false }),
-    supabase.rpc('is_app_admin')
-  ]);
-
-  const allItems = (rawItems ?? []).map(mapComplianceItem);
+  const { membership, company, isAppAdmin } = await getCustomerContext({ allowAppAdmin: true });
+  const allItems = await getCustomerItems(membership.company_id);
   const owners = Array.from(new Set(allItems.map((item) => item.owner_current).filter(Boolean) as string[])).sort();
   const vessels = Array.from(new Set(allItems.map((item) => item.vessel_name).filter(Boolean) as string[])).sort();
   const areas = Array.from(new Set(allItems.map((item) => item.compliance_area).filter(Boolean) as string[])).sort();
@@ -75,20 +19,21 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
     const state = displayState(item).toLowerCase().replaceAll(' ', '_');
     if (searchParams?.status && searchParams.status !== item.status && searchParams.status !== state) return false;
     if (searchParams?.owner && item.owner_current !== searchParams.owner) return false;
-    if (searchParams?.vessel && item.vessel_name !== searchParams.vessel) return false;
+    if (searchParams?.vessel === 'company-wide' && item.vessel_name) return false;
+    if (searchParams?.vessel && searchParams.vessel !== 'company-wide' && item.vessel_name !== searchParams.vessel) return false;
     if (searchParams?.area && item.compliance_area !== searchParams.area) return false;
     return true;
   });
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} isAppAdmin={Boolean(isAppAdmin)} activePath="/items" />
+      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} isAppAdmin={Boolean(isAppAdmin)} activePath="" />
       <main className="workspace list-workspace">
         <header className="list-header">
           <div>
-            <p className="eyebrow">All Items</p>
+            <p className="eyebrow">Records</p>
             <h1>Compliance item list</h1>
-            <p>Spreadsheet replacement for current, upcoming, submitted, overdue, complete, and discontinued items.</p>
+            <p>Search the full imported spreadsheet replacement: current, upcoming, submitted, overdue, complete, and discontinued items.</p>
           </div>
           <Link className="primary-action" href="/items/new">New Item</Link>
         </header>
@@ -111,6 +56,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
           </div>
           <div>
             <span>Vessel</span>
+            <Link className={searchParams?.vessel === 'company-wide' ? 'active' : ''} href="/items?vessel=company-wide">Company-wide</Link>
             {vessels.slice(0, 10).map((vessel) => <Link className={searchParams?.vessel === vessel ? 'active' : ''} href={`/items?vessel=${encodeURIComponent(vessel)}`} key={vessel}>{vessel}</Link>)}
           </div>
         </section>

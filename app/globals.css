@@ -1153,6 +1153,247 @@ svg {
 .status-chip.state-discontinued { background: #eeeef0; color: #555b61; }
 .status-chip.state-overdue { background: #ffe0df; color: #b92f2f; }
 
+.customer-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.customer-summary-grid article {
+  min-height: 132px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.customer-summary-grid span,
+.vessel-summary-card span,
+.settings-card .panel-heading span,
+.agenda-list h3 {
+  display: block;
+  margin: 0 0 8px;
+  color: #89938f;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.customer-summary-grid strong {
+  display: block;
+  font-size: 40px;
+  line-height: 1;
+}
+
+.customer-summary-grid p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.agenda-list {
+  display: grid;
+}
+
+.agenda-list section + section {
+  border-top: 1px solid var(--line);
+}
+
+.agenda-list h3 {
+  padding: 22px 24px 8px;
+}
+
+.agenda-row {
+  display: grid;
+  grid-template-columns: 104px 122px minmax(0, 1fr) 98px 128px;
+  gap: 16px;
+  align-items: center;
+  min-height: 74px;
+  padding: 14px 24px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.agenda-row + .agenda-row {
+  border-top: 1px solid var(--line);
+}
+
+.agenda-row:hover,
+.vessel-summary-card:hover {
+  background: #f7fbf8;
+}
+
+.agenda-row b,
+.agenda-row p {
+  display: block;
+  min-width: 0;
+  margin: 0;
+}
+
+.agenda-row p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.agenda-kind {
+  display: inline-flex;
+  justify-content: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: #28547a;
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.agenda-kind-expiration {
+  background: var(--amber-soft);
+  color: #7a5115;
+}
+
+.vessel-card-grid,
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.vessel-summary-card {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  box-shadow: none;
+}
+
+.vessel-summary-card h2,
+.settings-card h2 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.08;
+}
+
+.vessel-summary-card dl,
+.settings-definition-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.vessel-summary-card dl div,
+.settings-definition-list div {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.vessel-summary-card dt,
+.settings-definition-list dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vessel-summary-card dd,
+.settings-definition-list dd {
+  margin: 6px 0 0;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.vessel-summary-card p,
+.settings-note {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.completed-table .work-table-row {
+  grid-template-columns: 120px minmax(120px, 0.8fr) minmax(260px, 1.4fr) 110px minmax(220px, 1fr) 136px;
+}
+
+.settings-card {
+  overflow: hidden;
+}
+
+.settings-card .panel-heading {
+  padding: 22px;
+}
+
+.settings-definition-list,
+.settings-list,
+.owner-code-grid,
+.settings-note {
+  margin: 22px;
+}
+
+.settings-list {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.9fr) minmax(118px, auto);
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-list article:last-child {
+  border-bottom: 0;
+}
+
+.settings-list span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+
+.settings-list b {
+  color: var(--teal-dark);
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.owner-code-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.owner-code-grid a {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.owner-code-grid a:hover {
+  border-color: rgba(18, 120, 109, 0.32);
+}
+
+.owner-code-grid span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
 .admin-console {
   display: grid;
   grid-template-columns: 232px minmax(0, 1fr);
@@ -1638,6 +1879,7 @@ svg {
 
 .detail-panel {
   max-width: 1180px;
+  padding: 28px;
 }
 
 .detail-grid,
@@ -1668,6 +1910,38 @@ svg {
 
 .detail-two-col {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.workflow-steps article {
+  min-height: 118px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.workflow-steps article.active {
+  border-color: rgba(18, 120, 109, 0.45);
+  background: #edf7f1;
+}
+
+.workflow-steps strong {
+  display: block;
+  font-size: 15px;
+}
+
+.workflow-steps p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .status-form {
@@ -1723,13 +1997,23 @@ svg {
 @media (max-width: 1100px) {
   .work-table-row,
   .all-items-table .work-table-row,
-  .reminder-table .work-table-row {
+  .reminder-table .work-table-row,
+  .completed-table .work-table-row,
+  .agenda-row {
     grid-template-columns: 1fr;
     align-items: start;
   }
 
   .detail-grid,
-  .detail-two-col {
+  .detail-two-col,
+  .workflow-steps,
+  .customer-summary-grid,
+  .vessel-card-grid,
+  .settings-grid,
+  .vessel-summary-card dl,
+  .settings-definition-list,
+  .settings-list article,
+  .owner-code-grid {
     grid-template-columns: 1fr;
   }
 }

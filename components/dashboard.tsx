@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CheckCircle2, ListFilter, Mail, Plus } from 'lucide-react';
+import { CalendarDays, CheckCircle2, ListFilter, Plus } from 'lucide-react';
 import { accessRoleLabel } from '@/lib/roles';
 import {
   type ComplianceItem,
@@ -9,6 +9,7 @@ import {
   stateClassName,
   shortDate
 } from '@/lib/compliance';
+import { itemVessel } from '@/lib/customer-data';
 
 function initials(name: string) {
   return name
@@ -17,10 +18,6 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join('') || 'U';
-}
-
-function itemVessel(item: ComplianceItem) {
-  return item.vessel_name || 'Company-wide';
 }
 
 function sortedByStart(items: ComplianceItem[]) {
@@ -84,9 +81,9 @@ export function Dashboard({
           </strong>
         </article>
 
-        <Link className="secondary-action" href="/reminders">
-          <Mail aria-hidden="true" />
-          <span>Reminders</span>
+        <Link className="secondary-action" href="/calendar">
+          <CalendarDays aria-hidden="true" />
+          <span>Calendar</span>
         </Link>
         {canCreateItems ? (
           <Link className="primary-action" href="/items/new">
@@ -137,7 +134,7 @@ export function Dashboard({
                   <ListFilter aria-hidden="true" />
                   {showAllOwners ? 'Show Mine' : 'All Owners'}
                 </Link>
-                <Link className="secondary-link" href="/items">All Items</Link>
+                <Link className="secondary-link" href="/items">All records</Link>
               </div>
             </div>
 

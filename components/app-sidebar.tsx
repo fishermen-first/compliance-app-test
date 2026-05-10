@@ -1,13 +1,13 @@
 import Link from 'next/link';
-import { CalendarDays, ClipboardList, Gauge, LogOut, Mail, ShieldCheck, Settings } from 'lucide-react';
+import { Archive, CalendarDays, ClipboardList, LogOut, Ship, ShieldCheck, Settings } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
 
 const navItems = [
-  { label: 'Dashboard', icon: Gauge, href: '/' },
-  { label: 'All Items', icon: ClipboardList, href: '/items' },
-  { label: 'Reminders', icon: Mail, href: '/reminders' },
-  { label: 'Calendar', icon: CalendarDays, href: '#' },
-  { label: 'Rules', icon: Settings, href: '#' }
+  { label: 'Work Queue', icon: ClipboardList, href: '/' },
+  { label: 'Calendar', icon: CalendarDays, href: '/calendar' },
+  { label: 'Vessels', icon: Ship, href: '/vessels' },
+  { label: 'Completed', icon: Archive, href: '/completed' },
+  { label: 'Settings', icon: Settings, href: '/settings' }
 ];
 
 function initials(name: string) {
