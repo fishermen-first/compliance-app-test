@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { queueTodaysReminders, sendQueuedReminders } from '@/app/actions/reminders';
 import { AppSidebar } from '@/components/app-sidebar';
+import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
 function titleCase(value: string) {
@@ -39,7 +40,7 @@ export default async function RemindersPage() {
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={titleCase(membership.role)} isAppAdmin={Boolean(isAppAdmin)} activePath="/reminders" />
+      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} isAppAdmin={Boolean(isAppAdmin)} activePath="/reminders" />
       <main className="workspace list-workspace">
         <header className="list-header">
           <div>

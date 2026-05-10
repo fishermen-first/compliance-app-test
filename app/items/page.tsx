@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AppSidebar } from '@/components/app-sidebar';
 import { type ComplianceItem, displayState, formatDate, stateClassName } from '@/lib/compliance';
+import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
 type ItemsPageProps = {
@@ -81,7 +82,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={titleCase(membership.role)} isAppAdmin={Boolean(isAppAdmin)} activePath="/items" />
+      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} isAppAdmin={Boolean(isAppAdmin)} activePath="/items" />
       <main className="workspace list-workspace">
         <header className="list-header">
           <div>

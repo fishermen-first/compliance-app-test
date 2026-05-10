@@ -1,7 +1,17 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Building2, ClipboardList, DatabaseZap, MailWarning, ShieldCheck, Users } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  Building2,
+  ClipboardList,
+  MailWarning,
+  ShieldCheck,
+  UserPlus,
+  Users
+} from 'lucide-react';
 import { createInvitation } from '@/app/actions/invitations';
+import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
 type AdminPageProps = {
@@ -12,17 +22,13 @@ type CompanyHealth = {
   id: string;
   name: string;
   vessels: number;
-  members: number;
+  customerUsers: number;
   openItems: number;
   overdueItems: number;
+  dueSoonItems: number;
   pendingInvites: number;
-  failedReminders: number;
+  failedEmails: number;
 };
-
-function roleLabel(role: string) {
-  if (role === 'app_admin') return 'FF Admin';
-  return role.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
 
 function formatDate(value?: string | null) {
   if (!value) return 'Not set';
@@ -33,19 +39,21 @@ function isOpenItem(status: string) {
   return status !== 'complete' && status !== 'discontinued';
 }
 
+function relation<T>(value: T | T[] | null | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function companyName(row: any) {
-  const company = Array.isArray(row.companies) ? row.companies[0] : row.companies;
-  return company?.name ?? 'Unknown company';
+  return relation(row.companies)?.name ?? 'Unknown company';
 }
 
 function profileName(row: any) {
-  const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+  const profile = relation(row.profiles);
   return profile?.full_name ?? profile?.email ?? 'Unknown user';
 }
 
 function profileEmail(row: any) {
-  const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-  return profile?.email ?? 'Profile pending';
+  return relation(row.profiles)?.email ?? 'Profile pending';
 }
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
@@ -86,14 +94,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .from('company_invitations')
       .select('email, role, accepted_at, created_at, company_id, companies(name)')
       .order('created_at', { ascending: false })
-      .limit(25),
+      .limit(40),
     supabase.from('app_admins').select('email, created_at').order('created_at', { ascending: false }),
-    supabase.from('vessels').select('id, company_id, active, companies(name)'),
+    supabase.from('vessels').select('id, company_id, active'),
     supabase
       .from('compliance_items')
       .select('id, company_id, item_name, owner_current, expiration_date, start_working_on, status, companies(name), vessels(name)')
       .order('expiration_date', { ascending: true, nullsFirst: false })
-      .limit(300),
+      .limit(400),
     supabase
       .from('reminder_send_log')
       .select('company_id, recipient_email, subject, status, scheduled_for, sent_at, failure_reason, companies(name)')
@@ -112,9 +120,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const appAdminRows = appAdmins ?? [];
   const vesselRows = vessels ?? [];
   const itemRows = items ?? [];
-  const reminderRows = reminderLogs ?? [];
-  const queueRows = emailQueue ?? [];
-
+  const appAdminEmailSet = new Set(appAdminRows.map((admin) => admin.email.toLowerCase()));
+  const customerMembershipRows = membershipRows.filter((membership) => !appAdminEmailSet.has(profileEmail(membership).toLowerCase()));
+  const message = searchParams?.message;
+  const pendingInvites = invitationRows.filter((invite) => !invite.accepted_at);
   const openItems = itemRows.filter((item) => isOpenItem(item.status));
   const overdueItems = openItems.filter((item) => item.expiration_date && new Date(item.expiration_date) < today);
   const dueSoonItems = openItems.filter((item) => {
@@ -122,94 +131,69 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     const date = new Date(item.expiration_date);
     return date >= today && date <= twoWeeksFromNow;
   });
-  const pendingInvites = invitationRows.filter((invite) => !invite.accepted_at);
-  const failedReminders = [...reminderRows, ...queueRows].filter((row) => row.status === 'failed');
-  const queuedEmails = [...reminderRows, ...queueRows].filter((row) => row.status === 'queued');
+  const emailRows = [...(reminderLogs ?? []), ...(emailQueue ?? [])];
+  const failedEmails = emailRows.filter((row) => row.status === 'failed');
+  const queuedEmails = emailRows.filter((row) => ['queued', 'scheduled'].includes(row.status));
 
-  const uniquePeople = new Set([
-    ...appAdminRows.map((admin) => admin.email),
-    ...membershipRows.map((membership) => profileEmail(membership)).filter((email) => email !== 'Profile pending')
-  ]);
   const companyHealth: CompanyHealth[] = companyRows.map((company) => {
     const companyItems = openItems.filter((item) => item.company_id === company.id);
     return {
       id: company.id,
       name: company.name,
       vessels: vesselRows.filter((vessel) => vessel.company_id === company.id && vessel.active).length,
-      members: membershipRows.filter((membership) => membership.company_id === company.id).length,
+      customerUsers: customerMembershipRows.filter((membership) => membership.company_id === company.id).length,
       openItems: companyItems.length,
       overdueItems: companyItems.filter((item) => item.expiration_date && new Date(item.expiration_date) < today).length,
+      dueSoonItems: companyItems.filter((item) => {
+        if (!item.expiration_date) return false;
+        const date = new Date(item.expiration_date);
+        return date >= today && date <= twoWeeksFromNow;
+      }).length,
       pendingInvites: pendingInvites.filter((invite) => invite.company_id === company.id).length,
-      failedReminders: failedReminders.filter((log) => log.company_id === company.id).length
+      failedEmails: failedEmails.filter((row) => row.company_id === company.id).length
     };
   });
-
-  const atRiskCompanies = companyHealth.filter((company) => company.overdueItems > 0 || company.failedReminders > 0);
-  const recentPeople = [
-    ...appAdminRows.map((admin) => ({
-      email: admin.email,
-      name: admin.email,
-      role: 'FF Admin',
-      company: 'Platform',
-      createdAt: admin.created_at
-    })),
-    ...membershipRows.map((membership) => ({
-      email: profileEmail(membership),
-      name: profileName(membership),
-      role: roleLabel(membership.role),
-      company: companyName(membership),
-      createdAt: membership.created_at
-    }))
-  ].slice(0, 14);
-
+  const attentionCompanies = companyHealth.filter((company) => company.overdueItems > 0 || company.failedEmails > 0);
+  const recentCustomerUsers = customerMembershipRows.slice(0, 10);
   const urgentItems = [...overdueItems, ...dueSoonItems].slice(0, 8);
 
   return (
     <main className="admin-console">
       <aside className="admin-rail">
-        <div className="brand-block admin-brand-block">
-          <div className="brand-mark">FF</div>
-          <div>
-            <p>FF Compliance</p>
-            <strong>Site Admin</strong>
-            <small>Platform control</small>
-          </div>
-        </div>
+        <div className="admin-mark">FF</div>
         <nav className="admin-rail-nav" aria-label="Admin console sections">
-          <a href="#overview"><ShieldCheck aria-hidden="true" /><span>Overview</span></a>
-          <a href="#companies"><Building2 aria-hidden="true" /><span>Companies</span></a>
-          <a href="#users"><Users aria-hidden="true" /><span>Users & roles</span></a>
+          <a href="#workspaces"><Building2 aria-hidden="true" /><span>Workspaces</span></a>
+          <a href="#access"><Users aria-hidden="true" /><span>Access</span></a>
           <a href="#health"><MailWarning aria-hidden="true" /><span>Health</span></a>
         </nav>
-        <Link className="secondary-link admin-rail-link" href="/items">Company item view</Link>
+        <div className="admin-rail-footer">
+          <span>Signed in</span>
+          <strong>{userData.user.email}</strong>
+        </div>
       </aside>
 
       <section className="admin-workspace">
-        <header className="admin-hero" id="overview">
+        <header className="admin-topbar">
           <div>
-            <p className="eyebrow">Site admin</p>
-            <h1>Platform command center.</h1>
-            <p>Manage FF admins, company workspaces, invite status, compliance risk, and reminder health from one place.</p>
+            <p className="eyebrow">Internal operations</p>
+            <h1>FF Admin Console</h1>
           </div>
-          <div className="admin-identity">
-            <span>Signed in as</span>
-            <strong>{userData.user.email}</strong>
-          </div>
+          <span className="admin-subtle-pill">FF Admin</span>
         </header>
 
-        {searchParams?.message ? <p className="form-message admin-message">{searchParams.message}</p> : null}
+        {message ? <p className="form-message admin-message">{message}</p> : null}
 
-        <section className="admin-metric-grid" aria-label="Platform metrics">
+        <section className="admin-stat-grid" aria-label="Platform summary">
           <article>
             <Building2 aria-hidden="true" />
-            <span>Companies</span>
+            <span>Workspaces</span>
             <strong>{companyRows.length}</strong>
-            <p>{atRiskCompanies.length} need attention</p>
+            <p>{attentionCompanies.length} need attention</p>
           </article>
           <article>
             <Users aria-hidden="true" />
-            <span>Known users</span>
-            <strong>{uniquePeople.size}</strong>
+            <span>Customer users</span>
+            <strong>{customerMembershipRows.length}</strong>
             <p>{pendingInvites.length} pending invites</p>
           </article>
           <article>
@@ -219,59 +203,61 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
             <p>{overdueItems.length} overdue · {dueSoonItems.length} due soon</p>
           </article>
           <article>
-            <MailWarning aria-hidden="true" />
-            <span>Email health</span>
-            <strong>{failedReminders.length}</strong>
-            <p>{queuedEmails.length} queued reminders</p>
+            <ShieldCheck aria-hidden="true" />
+            <span>FF admins</span>
+            <strong>{appAdminRows.length}</strong>
+            <p>{failedEmails.length} failed emails · {queuedEmails.length} queued</p>
           </article>
         </section>
 
-        <section className="admin-two-column">
-          <div className="panel" id="companies">
-            <div className="panel-heading compact-heading">
+        <section className="admin-grid-main">
+          <section className="panel admin-panel" id="workspaces">
+            <div className="admin-panel-heading">
               <div>
-                <span>Company workspaces</span>
-                <h2>Client health</h2>
+                <span>Customer workspaces</span>
+                <h2>Support overview</h2>
               </div>
             </div>
-            <div className="admin-company-grid">
+            <div className="admin-company-list">
               {companyHealth.map((company) => (
-                <article className="admin-company-card" key={company.id}>
-                  <div>
-                    <h3>{company.name}</h3>
-                    <span className={company.overdueItems || company.failedReminders ? 'risk-chip risk-chip-hot' : 'risk-chip'}>
-                      {company.overdueItems || company.failedReminders ? 'Needs attention' : 'Operational'}
+                <article key={company.id}>
+                  <div className="admin-company-name">
+                    <strong>{company.name}</strong>
+                    <span className={company.overdueItems || company.failedEmails ? 'risk-chip risk-chip-hot' : 'risk-chip'}>
+                      {company.overdueItems || company.failedEmails ? 'Attention' : 'Normal'}
                     </span>
                   </div>
-                  <dl>
-                    <div><dt>Vessels</dt><dd>{company.vessels}</dd></div>
-                    <div><dt>Users</dt><dd>{company.members}</dd></div>
-                    <div><dt>Open</dt><dd>{company.openItems}</dd></div>
-                    <div><dt>Overdue</dt><dd>{company.overdueItems}</dd></div>
-                  </dl>
-                  <p>{company.pendingInvites} pending invite{company.pendingInvites === 1 ? '' : 's'} · {company.failedReminders} failed reminder{company.failedReminders === 1 ? '' : 's'}</p>
+                  <span>{company.customerUsers} users</span>
+                  <span>{company.vessels} vessels</span>
+                  <span>{company.openItems} open</span>
+                  <span>{company.overdueItems} overdue</span>
+                  <Link href={`/admin/companies/${company.id}`}>
+                    Support view
+                    <ArrowUpRight aria-hidden="true" />
+                  </Link>
                 </article>
               ))}
             </div>
-          </div>
+          </section>
 
-          <div className="panel" id="users">
-            <div className="panel-heading compact-heading">
+          <section className="panel admin-panel" id="access">
+            <div className="admin-panel-heading">
               <div>
-                <span>Users & roles</span>
-                <h2>Create access</h2>
+                <span>Access</span>
+                <h2>Add or update a user</h2>
               </div>
+              <UserPlus aria-hidden="true" />
             </div>
             <form action={createInvitation} className="admin-role-form">
               <label>
                 Email
-                <input name="email" type="email" placeholder="person@company.com" required />
+                <input name="email" type="email" placeholder="name@company.com" required />
               </label>
               <label>
                 Role
                 <select name="role" defaultValue="office_user">
                   <option value="app_admin">FF Admin</option>
-                  <option value="owner">Company Admin</option>
+                  <option value="owner">Customer Admin</option>
                   <option value="office_admin">Office Admin</option>
                   <option value="office_user">Office User</option>
                 </select>
@@ -279,75 +265,104 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <label>
                 Company
                 <select name="companyId">
-                  <option value="">Platform role only</option>
+                  <option value="">No customer workspace</option>
                   {companyRows.map((company) => (
                     <option value={company.id} key={company.id}>{company.name}</option>
                   ))}
                 </select>
               </label>
-              <button type="submit">Save user access</button>
+              <button type="submit">Save access</button>
             </form>
+          </section>
+        </section>
 
-            <div className="admin-list-table" aria-label="Recent user roles">
-              {recentPeople.map((person) => (
-                <article key={`${person.email}-${person.company}-${person.role}`}>
+        <section className="admin-grid-secondary" id="health">
+          <section className="panel admin-panel">
+            <div className="admin-panel-heading">
+              <div>
+                <span>Customer users</span>
+                <h2>Recent memberships</h2>
+              </div>
+            </div>
+            <div className="admin-user-table">
+              {recentCustomerUsers.map((membership) => (
+                <article key={`${membership.user_id}-${membership.company_id}`}>
                   <div>
-                    <strong>{person.name}</strong>
-                    <span>{person.email}</span>
+                    <strong>{profileName(membership)}</strong>
+                    <span>{profileEmail(membership)}</span>
                   </div>
-                  <span>{person.role}</span>
-                  <span>{person.company}</span>
+                  <span>{accessRoleLabel(membership.role)}</span>
+                  <span>{companyName(membership)}</span>
+                </article>
+              ))}
+              {recentCustomerUsers.length === 0 ? <p className="muted-panel-copy">No customer memberships yet.</p> : null}
+            </div>
+          </section>
+
+          <section className="panel admin-panel">
+            <div className="admin-panel-heading">
+              <div>
+                <span>Internal admins</span>
+                <h2>FF access</h2>
+              </div>
+            </div>
+            <div className="admin-admin-list">
+              {appAdminRows.map((admin) => (
+                <article key={admin.email}>
+                  <ShieldCheck aria-hidden="true" />
+                  <div>
+                    <strong>{admin.email}</strong>
+                    <span>{formatDate(admin.created_at)}</span>
+                  </div>
                 </article>
               ))}
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="admin-two-column admin-lower-grid" id="health">
-          <div className="panel">
-            <div className="panel-heading compact-heading">
+          <section className="panel admin-panel">
+            <div className="admin-panel-heading">
               <div>
                 <span>Compliance health</span>
-                <h2>Needs attention</h2>
+                <h2>Near-term risk</h2>
               </div>
             </div>
             <div className="admin-risk-list">
-              {urgentItems.length === 0 ? <p className="muted-panel-copy">No overdue or near-term compliance items.</p> : null}
               {urgentItems.map((item) => (
                 <article key={item.id}>
-                  <DatabaseZap aria-hidden="true" />
+                  <AlertTriangle aria-hidden="true" />
                   <div>
                     <strong>{item.item_name}</strong>
-                    <span>{companyName(item)} · {item.owner_current ?? 'No owner'} · expires {formatDate(item.expiration_date)}</span>
+                    <span>{companyName(item)} · {item.owner_current ?? 'Unassigned'} · {formatDate(item.expiration_date)}</span>
                   </div>
                   <span className={item.expiration_date && new Date(item.expiration_date) < today ? 'risk-chip risk-chip-hot' : 'risk-chip'}>
                     {item.expiration_date && new Date(item.expiration_date) < today ? 'Overdue' : 'Due soon'}
                   </span>
                 </article>
               ))}
+              {urgentItems.length === 0 ? <p className="muted-panel-copy">No overdue or near-term items.</p> : null}
             </div>
-          </div>
+          </section>
 
-          <div className="panel">
-            <div className="panel-heading compact-heading">
+          <section className="panel admin-panel">
+            <div className="admin-panel-heading">
               <div>
-                <span>Invites & email</span>
-                <h2>Access queue</h2>
+                <span>Invites</span>
+                <h2>Pending access</h2>
               </div>
             </div>
             <div className="admin-invite-list">
-              {pendingInvites.length === 0 ? <p className="muted-panel-copy">No pending invitations.</p> : null}
               {pendingInvites.slice(0, 10).map((invite) => (
-                <article key={`${invite.email}-${invite.created_at}`}>
+                <article key={`${invite.email}-${invite.company_id}`}>
                   <div>
                     <strong>{invite.email}</strong>
-                    <span>{roleLabel(invite.role)} · {companyName(invite)}</span>
+                    <span>{accessRoleLabel(invite.role)} · {companyName(invite)}</span>
                   </div>
                   <span>{formatDate(invite.created_at)}</span>
                 </article>
               ))}
+              {pendingInvites.length === 0 ? <p className="muted-panel-copy">No pending invitations.</p> : null}
             </div>
-          </div>
+          </section>
         </section>
       </section>
     </main>

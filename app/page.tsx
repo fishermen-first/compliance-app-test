@@ -4,17 +4,12 @@ import { AuthScreen } from '@/components/auth-screen';
 import { Dashboard } from '@/components/dashboard';
 import { NoAccessScreen } from '@/components/no-access-screen';
 import { type ComplianceItem } from '@/lib/compliance';
+import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
 type HomeProps = {
   searchParams?: { message?: string; owner?: string };
 };
-
-function titleCase(value: string) {
-  return value
-    .replaceAll('_', ' ')
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
 
 function ownerCodeForUser(name: string, email?: string | null) {
   const source = `${name} ${email ?? ''}`.toLowerCase();
@@ -104,7 +99,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={titleCase(membership.role)} />
+      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} />
       <Dashboard
         companyName={company?.name ?? 'FF Compliance'}
         items={items}

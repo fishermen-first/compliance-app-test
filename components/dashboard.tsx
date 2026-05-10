@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { CheckCircle2, ListFilter, Mail, Plus } from 'lucide-react';
+import { accessRoleLabel } from '@/lib/roles';
 import {
   type ComplianceItem,
   displayState,
@@ -16,16 +17,6 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join('') || 'U';
-}
-
-function roleLabel(role: string) {
-  const labels: Record<string, string> = {
-    owner: 'Company Admin',
-    office_admin: 'Office Admin',
-    office_user: 'Office User'
-  };
-
-  return labels[role] ?? role.replaceAll('_', ' ');
 }
 
 function itemVessel(item: ComplianceItem) {
@@ -106,7 +97,7 @@ export function Dashboard({
         <button className="user-pill" type="button" aria-label={`Current user ${currentUserName}`}>
           <span>{initials(currentUserName)}</span>
           <strong>{currentUserName}</strong>
-          <small>{roleLabel(currentUserRole)}{currentOwnerCode ? ` · ${currentOwnerCode}` : ''}</small>
+          <small>{accessRoleLabel(currentUserRole)}{currentOwnerCode ? ` · ${currentOwnerCode}` : ''}</small>
         </button>
       </header>
 
