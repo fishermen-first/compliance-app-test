@@ -41,7 +41,7 @@ export function WorkspaceSetup({ step, email }: WorkspaceSetupProps) {
         <form action={createWorkspace} className="setup-form-real">
           <label>
             Your name
-            <input name="fullName" placeholder="Sarah Nayani" required />
+            <input name="fullName" placeholder="Jordan Lee" required />
           </label>
           <label>
             Work email

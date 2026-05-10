@@ -11,7 +11,7 @@ export function AuthScreen({ message }: { message?: string }) {
         {message ? <p className="form-message">{message}</p> : null}
         <form action={signInWithMagicLink} className="auth-form">
           <label htmlFor="email">Email address</label>
-          <input id="email" name="email" type="email" placeholder="sarah@company.com" required />
+          <input id="email" name="email" type="email" placeholder="ops@company.com" required />
           <button type="submit">Send sign-in link</button>
         </form>
       </section>
