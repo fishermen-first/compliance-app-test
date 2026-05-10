@@ -6,8 +6,7 @@ import {
   displayState,
   formatDate,
   daysUntil,
-  stateClassName,
-  shortDate
+  stateClassName
 } from '@/lib/compliance';
 import { itemVessel } from '@/lib/customer-data';
 
@@ -53,7 +52,7 @@ export function Dashboard({
   const readyItems = openItems.filter((item) => displayState(item) === 'Ready');
   const inProgressItems = openItems.filter((item) => item.status === 'in_progress');
   const submittedItems = openItems.filter((item) => item.status === 'submitted');
-  const nextItem = actionableItems[0] ?? sortedByStart(openItems)[0];
+  const upcomingItems = openItems.filter((item) => displayState(item) === 'Upcoming');
   const ownerCodes = Array.from(new Set(openItems.map((item) => item.owner_current).filter(Boolean) as string[])).sort();
   const soonItems = openItems.filter((item) => {
     const expirationDays = daysUntil(item.expiration_date);
@@ -62,78 +61,85 @@ export function Dashboard({
 
   return (
     <main className="workspace">
-      <header className="topbar compliance-topbar">
-        <article className="next-due-banner">
-          <div>
-            <span>Next action</span>
-            <strong>{nextItem ? shortDate(nextItem.start_working_on) : 'None'}</strong>
-          </div>
-          <div>
-            <h1>{nextItem?.item_name ?? 'No compliance items yet'}</h1>
-            <p>
-              {nextItem
-                ? `${itemVessel(nextItem)} · ${nextItem.owner_current ?? 'Unassigned'} · expires ${shortDate(nextItem.expiration_date)}`
-                : 'Import the Due Dates sheet or add the first item to build the work queue.'}
-            </p>
-          </div>
-          <strong className={nextItem ? `due-soon state-${stateClassName(displayState(nextItem))}` : 'due-soon'}>
-            {nextItem ? displayState(nextItem) : 'Ready'}
-          </strong>
-        </article>
+      <header className="customer-page-header">
+        <div>
+          <p className="eyebrow">{companyName}</p>
+          <h1>Work queue</h1>
+          <p>Track active renewals, submissions, and upcoming compliance work from the imported due-date sheet.</p>
+        </div>
 
-        <Link className="secondary-action" href="/calendar">
-          <CalendarDays aria-hidden="true" />
-          <span>Calendar</span>
-        </Link>
-        {canCreateItems ? (
-          <Link className="primary-action" href="/items/new">
-            <Plus aria-hidden="true" />
-            <span>New Item</span>
+        <div className="customer-header-actions">
+          <Link className="secondary-action" href="/calendar">
+            <CalendarDays aria-hidden="true" />
+            <span>Calendar</span>
           </Link>
-        ) : null}
-        <button className="user-pill" type="button" aria-label={`Current user ${currentUserName}`}>
-          <span>{initials(currentUserName)}</span>
-          <strong>{currentUserName}</strong>
-          <small>{accessRoleLabel(currentUserRole)}{currentOwnerCode ? ` · ${currentOwnerCode}` : ''}</small>
-        </button>
+          {canCreateItems ? (
+            <Link className="primary-action" href="/items/new">
+              <Plus aria-hidden="true" />
+              <span>New item</span>
+            </Link>
+          ) : null}
+          <button className="user-pill" type="button" aria-label={`Current user ${currentUserName}`}>
+            <span>{initials(currentUserName)}</span>
+            <strong>{currentUserName}</strong>
+            <small>{accessRoleLabel(currentUserRole)}{currentOwnerCode ? ` · ${currentOwnerCode}` : ''}</small>
+          </button>
+        </div>
       </header>
 
-      <section className="metric-strip" aria-label="Compliance summary">
-        <article>
-          <span>My work queue</span>
-          <strong>{actionableItems.length}</strong>
-          <p>{showAllOwners ? 'All owners selected' : currentOwnerCode ? `Owner ${currentOwnerCode}` : 'All actionable items'}</p>
-        </article>
-        <article>
-          <span>Ready to start</span>
-          <strong>{readyItems.length}</strong>
+      <section className="workflow-tabs" aria-label="Workflow summary">
+        <Link href="/items?status=ready">
+          <div>
+            <span>Ready</span>
+            <strong>{readyItems.length}</strong>
+          </div>
           <p>Start date has arrived</p>
-        </article>
-        <article>
-          <span>Due in 30 days</span>
-          <strong>{soonItems.length}</strong>
-          <p>Expiration date approaching</p>
-        </article>
-        <article>
-          <span>Overdue</span>
-          <strong>{overdueItems.length}</strong>
-          <p>Past expiration date</p>
-        </article>
+        </Link>
+        <Link href="/items?status=in_progress">
+          <div>
+            <span>In progress</span>
+            <strong>{inProgressItems.length}</strong>
+          </div>
+          <p>Being worked now</p>
+        </Link>
+        <Link href="/items?status=submitted">
+          <div>
+            <span>Submitted</span>
+            <strong>{submittedItems.length}</strong>
+          </div>
+          <p>Waiting on response</p>
+        </Link>
+        <Link href="/items?status=upcoming">
+          <div>
+            <span>Upcoming</span>
+            <strong>{upcomingItems.length}</strong>
+          </div>
+          <p>Not ready yet</p>
+        </Link>
+        <Link href="/items?status=overdue">
+          <div>
+            <span>Overdue</span>
+            <strong>{overdueItems.length}</strong>
+          </div>
+          <p>Past expiration</p>
+        </Link>
       </section>
 
       <section className="dashboard-grid queue-grid">
         <div className="main-column">
-          <section className="panel priority-panel">
+          <section className="panel priority-panel queue-panel">
             <div className="panel-heading">
               <div>
-                <span>{companyName}</span>
-                <h2>{showAllOwners ? 'All actionable items' : 'My work queue'}</h2>
+                <span>{showAllOwners ? 'All owners' : currentOwnerCode ? `Legacy owner ${currentOwnerCode}` : 'Actionable work'}</span>
+                <h2>{showAllOwners ? 'Current work queue' : 'My work queue'}</h2>
               </div>
               <div className="queue-actions">
-                <Link className="secondary-link" href={showAllOwners ? '/' : '/?owner=all'}>
-                  <ListFilter aria-hidden="true" />
-                  {showAllOwners ? 'Show Mine' : 'All Owners'}
-                </Link>
+                {currentOwnerCode ? (
+                  <Link className="secondary-link" href={showAllOwners ? `/?owner=${currentOwnerCode}` : '/?owner=all'}>
+                    <ListFilter aria-hidden="true" />
+                    {showAllOwners ? 'Show mine' : 'All owners'}
+                  </Link>
+                ) : null}
                 <Link className="secondary-link" href="/items">All records</Link>
               </div>
             </div>
@@ -147,11 +153,10 @@ export function Dashboard({
             ) : null}
 
             <div className="work-table" role="table" aria-label="Actionable compliance items">
-              <div className="work-table-row work-table-head" role="row">
-                <span>Owner</span>
+              <div className="work-table-row queue-table-row work-table-head" role="row">
+                <span>Legacy owner</span>
                 <span>Vessel</span>
                 <span>Item</span>
-                <span>Area</span>
                 <span>Start</span>
                 <span>Expiration</span>
                 <span>Status</span>
@@ -165,11 +170,10 @@ export function Dashboard({
               ) : actionableItems.slice(0, 12).map((item) => {
                 const state = displayState(item);
                 return (
-                  <Link className="work-table-row" href={`/items/${item.id}`} role="row" key={item.id}>
+                  <Link className="work-table-row queue-table-row" href={`/items/${item.id}`} role="row" key={item.id}>
                     <span>{item.owner_current ?? 'Unassigned'}</span>
                     <span>{itemVessel(item)}</span>
-                    <strong>{item.item_name}</strong>
-                    <span>{item.compliance_area ?? 'Other'}</span>
+                    <strong>{item.item_name}<small>{item.agency_type ?? 'No agency'} · {item.compliance_area ?? 'Other'}</small></strong>
                     <span>{formatDate(item.start_working_on)}</span>
                     <span>{formatDate(item.expiration_date)}</span>
                     <span className={`status-chip state-${stateClassName(state)}`}>{state}</span>
@@ -182,26 +186,25 @@ export function Dashboard({
 
         <aside className="right-column">
           <section className="panel vessel-panel">
-            <span>By Owner</span>
+            <span>Legacy owners</span>
+            <div className="owner-count-list">
             {ownerCodes.map((owner) => {
               const count = openItems.filter((item) => item.owner_current === owner).length;
               return (
-                <div className="vessel-bar" key={owner}>
-                  <div>
-                    <strong>{owner}</strong>
-                    <span>{count}</span>
-                  </div>
-                  <progress value={count} max={Math.max(1, openItems.length)} />
-                </div>
+                <Link href={`/?owner=${owner}`} key={owner} className={currentOwnerCode === owner && !showAllOwners ? 'active' : ''}>
+                  <strong>{owner}</strong>
+                  <span>{count}</span>
+                </Link>
               );
             })}
+            </div>
           </section>
 
           <section className="panel week-panel">
-            <span>Submitted</span>
-            <strong>{submittedItems.length} items</strong>
-            <p>Waiting on agencies, auditors, certifiers, or confirmation paperwork.</p>
-            <Link href="/items?status=submitted">Review submitted</Link>
+            <span>Due in 30 days</span>
+            <strong>{soonItems.length}</strong>
+            <p>Expirations approaching soon. Review these alongside submitted and ready work.</p>
+            <Link href="/calendar">Open calendar</Link>
           </section>
 
           <section className="panel activity-panel">

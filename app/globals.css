@@ -102,7 +102,7 @@ svg {
 
 .brand-block strong {
   display: block;
-  font-size: 22px;
+  font-size: 18px;
   line-height: 1.12;
 }
 
@@ -274,6 +274,7 @@ svg {
   border-radius: 8px;
   background: #fffefa;
   font-weight: 850;
+  text-decoration: none;
 }
 
 .primary-action {
@@ -292,15 +293,15 @@ svg {
 
 .user-pill {
   gap: 10px;
-  min-width: 180px;
-  padding: 0 16px;
+  min-width: 0;
+  padding: 0 14px;
   border-radius: 999px;
 }
 
 .user-pill span {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   place-items: center;
   border-radius: 50%;
   background: #edf4e6;
@@ -324,11 +325,108 @@ svg {
   text-transform: uppercase;
 }
 
+.customer-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 28px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.customer-page-header h1 {
+  margin: 0;
+  font-size: clamp(34px, 4vw, 52px);
+  line-height: 0.98;
+}
+
+.customer-page-header p:not(.eyebrow) {
+  max-width: 720px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.customer-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.customer-header-actions .secondary-action,
+.customer-header-actions .primary-action {
+  min-height: 46px;
+}
+
+.customer-header-actions .user-pill {
+  min-height: 46px;
+}
+
+.workflow-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.workflow-tabs a {
+  display: grid;
+  gap: 8px;
+  min-height: 104px;
+  padding: 18px 20px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.workflow-tabs a + a {
+  border-left: 1px solid var(--line);
+}
+
+.workflow-tabs a:hover {
+  background: #f7fbf8;
+}
+
+.workflow-tabs div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.workflow-tabs span {
+  color: #89938f;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.workflow-tabs strong {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.workflow-tabs p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 750;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
   gap: 24px;
   align-items: flex-start;
+}
+
+.queue-grid {
+  grid-template-columns: minmax(0, 1fr) 280px;
 }
 
 .main-column,
@@ -406,6 +504,17 @@ svg {
   font-size: 38px;
   font-weight: 500;
   line-height: 1.05;
+}
+
+.queue-panel .panel-heading {
+  padding: 22px 28px;
+}
+
+.queue-panel .panel-heading h2 {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.1;
 }
 
 .legend {
@@ -554,6 +663,47 @@ svg {
   color: #fff;
 }
 
+.week-panel a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  margin-top: 16px;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.11);
+  color: #fff;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.owner-count-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.owner-count-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.owner-count-list a:hover,
+.owner-count-list a.active {
+  border-color: rgba(18, 120, 109, 0.34);
+  background: #edf7f1;
+  color: var(--teal-dark);
+}
+
 .activity-panel ul {
   display: grid;
   gap: 14px;
@@ -582,6 +732,23 @@ svg {
     grid-template-columns: 1fr;
   }
 
+  .customer-page-header {
+    flex-direction: column;
+  }
+
+  .customer-header-actions {
+    justify-content: flex-start;
+  }
+
+  .workflow-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workflow-tabs a + a {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
   .next-due-banner {
     grid-template-columns: 96px minmax(0, 1fr) 120px;
   }
@@ -603,6 +770,7 @@ svg {
   }
 
   .metric-strip,
+  .workflow-tabs,
   .right-column {
     grid-template-columns: 1fr;
   }
@@ -1112,6 +1280,10 @@ svg {
   text-decoration: none;
 }
 
+.queue-table-row {
+  grid-template-columns: 92px minmax(122px, 0.72fr) minmax(300px, 1.6fr) 126px 126px 118px;
+}
+
 .all-items-table .work-table-row {
   grid-template-columns: 62px minmax(118px, 145px) minmax(250px, 1.4fr) minmax(80px, 0.45fr) minmax(130px, 0.75fr) minmax(105px, 0.6fr) minmax(112px, 0.65fr) minmax(112px, 0.65fr) minmax(112px, 0.65fr);
 }
@@ -1143,6 +1315,21 @@ svg {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.queue-table-row strong {
+  display: grid;
+  gap: 4px;
+}
+
+.queue-table-row strong small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status-chip.state-upcoming { background: #ece9df; color: #635d4f; }
