@@ -71,7 +71,7 @@ function setupStage(company: CompanySetup) {
 
   return {
     label: 'Verify access',
-    detail: `${company.users} active users · ${company.pendingInvites} pending invites.`,
+    detail: `${company.users} active users · ${company.pendingInvites} pending login.`,
     action: 'View workspace',
     href: `/admin/companies/${company.id}`,
     tone: 'ready'
@@ -163,7 +163,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     },
     {
       label: 'Add users',
-      description: hasWorkspaces ? 'Invite users after owner mapping is ready.' : 'Users are added after mapping.',
+      description: hasWorkspaces ? 'Add users after owner mapping is ready.' : 'Users are added after mapping.',
       state: hasWorkspaces && activeStage?.label === 'Add users' ? 'active' : hasWorkspaces ? 'ready' : 'locked',
       icon: UserPlus,
       href: activeCompany ? `/admin/companies/${activeCompany.id}#access` : '#create-workspace'
@@ -202,7 +202,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <div className="admin-wizard-intro">
             <span>Guided setup</span>
             <h2>{activeCompany && activeStage ? `${activeStage.action} for ${activeCompany.name}` : 'Create your first customer workspace'}</h2>
-            <p>{activeStage?.detail ?? 'Create the workspace first. Import, owner mapping, and user invites happen from that workspace page.'}</p>
+            <p>{activeStage?.detail ?? 'Create the workspace first. Import, owner mapping, and user access happen from that workspace page.'}</p>
           </div>
 
           <div className="admin-wizard-steps" aria-label="Setup steps">

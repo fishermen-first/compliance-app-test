@@ -150,12 +150,7 @@ export function proposedNextDates(item: Pick<ComplianceItem, 'start_working_on' 
 
 export function parseOwnerCurrent(ownerRaw: string | null) {
   const value = (ownerRaw ?? '').trim();
-  if (!value) return null;
-  if (value.includes('-->')) return value.split('-->')[0].trim();
-  if (value.includes('->')) return value.split('->')[0].trim();
-  if (value.includes('/')) return value.split('/')[0].trim();
-  if (value.includes('-')) return value.split('-')[0].trim();
-  return value;
+  return value || null;
 }
 
 export function inferComplianceArea(agencyType: string | null, itemName: string | null) {

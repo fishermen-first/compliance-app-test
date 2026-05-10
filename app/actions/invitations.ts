@@ -39,7 +39,7 @@ async function provisionAuthUser(email: string) {
     return 'existing';
   }
 
-  throw new Error(`Invitation saved, but Supabase could not provision the auth user: ${error.message}`);
+  throw new Error(`User access saved, but Supabase could not provision the auth user: ${error.message}`);
 }
 
 function parseOwnerCodes(formData: FormData) {
@@ -136,7 +136,7 @@ export async function createInvitation(formData: FormData) {
   const { data: isAppAdmin } = await supabase.rpc('is_app_admin');
 
   if (!isAppAdmin) {
-    throw new Error('Only FF admins can invite demo users right now.');
+    throw new Error('Only FF admins can add customer users right now.');
   }
 
   if (role === 'app_admin') {
@@ -185,7 +185,7 @@ export async function createInvitation(formData: FormData) {
   revalidatePath(`/admin/companies/${companyId}`);
   const message =
     authUserStatus === 'created'
-      ? 'Invitation saved. User can request a login link.'
-      : 'Invitation saved. Existing user can request a login link.';
+      ? 'User added. They can request a login link when you are ready.'
+      : 'User access updated. Existing user can request a login link when you are ready.';
   redirect(`${redirectTo}?message=${encodeURIComponent(message)}#access`);
 }

@@ -16,7 +16,7 @@ function loginErrorMessage(message: string) {
     normalized.includes('user not found') ||
     normalized.includes('database error saving new user')
   ) {
-    return 'This email is not invited yet. Ask an FF admin to add you first.';
+    return 'This email has not been added yet. Ask an FF admin to add you first.';
   }
 
   return message;
@@ -93,7 +93,7 @@ export async function signInWithMagicLink(formData: FormData) {
   }
 
   if (!canLogIn) {
-    redirect('/?message=This%20email%20is%20not%20invited%20yet.%20Ask%20an%20FF%20admin%20to%20add%20you%20first.');
+    redirect('/?message=This%20email%20has%20not%20been%20added%20yet.%20Ask%20an%20FF%20admin%20to%20add%20you%20first.');
   }
 
   const supabaseAdmin = createAdminClient();

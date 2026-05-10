@@ -127,7 +127,7 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
         : !ownerMappingComplete
           ? 'Map every detected owner code'
           : !hasAccessStarted
-            ? 'Invite the customer team'
+            ? 'Add the customer team'
             : 'Verify first login';
 
   const steps = [
@@ -135,8 +135,8 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
     { label: 'Import', detail: `${itemRows.length} items`, state: stepState(hasData, !hasData) },
     { label: 'Review', detail: `${activeVessels.length} vessels · ${ownerCodeRows.length} owner codes`, state: stepState(hasData && hasOwnerCodes, hasData && !hasOwnerCodes) },
     { label: 'Map owners', detail: `${mappedOwnerCodes.length}/${ownerCodeRows.length} mapped`, state: stepState(ownerMappingComplete, hasOwnerCodes && !ownerMappingComplete) },
-    { label: 'Invite', detail: `${customerMemberships.length} users · ${pendingInvites.length} pending`, state: stepState(hasAccessStarted, canInvite && !hasAccessStarted) },
-    { label: 'Verify', detail: hasAccessStarted ? 'Customer access started' : 'Waiting for invites', state: stepState(hasAccessStarted, false) }
+    { label: 'Add users', detail: `${customerMemberships.length} users · ${pendingInvites.length} pending`, state: stepState(hasAccessStarted, canInvite && !hasAccessStarted) },
+    { label: 'Verify', detail: hasAccessStarted ? 'Customer access started' : 'Waiting for users', state: stepState(hasAccessStarted, false) }
   ];
 
   return (
@@ -149,7 +149,7 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
         <nav className="admin-rail-nav" aria-label="Workspace setup steps">
           <a href="#import"><Upload aria-hidden="true" /><span>Import</span></a>
           <a href="#mapping"><Users aria-hidden="true" /><span>Map owners</span></a>
-          <a href="#access"><UserPlus aria-hidden="true" /><span>Invite</span></a>
+          <a href="#access"><UserPlus aria-hidden="true" /><span>Add users</span></a>
         </nav>
         <div className="admin-rail-footer">
           <span>Workspace</span>
@@ -224,19 +224,19 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
               </label>
               <button type="submit">{hasData ? 'Re-import workbook' : 'Import workbook'}</button>
             </form>
-            <p className="admin-flow-note">Re-importing updates rows from the same sheet and row number. It will not invite anyone.</p>
+            <p className="admin-flow-note">Re-importing updates rows from the same sheet and row number. It will not add users or notify anyone.</p>
           </section>
 
           <section className="panel admin-panel" id="access">
             <div className="admin-panel-heading">
               <div>
                 <span>Final step</span>
-                <h2>Invite customer users</h2>
+                <h2>Add customer users</h2>
               </div>
               <UserPlus aria-hidden="true" />
             </div>
             {!canInvite ? (
-              <p className="admin-guard-note">Invites unlock after the workbook is imported and every detected owner code has an assigned or pending email.</p>
+              <p className="admin-guard-note">User access unlocks after the workbook is imported and every detected owner code has an assigned email.</p>
             ) : null}
             <form action={createInvitation} className="admin-role-form">
               <input type="hidden" name="companyId" value={companyId} />
@@ -262,7 +262,7 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
                   </label>
                 ))}
               </fieldset>
-              <button type="submit" disabled={!canInvite}>Send invite</button>
+              <button type="submit" disabled={!canInvite}>Add user</button>
             </form>
             <div className="support-access-list">
               {customerMemberships.map((membership) => (
@@ -278,12 +278,12 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
                 <article key={`${invite.email}-${invite.created_at}`}>
                   <div>
                     <strong>{invite.email}</strong>
-                    <span>Invite pending · {formatDate(invite.created_at)}</span>
+                    <span>Added, login pending · {formatDate(invite.created_at)}</span>
                   </div>
                   <span>{accessRoleLabel(invite.role)}</span>
                 </article>
               ))}
-              {customerMemberships.length === 0 && pendingInvites.length === 0 ? <p className="muted-panel-copy">No customer users or pending invites.</p> : null}
+              {customerMemberships.length === 0 && pendingInvites.length === 0 ? <p className="muted-panel-copy">No customer users added yet.</p> : null}
             </div>
           </section>
         </section>
@@ -304,7 +304,7 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
                 <article key={owner.code}>
                   <div>
                     <strong>{owner.code}</strong>
-                    <span>{count} records · {owner.user_id ? 'Mapped user' : owner.pending_email ? 'Pending invite' : 'Unmapped'}</span>
+                    <span>{count} records · {owner.user_id ? 'Mapped user' : owner.pending_email ? 'Pending login' : 'Unmapped'}</span>
                   </div>
                   <form action={saveOwnerCodeMapping} className="owner-mapping-form">
                     <input type="hidden" name="companyId" value={companyId} />

@@ -95,12 +95,8 @@ function importDate(
 }
 
 function parseOwnerCurrent(ownerRaw: string | null) {
-  if (!ownerRaw) return null;
-  if (ownerRaw.includes('-->')) return ownerRaw.split('-->', 1)[0].trim();
-  if (ownerRaw.includes('->')) return ownerRaw.split('->', 1)[0].trim();
-  if (ownerRaw.includes('/')) return ownerRaw.split('/', 1)[0].trim();
-  if (ownerRaw.includes('-')) return ownerRaw.split('-', 1)[0].trim();
-  return ownerRaw.trim();
+  const value = ownerRaw?.trim();
+  return value || null;
 }
 
 function inferRecurrence(frequency: string | null): { unit: RecurrenceUnit; interval: number | null } {

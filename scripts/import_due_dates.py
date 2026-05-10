@@ -92,15 +92,7 @@ def parse_owner_current(owner_raw: str | None) -> str | None:
     if not owner_raw:
         return None
     value = owner_raw.strip()
-    if "-->" in value:
-        return value.split("-->", 1)[0].strip()
-    if "->" in value:
-        return value.split("->", 1)[0].strip()
-    if "/" in value:
-        return value.split("/", 1)[0].strip()
-    if "-" in value:
-        return value.split("-", 1)[0].strip()
-    return value
+    return value or None
 
 
 def owner_code(value: str | None) -> str | None:

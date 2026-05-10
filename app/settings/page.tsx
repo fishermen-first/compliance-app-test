@@ -95,7 +95,7 @@ export default async function SettingsPage() {
               {pendingInvites.map((invite) => (
                 <article key={invite.email}>
                   <strong>{invite.email}</strong>
-                  <span>Invitation pending</span>
+                  <span>Added, login pending</span>
                   <b>{accessRoleLabel(invite.role)}</b>
                 </article>
               ))}
@@ -121,7 +121,7 @@ export default async function SettingsPage() {
                   <article key={owner.code}>
                     <div>
                       <strong>{owner.code}</strong>
-                      <span>{count} records · {owner.user_id ? 'Mapped user' : owner.pending_email ? 'Pending invite' : 'Unmapped'}</span>
+                      <span>{count} records · {owner.user_id ? 'Mapped user' : owner.pending_email ? 'Pending login' : 'Unmapped'}</span>
                     </div>
                     <Link href={`/items?owner=${encodeURIComponent(owner.code)}`}>View records</Link>
                     {canManageOwnerCodes ? (
