@@ -1,37 +1,13 @@
 import Link from 'next/link';
-import { Mail, Plus } from 'lucide-react';
-
-export type DashboardEvent = {
-  id: string;
-  title: string;
-  vessel: string;
-  owner: string;
-  dueDate: string;
-  daysAway: number;
-  status: 'draft' | 'active' | 'waiting_on_vessel' | 'office_review' | 'complete' | 'archived';
-  priority: 'low' | 'medium' | 'high';
-  category: string;
-};
-
-export type DashboardVessel = {
-  id: string;
-  name: string;
-  activeEvents: number;
-  color: string;
-};
-
-const statusLabels: Record<DashboardEvent['status'], string> = {
-  draft: 'Draft',
-  active: 'Active',
-  waiting_on_vessel: 'Waiting on Vessel',
-  office_review: 'Office Review',
-  complete: 'Complete',
-  archived: 'Archived'
-};
-
-function statusClass(status: string) {
-  return status.replaceAll('_', '-');
-}
+import { CheckCircle2, ListFilter, Mail, Plus } from 'lucide-react';
+import {
+  type ComplianceItem,
+  displayState,
+  formatDate,
+  daysUntil,
+  stateClassName,
+  shortDate
+} from '@/lib/compliance';
 
 function initials(name: string) {
   return name
@@ -42,156 +18,210 @@ function initials(name: string) {
     .join('') || 'U';
 }
 
-function pluralize(count: number, singular: string, plural = singular + 's') {
-  return `${count} ${count === 1 ? singular : plural}`;
+function roleLabel(role: string) {
+  const labels: Record<string, string> = {
+    owner: 'Company Admin',
+    office_admin: 'Office Admin',
+    office_user: 'Office User'
+  };
+
+  return labels[role] ?? role.replaceAll('_', ' ');
+}
+
+function itemVessel(item: ComplianceItem) {
+  return item.vessel_name || 'Company-wide';
+}
+
+function sortedByStart(items: ComplianceItem[]) {
+  return [...items].sort((a, b) => (a.start_working_on ?? '9999-12-31').localeCompare(b.start_working_on ?? '9999-12-31'));
 }
 
 export function Dashboard({
-  events,
-  vessels,
+  companyName,
+  items,
   currentUserName,
-  activity
+  currentUserRole,
+  currentOwnerCode,
+  showAllOwners,
+  canCreateItems
 }: {
-  events: DashboardEvent[];
-  vessels: DashboardVessel[];
+  companyName: string;
+  items: ComplianceItem[];
   currentUserName: string;
-  activity: string[];
+  currentUserRole: string;
+  currentOwnerCode: string | null;
+  showAllOwners: boolean;
+  canCreateItems: boolean;
 }) {
-  const nextEvent = events[0];
-  const dueNextThirty = events.filter((event) => event.daysAway <= 30).length;
-  const waitingOnVessel = events.filter((event) => event.status === 'waiting_on_vessel').length;
-  const officeReview = events.filter((event) => event.status === 'office_review').length;
-  const highPriority = events.filter((event) => event.priority === 'high').length;
-  const maxVesselEvents = Math.max(1, ...vessels.map((vessel) => vessel.activeEvents));
-  const thisWeekCount = events.filter((event) => event.daysAway >= 0 && event.daysAway <= 7).length;
+  const openItems = items.filter((item) => !['complete', 'discontinued'].includes(item.status));
+  const ownerItems = currentOwnerCode && !showAllOwners
+    ? openItems.filter((item) => item.owner_current === currentOwnerCode)
+    : openItems;
+  const actionableItems = sortedByStart(ownerItems.filter((item) => {
+    const state = displayState(item);
+    return ['Ready', 'In Progress', 'Submitted', 'Overdue'].includes(state);
+  }));
+  const overdueItems = openItems.filter((item) => displayState(item) === 'Overdue');
+  const readyItems = openItems.filter((item) => displayState(item) === 'Ready');
+  const inProgressItems = openItems.filter((item) => item.status === 'in_progress');
+  const submittedItems = openItems.filter((item) => item.status === 'submitted');
+  const nextItem = actionableItems[0] ?? sortedByStart(openItems)[0];
+  const ownerCodes = Array.from(new Set(openItems.map((item) => item.owner_current).filter(Boolean) as string[])).sort();
+  const soonItems = openItems.filter((item) => {
+    const expirationDays = daysUntil(item.expiration_date);
+    return expirationDays !== null && expirationDays >= 0 && expirationDays <= 30;
+  });
 
   return (
     <main className="workspace">
-      <header className="topbar">
+      <header className="topbar compliance-topbar">
         <article className="next-due-banner">
           <div>
-            <span>Next due</span>
-            <strong>{nextEvent?.dueDate ?? 'None'}</strong>
+            <span>Next action</span>
+            <strong>{nextItem ? shortDate(nextItem.start_working_on) : 'None'}</strong>
           </div>
           <div>
-            <h1>{nextEvent?.title ?? 'No compliance events yet'}</h1>
+            <h1>{nextItem?.item_name ?? 'No compliance items yet'}</h1>
             <p>
-              {nextEvent
-                ? `${nextEvent.vessel} · ${nextEvent.daysAway} days · ${nextEvent.owner}`
-                : 'Create your first event to start tracking deadlines.'}
+              {nextItem
+                ? `${itemVessel(nextItem)} · ${nextItem.owner_current ?? 'Unassigned'} · expires ${shortDate(nextItem.expiration_date)}`
+                : 'Import the Due Dates sheet or add the first item to build the work queue.'}
             </p>
           </div>
-          <strong className="due-soon">{nextEvent && nextEvent.daysAway <= 14 ? 'Due soon' : 'Ready'}</strong>
+          <strong className={nextItem ? `due-soon state-${stateClassName(displayState(nextItem))}` : 'due-soon'}>
+            {nextItem ? displayState(nextItem) : 'Ready'}
+          </strong>
         </article>
 
-        <Link className="secondary-action" href="#">
+        <Link className="secondary-action" href="/reminders">
           <Mail aria-hidden="true" />
-          <span>Email Queue</span>
+          <span>Reminders</span>
         </Link>
-        <Link className="primary-action" href="/events/new">
-          <Plus aria-hidden="true" />
-          <span>New Event</span>
-        </Link>
+        {canCreateItems ? (
+          <Link className="primary-action" href="/items/new">
+            <Plus aria-hidden="true" />
+            <span>New Item</span>
+          </Link>
+        ) : null}
         <button className="user-pill" type="button" aria-label={`Current user ${currentUserName}`}>
           <span>{initials(currentUserName)}</span>
           <strong>{currentUserName}</strong>
+          <small>{roleLabel(currentUserRole)}{currentOwnerCode ? ` · ${currentOwnerCode}` : ''}</small>
         </button>
       </header>
 
-      <section className="dashboard-grid">
-        <div className="main-column">
-          <section className="metric-strip" aria-label="Compliance summary">
-            <article>
-              <span>Next 30 days</span>
-              <strong>{dueNextThirty}</strong>
-              <p>{pluralize(highPriority, 'high priority item')}</p>
-            </article>
-            <article>
-              <span>Waiting on vessel</span>
-              <strong>{waitingOnVessel}</strong>
-              <p>Response needed</p>
-            </article>
-            <article>
-              <span>Office review</span>
-              <strong>{officeReview}</strong>
-              <p>Ready to confirm</p>
-            </article>
-            <article>
-              <span>High priority</span>
-              <strong>{highPriority}</strong>
-              <p>Open items</p>
-            </article>
-          </section>
+      <section className="metric-strip" aria-label="Compliance summary">
+        <article>
+          <span>My work queue</span>
+          <strong>{actionableItems.length}</strong>
+          <p>{showAllOwners ? 'All owners selected' : currentOwnerCode ? `Owner ${currentOwnerCode}` : 'All actionable items'}</p>
+        </article>
+        <article>
+          <span>Ready to start</span>
+          <strong>{readyItems.length}</strong>
+          <p>Start date has arrived</p>
+        </article>
+        <article>
+          <span>Due in 30 days</span>
+          <strong>{soonItems.length}</strong>
+          <p>Expiration date approaching</p>
+        </article>
+        <article>
+          <span>Overdue</span>
+          <strong>{overdueItems.length}</strong>
+          <p>Past expiration date</p>
+        </article>
+      </section>
 
+      <section className="dashboard-grid queue-grid">
+        <div className="main-column">
           <section className="panel priority-panel">
             <div className="panel-heading">
               <div>
-                <span>Priority queue</span>
-                <h2>Upcoming deadlines</h2>
+                <span>{companyName}</span>
+                <h2>{showAllOwners ? 'All actionable items' : 'My work queue'}</h2>
               </div>
-              <div className="legend">
-                <span><i className="red-dot" />≤7d</span>
-                <span><i className="amber-dot" />≤14d</span>
-                <span><i className="green-dot" />≤30d</span>
+              <div className="queue-actions">
+                <Link className="secondary-link" href={showAllOwners ? '/' : '/?owner=all'}>
+                  <ListFilter aria-hidden="true" />
+                  {showAllOwners ? 'Show Mine' : 'All Owners'}
+                </Link>
+                <Link className="secondary-link" href="/items">All Items</Link>
               </div>
             </div>
 
-            <div className="event-list">
-              {events.length === 0 ? (
+            {ownerCodes.length > 0 ? (
+              <div className="owner-filter-row">
+                {ownerCodes.map((owner) => (
+                  <Link href={`/?owner=${owner}`} key={owner} className={currentOwnerCode === owner && !showAllOwners ? 'active' : ''}>{owner}</Link>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="work-table" role="table" aria-label="Actionable compliance items">
+              <div className="work-table-row work-table-head" role="row">
+                <span>Owner</span>
+                <span>Vessel</span>
+                <span>Item</span>
+                <span>Area</span>
+                <span>Start</span>
+                <span>Expiration</span>
+                <span>Status</span>
+              </div>
+              {actionableItems.length === 0 ? (
                 <div className="empty-state">
-                  <h3>No events yet</h3>
-                  <p>Add your first compliance deadline so reminders, status tracking, and vessel visibility have real data to work from.</p>
-                  <Link className="primary-action" href="/events/new">
-                    <Plus aria-hidden="true" />
-                    <span>Create first event</span>
-                  </Link>
+                  <CheckCircle2 aria-hidden="true" />
+                  <h3>No actionable items right now</h3>
+                  <p>Items will appear here when their start-working date arrives, or when they are in progress, submitted, or overdue.</p>
                 </div>
-              ) : (
-                events.map((event) => (
-                  <article className="event-row" key={event.id}>
-                    <i className={`category-dot ${event.category.toLowerCase()}`} />
-                    <div>
-                      <h3>{event.title}</h3>
-                      <p><span>{event.vessel}</span> {event.owner}</p>
-                    </div>
-                    <strong className={`status-chip ${statusClass(event.status)}`}>{statusLabels[event.status]}</strong>
-                    <span className="due-chip">{event.daysAway} days</span>
-                  </article>
-                ))
-              )}
+              ) : actionableItems.slice(0, 12).map((item) => {
+                const state = displayState(item);
+                return (
+                  <Link className="work-table-row" href={`/items/${item.id}`} role="row" key={item.id}>
+                    <span>{item.owner_current ?? 'Unassigned'}</span>
+                    <span>{itemVessel(item)}</span>
+                    <strong>{item.item_name}</strong>
+                    <span>{item.compliance_area ?? 'Other'}</span>
+                    <span>{formatDate(item.start_working_on)}</span>
+                    <span>{formatDate(item.expiration_date)}</span>
+                    <span className={`status-chip state-${stateClassName(state)}`}>{state}</span>
+                  </Link>
+                );
+              })}
             </div>
           </section>
         </div>
 
         <aside className="right-column">
           <section className="panel vessel-panel">
-            <span>By vessel</span>
-            {vessels.length === 0 ? <p className="muted-panel-copy">No vessels added yet.</p> : null}
-            {vessels.map((vessel) => (
-              <div className="vessel-bar" key={vessel.id}>
-                <div>
-                  <strong>{vessel.name}</strong>
-                  <span>{vessel.activeEvents}</span>
+            <span>By Owner</span>
+            {ownerCodes.map((owner) => {
+              const count = openItems.filter((item) => item.owner_current === owner).length;
+              return (
+                <div className="vessel-bar" key={owner}>
+                  <div>
+                    <strong>{owner}</strong>
+                    <span>{count}</span>
+                  </div>
+                  <progress value={count} max={Math.max(1, openItems.length)} />
                 </div>
-                <progress value={vessel.activeEvents} max={maxVesselEvents} style={{ accentColor: vessel.color }} />
-              </div>
-            ))}
+              );
+            })}
           </section>
 
           <section className="panel week-panel">
-            <span>This week</span>
-            <strong>{pluralize(thisWeekCount, 'item')}</strong>
-            <p>{thisWeekCount === 0 ? 'No deadlines in the next seven days.' : 'Items due soon are ready for reminders and office follow-up.'}</p>
-            <Link href="#">View schedule</Link>
+            <span>Submitted</span>
+            <strong>{submittedItems.length} items</strong>
+            <p>Waiting on agencies, auditors, certifiers, or confirmation paperwork.</p>
+            <Link href="/items?status=submitted">Review submitted</Link>
           </section>
 
           <section className="panel activity-panel">
-            <span>Recent activity</span>
-            {activity.length === 0 ? <p className="muted-panel-copy">No activity yet.</p> : null}
+            <span>Import health</span>
             <ul>
-              {activity.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
+              <li>{items.length} total imported/current items</li>
+              <li>{openItems.length} open items</li>
+              <li>{items.filter((item) => item.source_row_number).length} rows linked to spreadsheet source</li>
             </ul>
           </section>
         </aside>

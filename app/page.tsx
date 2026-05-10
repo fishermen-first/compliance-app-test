@@ -1,31 +1,56 @@
+import { redirect } from 'next/navigation';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AuthScreen } from '@/components/auth-screen';
-import { Dashboard, type DashboardEvent, type DashboardVessel } from '@/components/dashboard';
+import { Dashboard } from '@/components/dashboard';
+import { NoAccessScreen } from '@/components/no-access-screen';
 import { WorkspaceSetup } from '@/components/workspace-setup';
+import { type ComplianceItem } from '@/lib/compliance';
 import { createClient } from '@/lib/supabase/server';
 
 type HomeProps = {
-  searchParams?: { message?: string };
+  searchParams?: { message?: string; owner?: string };
 };
-
-const vesselColors = ['#12786d', '#132b3a', '#376f9f', '#8263c7', '#c45570'];
-
-function formatDueDate(value: string) {
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(value));
-}
-
-function daysAway(value: string) {
-  const due = new Date(value);
-  const now = new Date();
-  const start = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = Date.UTC(due.getFullYear(), due.getMonth(), due.getDate());
-  return Math.ceil((target - start) / 86_400_000);
-}
 
 function titleCase(value: string) {
   return value
     .replaceAll('_', ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function ownerCodeForUser(name: string, email?: string | null) {
+  const source = `${name} ${email ?? ''}`.toLowerCase();
+  if (source.includes('sarah')) return 'SN';
+  if (source.includes('emma')) return 'ES';
+  if (source.includes('meagan') || source.includes('meghan')) return 'MA';
+  return null;
+}
+
+function mapComplianceItem(row: any): ComplianceItem {
+  return {
+    id: row.id,
+    company_id: row.company_id,
+    vessel_id: row.vessel_id,
+    vessel_name: row.vessels?.name ?? null,
+    owner_raw: row.owner_raw,
+    owner_current: row.owner_current,
+    item_name: row.item_name,
+    item_number: row.item_number,
+    agency_type: row.agency_type,
+    compliance_area: row.compliance_area,
+    frequency_label: row.frequency_label,
+    recurrence_unit: row.recurrence_unit,
+    recurrence_interval: row.recurrence_interval,
+    start_working_on: row.start_working_on,
+    expiration_date: row.expiration_date,
+    status: row.status,
+    status_notes: row.status_notes,
+    instructions: row.instructions,
+    sharepoint_url: row.sharepoint_url,
+    completed_at: row.completed_at,
+    discontinued_at: row.discontinued_at,
+    source_row_number: row.source_row_number,
+    previous_item_id: row.previous_item_id
+  };
 }
 
 export default async function Home({ searchParams }: HomeProps) {
@@ -38,73 +63,60 @@ export default async function Home({ searchParams }: HomeProps) {
 
   const { data: membership } = await supabase
     .from('company_memberships')
-    .select('company_id')
+    .select('company_id, role')
     .eq('user_id', userData.user.id)
     .limit(1)
     .maybeSingle();
 
   if (!membership) {
-    return <WorkspaceSetup step="company" email={userData.user.email} />;
+    const [{ data: acceptedCompanyId }, { data: isAppAdmin }] = await Promise.all([
+      supabase.rpc('accept_company_invite', { full_name: userData.user.email?.split('@')[0] ?? 'User' }),
+      supabase.rpc('is_app_admin')
+    ]);
+
+    if (acceptedCompanyId) {
+      redirect('/');
+    }
+
+    if (isAppAdmin) {
+      return <WorkspaceSetup step="company" email={userData.user.email} />;
+    }
+
+    return <NoAccessScreen email={userData.user.email} />;
   }
 
-  const [{ data: company }, { data: profile }, { data: vessels }, { data: rawEvents }, { data: auditLog }] = await Promise.all([
+  const [{ data: company }, { data: profile }, { data: rawItems }, { data: isAppAdmin }] = await Promise.all([
     supabase.from('companies').select('name').eq('id', membership.company_id).single(),
     supabase.from('profiles').select('full_name').eq('id', userData.user.id).maybeSingle(),
-    supabase.from('vessels').select('id, name').eq('company_id', membership.company_id).eq('active', true).order('name'),
     supabase
-      .from('compliance_events')
-      .select('id, title, vessel_id, owner_id, due_at, status, priority, category')
+      .from('compliance_items')
+      .select('*, vessels(name)')
       .eq('company_id', membership.company_id)
-      .neq('status', 'archived')
-      .order('due_at', { ascending: true }),
-    supabase
-      .from('audit_log')
-      .select('action, metadata, created_at')
-      .eq('company_id', membership.company_id)
-      .order('created_at', { ascending: false })
-      .limit(5)
+      .order('start_working_on', { ascending: true, nullsFirst: false })
+      .order('expiration_date', { ascending: true, nullsFirst: false }),
+    supabase.rpc('is_app_admin')
   ]);
 
   const currentUserName = profile?.full_name ?? userData.user.email ?? 'User';
-  const vesselList = vessels ?? [];
-  const events = rawEvents ?? [];
-  const eventCountsByVessel = new Map<string, number>();
-
-  events.forEach((event) => {
-    if (event.vessel_id) {
-      eventCountsByVessel.set(event.vessel_id, (eventCountsByVessel.get(event.vessel_id) ?? 0) + 1);
-    }
-  });
-
-  const dashboardVessels: DashboardVessel[] = vesselList.map((vessel, index) => ({
-    id: vessel.id,
-    name: vessel.name,
-    activeEvents: eventCountsByVessel.get(vessel.id) ?? 0,
-    color: vesselColors[index % vesselColors.length]
-  }));
-
-  const vesselNameById = new Map(vesselList.map((vessel) => [vessel.id, vessel.name]));
-  const dashboardEvents: DashboardEvent[] = events.map((event) => ({
-    id: event.id,
-    title: event.title,
-    vessel: event.vessel_id ? vesselNameById.get(event.vessel_id) ?? 'Company-wide' : 'Company-wide',
-    owner: event.owner_id === userData.user.id ? currentUserName : 'Office',
-    dueDate: formatDueDate(event.due_at),
-    daysAway: daysAway(event.due_at),
-    status: event.status,
-    priority: event.priority,
-    category: titleCase(event.category)
-  }));
-
-  const activity = (auditLog ?? []).map((item) => {
-    const title = typeof item.metadata === 'object' && item.metadata && 'title' in item.metadata ? String(item.metadata.title) : '';
-    return title ? `${titleCase(item.action)}: ${title}` : titleCase(item.action);
-  });
+  const userOwnerCode = ownerCodeForUser(currentUserName, userData.user.email);
+  const requestedOwner = searchParams?.owner;
+  const showAllOwners = requestedOwner === 'all' || (!requestedOwner && !userOwnerCode);
+  const currentOwnerCode = requestedOwner && requestedOwner !== 'all' ? requestedOwner : userOwnerCode;
+  const canCreateItems = ['owner', 'office_admin', 'office_user'].includes(membership.role);
+  const items = (rawItems ?? []).map(mapComplianceItem);
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} />
-      <Dashboard events={dashboardEvents} vessels={dashboardVessels} currentUserName={currentUserName} activity={activity} />
+      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={titleCase(membership.role)} isAppAdmin={Boolean(isAppAdmin)} />
+      <Dashboard
+        companyName={company?.name ?? 'FF Compliance'}
+        items={items}
+        currentUserName={currentUserName}
+        currentUserRole={membership.role}
+        currentOwnerCode={currentOwnerCode}
+        showAllOwners={showAllOwners}
+        canCreateItems={canCreateItems}
+      />
     </div>
   );
 }

@@ -36,8 +36,8 @@ export function WorkspaceSetup({ step, email }: WorkspaceSetupProps) {
       <section className="setup-panel">
         <div className="setup-brand-row"><span className="brand-mark">FF</span><span>FF Compliance</span></div>
         <p className="eyebrow">Step 1 of 2</p>
-        <h1>Create your company workspace.</h1>
-        <p>This becomes the top-level account for vessels, people, compliance events, reminders, and document links.</p>
+        <h1>Create a client workspace.</h1>
+        <p>This FF admin-only setup creates the top-level account for vessels, people, compliance events, reminders, and document links.</p>
         <form action={createWorkspace} className="setup-form-real">
           <label>
             Your name

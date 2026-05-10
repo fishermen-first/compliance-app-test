@@ -10,5 +10,17 @@ export default async function VesselSetupPage() {
     redirect('/');
   }
 
+  const { data: membership } = await supabase
+    .from('company_memberships')
+    .select('role')
+    .eq('user_id', userData.user.id)
+    .in('role', ['owner', 'office_admin'])
+    .limit(1)
+    .maybeSingle();
+
+  if (!membership) {
+    redirect('/');
+  }
+
   return <WorkspaceSetup step="vessels" email={userData.user.email} />;
 }
