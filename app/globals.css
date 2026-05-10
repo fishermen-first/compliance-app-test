@@ -1489,8 +1489,7 @@ svg {
 
 .customer-summary-grid span,
 .vessel-summary-card span,
-.settings-card .panel-heading span,
-.agenda-list h3 {
+.settings-card .panel-heading span {
   display: block;
   margin: 0 0 8px;
   color: #89938f;
@@ -1512,18 +1511,106 @@ svg {
   font-weight: 750;
 }
 
-.agenda-list {
+.planning-toolbar {
+  display: grid;
+  gap: 14px;
+  padding: 18px 22px;
+}
+
+.planning-toolbar div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.planning-toolbar span {
+  min-width: 62px;
+  color: #66716e;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.planning-toolbar a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  color: var(--ink);
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.planning-toolbar a.active,
+.planning-toolbar a:hover {
+  border-color: rgba(18, 120, 109, 0.34);
+  background: #edf7f1;
+  color: var(--teal-dark);
+}
+
+.planning-list {
   display: grid;
 }
 
-.agenda-table-head {
+.planning-section + .planning-section {
+  border-top: 1px solid var(--line);
+}
+
+.planning-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px;
+}
+
+.planning-section-heading h3 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.08;
+}
+
+.planning-section-heading p {
+  max-width: 760px;
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.42;
+}
+
+.planning-section-heading > strong {
   display: grid;
-  grid-template-columns: 104px 122px minmax(0, 1fr) 98px 128px;
-  gap: 16px;
+  min-width: 44px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  font-size: 20px;
+}
+
+.planning-table {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+
+.planning-table-head,
+.planning-row {
+  display: grid;
+  grid-template-columns: 78px minmax(150px, 0.78fr) minmax(270px, 1.55fr) minmax(150px, 0.7fr) minmax(150px, 0.7fr) 118px;
+  gap: 14px;
   align-items: center;
+}
+
+.planning-table-head {
   min-height: 44px;
   padding: 0 24px;
-  border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   background: #f3f5ef;
   color: #66716e;
@@ -1533,64 +1620,89 @@ svg {
   text-transform: uppercase;
 }
 
-.agenda-list section + section {
-  border-top: 1px solid var(--line);
-}
-
-.agenda-list h3 {
-  padding: 22px 24px 8px;
-}
-
-.agenda-row {
-  display: grid;
-  grid-template-columns: 104px 122px minmax(0, 1fr) 98px 128px;
-  gap: 16px;
-  align-items: center;
-  min-height: 74px;
-  padding: 14px 24px;
+.planning-row {
+  min-height: 96px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line);
   color: var(--ink);
   text-decoration: none;
 }
 
-.agenda-row + .agenda-row {
-  border-top: 1px solid var(--line);
+.planning-row:last-child {
+  border-bottom: 0;
 }
 
-.agenda-row:hover,
+.planning-row:hover,
 .vessel-summary-card:hover {
   background: #f7fbf8;
 }
 
-.agenda-row b,
-.agenda-row p {
+.planning-owner-pill {
+  display: inline-flex;
+  justify-content: center;
+  width: fit-content;
+  min-width: 42px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #f8f7f1;
+  color: #58635f;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.planning-entity,
+.planning-item,
+.planning-date-cell {
+  min-width: 0;
+}
+
+.planning-entity strong,
+.planning-entity span,
+.planning-item b,
+.planning-item p,
+.planning-date-cell strong,
+.planning-date-cell small {
   display: block;
   min-width: 0;
   margin: 0;
 }
 
-.agenda-row p {
+.planning-entity strong,
+.planning-item b,
+.planning-date-cell strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.planning-entity span,
+.planning-item p,
+.planning-date-cell small {
   margin-top: 4px;
   color: var(--muted);
   font-weight: 650;
 }
 
-.agenda-kind {
-  display: inline-flex;
-  justify-content: center;
-  width: fit-content;
-  min-height: 28px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: var(--blue-soft);
-  color: #28547a;
-  font-size: 12px;
-  font-weight: 950;
+.planning-date-cell span {
+  display: none;
+  color: #89938f;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.agenda-kind-expiration {
-  background: var(--amber-soft);
-  color: #7a5115;
+.planning-row .status-chip {
+  justify-self: start;
+  padding: 7px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.planning-empty {
+  margin: 0;
+  padding: 0 24px 24px;
+  color: var(--muted);
+  font-weight: 750;
 }
 
 .vessel-card-grid,
@@ -3296,13 +3408,21 @@ svg {
   .all-items-table .work-table-row,
   .reminder-table .work-table-row,
   .completed-table .work-table-row,
-  .agenda-row {
+  .planning-row {
     grid-template-columns: 1fr;
     align-items: start;
   }
 
-  .agenda-table-head {
+  .planning-table-head {
     display: none;
+  }
+
+  .planning-section-heading {
+    display: grid;
+  }
+
+  .planning-date-cell span {
+    display: block;
   }
 
   .detail-grid,
