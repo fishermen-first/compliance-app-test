@@ -1912,6 +1912,13 @@ svg {
   align-items: start;
 }
 
+.admin-mapping-review-grid {
+  display: grid;
+  grid-template-columns: minmax(760px, 1.55fr) minmax(320px, 0.45fr);
+  gap: 18px;
+  align-items: start;
+}
+
 .admin-panel {
   overflow: hidden;
   box-shadow: none;
@@ -2988,6 +2995,12 @@ svg {
   .settings-definition-list,
   .settings-list article,
   .owner-code-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1340px) {
+  .admin-mapping-review-grid {
     grid-template-columns: 1fr;
   }
 }

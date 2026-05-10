@@ -288,71 +288,42 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
           </section>
         </section>
 
-        <section className="panel admin-panel" id="mapping">
-          <div className="admin-panel-heading">
-            <div>
-              <span>Step 2</span>
-              <h2>Map sheet owners to people</h2>
-            </div>
-          </div>
-          <div className="owner-mapping-list owner-mapping-list-admin">
-            {ownerCodeRows.length > 0 ? (
-              <div className="owner-mapping-header" aria-hidden="true">
-                <span>Owner code</span>
-                <span>Records</span>
-                <span>Assignment email</span>
-                <span>Action</span>
-              </div>
-            ) : null}
-            {ownerCodeRows.map((owner: any) => {
-              const profile = relation(owner.profiles);
-              const assigned = profile?.email ?? owner.pending_email ?? '';
-              const count = itemRows.filter((item) => item.owner_current === owner.code).length;
-              return (
-                <article key={owner.code}>
-                  <strong>{owner.code}</strong>
-                  <span>{count} {count === 1 ? 'record' : 'records'} · {owner.user_id ? 'Mapped user' : owner.pending_email ? 'Pending login' : 'Unmapped'}</span>
-                  <form action={saveOwnerCodeMapping} className="owner-mapping-form">
-                    <input type="hidden" name="companyId" value={companyId} />
-                    <input type="hidden" name="code" value={owner.code} />
-                    <input type="hidden" name="redirectTo" value={`/admin/companies/${companyId}`} />
-                    <input name="assignmentEmail" type="email" placeholder="email@company.com" defaultValue={assigned} aria-label={`Assign owner ${owner.code}`} />
-                    <button type="submit">Save</button>
-                  </form>
-                </article>
-              );
-            })}
-            {ownerCodeRows.length === 0 ? <p className="muted-panel-copy">Owner codes will appear here after import.</p> : null}
-          </div>
-        </section>
-
-        <section className="admin-grid-secondary">
-          <section className="panel admin-panel">
+        <section className="admin-mapping-review-grid">
+          <section className="panel admin-panel" id="mapping">
             <div className="admin-panel-heading">
               <div>
-                <span>Review</span>
-                <h2>Imported work sample</h2>
+                <span>Step 2</span>
+                <h2>Map sheet owners to people</h2>
               </div>
             </div>
-            <div className="support-item-table support-item-table-compact">
-              {openItems.length > 0 ? (
-                <div className="support-item-header" aria-hidden="true">
-                  <span>Item</span>
-                  <span>Start</span>
-                  <span>Expiration</span>
+            <div className="owner-mapping-list owner-mapping-list-admin">
+              {ownerCodeRows.length > 0 ? (
+                <div className="owner-mapping-header" aria-hidden="true">
+                  <span>Owner code</span>
+                  <span>Records</span>
+                  <span>Assignment email</span>
+                  <span>Action</span>
                 </div>
               ) : null}
-              {openItems.slice(0, 10).map((item) => (
-                <article key={item.id}>
-                  <div>
-                    <strong>{item.item_name}</strong>
-                    <span>{vesselName(item)} · {item.compliance_area ?? 'Other'} · {item.owner_current ?? 'Unassigned'}</span>
-                  </div>
-                  <span>{formatDate(item.start_working_on)}</span>
-                  <span>{formatDate(item.expiration_date)}</span>
-                </article>
-              ))}
-              {openItems.length === 0 ? <p className="muted-panel-copy">Imported work will appear here.</p> : null}
+              {ownerCodeRows.map((owner: any) => {
+                const profile = relation(owner.profiles);
+                const assigned = profile?.email ?? owner.pending_email ?? '';
+                const count = itemRows.filter((item) => item.owner_current === owner.code).length;
+                return (
+                  <article key={owner.code}>
+                    <strong>{owner.code}</strong>
+                    <span>{count} {count === 1 ? 'record' : 'records'} · {owner.user_id ? 'Mapped user' : owner.pending_email ? 'Pending login' : 'Unmapped'}</span>
+                    <form action={saveOwnerCodeMapping} className="owner-mapping-form">
+                      <input type="hidden" name="companyId" value={companyId} />
+                      <input type="hidden" name="code" value={owner.code} />
+                      <input type="hidden" name="redirectTo" value={`/admin/companies/${companyId}`} />
+                      <input name="assignmentEmail" type="email" placeholder="email@company.com" defaultValue={assigned} aria-label={`Assign owner ${owner.code}`} />
+                      <button type="submit">Save</button>
+                    </form>
+                  </article>
+                );
+              })}
+              {ownerCodeRows.length === 0 ? <p className="muted-panel-copy">Owner codes will appear here after import.</p> : null}
             </div>
           </section>
 
@@ -373,6 +344,35 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
               {activeVessels.length === 0 ? <p className="muted-panel-copy">No vessel records yet.</p> : null}
             </div>
           </section>
+        </section>
+
+        <section className="panel admin-panel">
+          <div className="admin-panel-heading">
+            <div>
+              <span>Review</span>
+              <h2>Imported work sample</h2>
+            </div>
+          </div>
+          <div className="support-item-table support-item-table-compact">
+            {openItems.length > 0 ? (
+              <div className="support-item-header" aria-hidden="true">
+                <span>Item</span>
+                <span>Start</span>
+                <span>Expiration</span>
+              </div>
+            ) : null}
+            {openItems.slice(0, 10).map((item) => (
+              <article key={item.id}>
+                <div>
+                  <strong>{item.item_name}</strong>
+                  <span>{vesselName(item)} · {item.compliance_area ?? 'Other'} · {item.owner_current ?? 'Unassigned'}</span>
+                </div>
+                <span>{formatDate(item.start_working_on)}</span>
+                <span>{formatDate(item.expiration_date)}</span>
+              </article>
+            ))}
+            {openItems.length === 0 ? <p className="muted-panel-copy">Imported work will appear here.</p> : null}
+          </div>
         </section>
       </section>
     </main>
