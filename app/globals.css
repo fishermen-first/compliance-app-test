@@ -1366,8 +1366,8 @@ svg {
 
 .admin-company-list article {
   display: grid;
-  grid-template-columns: minmax(230px, 1.1fr) minmax(170px, 0.8fr) 88px 118px 148px 168px;
-  gap: 14px;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.6fr) auto;
+  gap: 24px;
   align-items: center;
   min-height: 64px;
   min-width: 0;
@@ -1375,7 +1375,8 @@ svg {
   border-bottom: 1px solid var(--line);
 }
 
-.admin-company-list article > span {
+.admin-company-list article > span,
+.admin-company-metrics span {
   min-width: 0;
   line-height: 1.25;
   overflow-wrap: anywhere;
@@ -1395,9 +1396,16 @@ svg {
 }
 
 .admin-company-name {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+
+.admin-company-metrics {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.3fr) minmax(76px, 0.7fr) minmax(96px, 0.8fr) minmax(130px, 1fr);
+  gap: 18px;
   align-items: center;
   min-width: 0;
 }
@@ -1749,6 +1757,7 @@ svg {
   .admin-topbar,
   .admin-role-form,
   .admin-company-list article,
+  .admin-company-metrics,
   .admin-setup-list article,
   .admin-user-table article,
   .admin-risk-list article,

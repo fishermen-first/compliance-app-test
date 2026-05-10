@@ -244,15 +244,19 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               {companyHealth.map((company) => (
                 <article key={company.id}>
                   <div className="admin-company-name">
-                    <strong>{company.name}</strong>
+                    <div>
+                      <strong>{company.name}</strong>
+                    </div>
                     <span className={company.overdueItems || company.failedEmails ? 'risk-chip risk-chip-hot' : 'risk-chip'}>
                       {company.overdueItems || company.failedEmails ? 'Attention' : 'Normal'}
                     </span>
                   </div>
-                  <span>{setupStatus(company)}</span>
-                  <span>{company.customerUsers} users</span>
-                  <span>{company.totalItems} items</span>
-                  <span>{company.reminderRules} reminders</span>
+                  <div className="admin-company-metrics">
+                    <span>{setupStatus(company)}</span>
+                    <span>{company.customerUsers} users</span>
+                    <span>{company.totalItems} items</span>
+                    <span>{company.reminderRules} reminders</span>
+                  </div>
                   <div className="admin-row-actions">
                     <Link href={`/admin/companies/${company.id}`}>
                       View workspace
