@@ -255,10 +255,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <span>{company.reminderRules} reminders</span>
                   <div className="admin-row-actions">
                     <Link href={`/admin/companies/${company.id}`}>
-                      Open setup
+                      View workspace
                       <ArrowUpRight aria-hidden="true" />
                     </Link>
-                    <Link href={`/admin?companyId=${company.id}#access`}>Invite users</Link>
                   </div>
                 </article>
               ))}
@@ -345,7 +344,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <span>{company.vessels} vessels</span>
                 <span>{company.totalItems} imported items</span>
                 <span>{company.reminderRules} reminder rules</span>
-                <Link href={`/admin/companies/${company.id}`}>Open setup</Link>
+                <Link href={`/admin/companies/${company.id}`}>View workspace</Link>
               </article>
             ))}
           </div>
