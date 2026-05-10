@@ -296,16 +296,22 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
             </div>
           </div>
           <div className="owner-mapping-list owner-mapping-list-admin">
+            {ownerCodeRows.length > 0 ? (
+              <div className="owner-mapping-header" aria-hidden="true">
+                <span>Owner code</span>
+                <span>Records</span>
+                <span>Assignment email</span>
+                <span>Action</span>
+              </div>
+            ) : null}
             {ownerCodeRows.map((owner: any) => {
               const profile = relation(owner.profiles);
               const assigned = profile?.email ?? owner.pending_email ?? '';
               const count = itemRows.filter((item) => item.owner_current === owner.code).length;
               return (
                 <article key={owner.code}>
-                  <div>
-                    <strong>{owner.code}</strong>
-                    <span>{count} records · {owner.user_id ? 'Mapped user' : owner.pending_email ? 'Pending login' : 'Unmapped'}</span>
-                  </div>
+                  <strong>{owner.code}</strong>
+                  <span>{count} {count === 1 ? 'record' : 'records'} · {owner.user_id ? 'Mapped user' : owner.pending_email ? 'Pending login' : 'Unmapped'}</span>
                   <form action={saveOwnerCodeMapping} className="owner-mapping-form">
                     <input type="hidden" name="companyId" value={companyId} />
                     <input type="hidden" name="code" value={owner.code} />
@@ -329,6 +335,13 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
               </div>
             </div>
             <div className="support-item-table support-item-table-compact">
+              {openItems.length > 0 ? (
+                <div className="support-item-header" aria-hidden="true">
+                  <span>Item</span>
+                  <span>Start</span>
+                  <span>Expiration</span>
+                </div>
+              ) : null}
               {openItems.slice(0, 10).map((item) => (
                 <article key={item.id}>
                   <div>
