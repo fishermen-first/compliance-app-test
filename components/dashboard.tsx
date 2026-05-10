@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CalendarDays, CheckCircle2, ListFilter, Plus } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Plus } from 'lucide-react';
 import { accessRoleLabel } from '@/lib/roles';
 import {
   type ComplianceItem,
@@ -129,31 +129,17 @@ export function Dashboard({
           <section className="panel priority-panel queue-panel">
             <div className="panel-heading">
               <div>
-                <span>{showAllOwners ? 'All owners' : currentOwnerCode ? `Legacy owner ${currentOwnerCode}` : 'Actionable work'}</span>
+                <span>{showAllOwners ? 'All owners' : currentOwnerCode ? `Owner ${currentOwnerCode}` : 'Actionable work'}</span>
                 <h2>{showAllOwners ? 'Current work queue' : 'My work queue'}</h2>
               </div>
               <div className="queue-actions">
-                {currentOwnerCode ? (
-                  <Link className="secondary-link" href={showAllOwners ? `/?owner=${currentOwnerCode}` : '/?owner=all'}>
-                    <ListFilter aria-hidden="true" />
-                    {showAllOwners ? 'Show mine' : 'All owners'}
-                  </Link>
-                ) : null}
                 <Link className="secondary-link" href="/items">All records</Link>
               </div>
             </div>
 
-            {ownerCodes.length > 0 ? (
-              <div className="owner-filter-row">
-                {ownerCodes.map((owner) => (
-                  <Link href={`/?owner=${owner}`} key={owner} className={currentOwnerCode === owner && !showAllOwners ? 'active' : ''}>{owner}</Link>
-                ))}
-              </div>
-            ) : null}
-
             <div className="work-table" role="table" aria-label="Actionable compliance items">
               <div className="work-table-row queue-table-row work-table-head" role="row">
-                <span>Legacy owner</span>
+                <span>Owner</span>
                 <span>Vessel</span>
                 <span>Item</span>
                 <span>Start</span>
@@ -180,17 +166,21 @@ export function Dashboard({
 
         <aside className="right-column">
           <section className="panel vessel-panel">
-            <span>Legacy owners</span>
+            <span>Filter by owner</span>
             <div className="owner-count-list">
-            {ownerCodes.map((owner) => {
-              const count = openItems.filter((item) => item.owner_current === owner).length;
-              return (
-                <Link href={`/?owner=${owner}`} key={owner} className={currentOwnerCode === owner && !showAllOwners ? 'active' : ''}>
-                  <strong>{owner}</strong>
-                  <span>{count}</span>
-                </Link>
-              );
-            })}
+              <Link href="/?owner=all" className={showAllOwners ? 'active' : ''}>
+                <strong>All owners</strong>
+                <span>{openItems.length}</span>
+              </Link>
+              {ownerCodes.map((owner) => {
+                const count = openItems.filter((item) => item.owner_current === owner).length;
+                return (
+                  <Link href={`/?owner=${owner}`} key={owner} className={currentOwnerCode === owner && !showAllOwners ? 'active' : ''}>
+                    <strong>{owner}</strong>
+                    <span>{count}</span>
+                  </Link>
+                );
+              })}
             </div>
           </section>
 
