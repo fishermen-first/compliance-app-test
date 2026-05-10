@@ -4,6 +4,16 @@ import { redirect } from 'next/navigation';
 import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 
+function loginErrorMessage(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes('signups not allowed') || normalized.includes('user not found')) {
+    return 'This email is not invited yet. Ask an FF admin to add you first.';
+  }
+
+  return message;
+}
+
 export async function signInWithMagicLink(formData: FormData) {
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
 
@@ -21,7 +31,7 @@ export async function signInWithMagicLink(formData: FormData) {
   });
 
   if (error) {
-    redirect('/?message=This%20email%20is%20not%20invited%20yet.%20Ask%20an%20FF%20admin%20to%20add%20you%20first.');
+    redirect(`/?message=${encodeURIComponent(loginErrorMessage(error.message))}`);
   }
 
   redirect('/?message=Check%20your%20email%20for%20the%20login%20link');
