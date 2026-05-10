@@ -252,10 +252,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     </span>
                   </div>
                   <div className="admin-company-metrics">
-                    <span>{setupStatus(company)}</span>
-                    <span>{company.customerUsers} users</span>
-                    <span>{company.totalItems} items</span>
-                    <span>{company.reminderRules} reminders</span>
+                    <span className="admin-company-metric">{setupStatus(company)}</span>
+                    <span className="admin-company-metric">{company.customerUsers} users</span>
+                    <span className="admin-company-metric">{company.totalItems} items</span>
+                    <span className="admin-company-metric">{company.reminderRules} reminders</span>
                   </div>
                   <div className="admin-row-actions">
                     <Link href={`/admin/companies/${company.id}`}>

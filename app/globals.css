@@ -1366,20 +1366,21 @@ svg {
 
 .admin-company-list article {
   display: grid;
-  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.6fr) auto;
-  gap: 24px;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr) 170px;
+  gap: 32px;
   align-items: center;
   min-height: 64px;
   min-width: 0;
-  padding: 20px 24px;
+  overflow: hidden;
+  padding: 28px 32px;
   border-bottom: 1px solid var(--line);
 }
 
 .admin-company-list article > span,
-.admin-company-metrics span {
+.admin-company-metric {
   min-width: 0;
   line-height: 1.25;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .admin-company-list article:last-child,
@@ -1404,10 +1405,20 @@ svg {
 
 .admin-company-metrics {
   display: grid;
-  grid-template-columns: minmax(150px, 1.3fr) minmax(76px, 0.7fr) minmax(96px, 0.8fr) minmax(130px, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(150px, 1.3fr) minmax(78px, 0.7fr) minmax(98px, 0.8fr) minmax(124px, 1fr);
+  gap: 24px;
   align-items: center;
   min-width: 0;
+  overflow: hidden;
+}
+
+.admin-company-metric {
+  display: block;
+  color: #89938f;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .admin-row-actions {
@@ -1415,7 +1426,7 @@ svg {
   flex-wrap: nowrap;
   gap: 10px;
   justify-content: flex-end;
-  min-width: 0;
+  min-width: 170px;
 }
 
 .admin-company-name strong,
