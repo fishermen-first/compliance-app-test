@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { queueTodaysReminders } from '@/app/actions/reminders';
+import { queueTodaysReminders, sendQueuedReminders } from '@/app/actions/reminders';
 import { AppSidebar } from '@/components/app-sidebar';
 import { createClient } from '@/lib/supabase/server';
 
@@ -45,11 +45,16 @@ export default async function RemindersPage() {
           <div>
             <p className="eyebrow">Reminders</p>
             <h1>Email reminder queue</h1>
-            <p>MVP foundation for scheduling owner/additional-recipient emails. Sending through Resend comes after queue verification.</p>
+            <p>Queue due owner/additional-recipient reminders, then send scheduled emails through Resend.</p>
           </div>
-          <form action={queueTodaysReminders}>
-            <button className="primary-action" type="submit">Queue today</button>
-          </form>
+          <div className="header-action-row">
+            <form action={queueTodaysReminders}>
+              <button className="secondary-action" type="submit">Queue today</button>
+            </form>
+            <form action={sendQueuedReminders}>
+              <button className="primary-action" type="submit">Send queued</button>
+            </form>
+          </div>
         </header>
 
         <section className="metric-strip" aria-label="Reminder summary">
@@ -89,6 +94,7 @@ export default async function RemindersPage() {
               <span>Status</span>
               <span>Scheduled</span>
               <span>Sent</span>
+              <span>Failure</span>
             </div>
             {(logs ?? []).length === 0 ? <div className="empty-state"><h3>No reminders queued yet</h3><p>Queue today after importing data and adding recipients.</p></div> : null}
             {(logs ?? []).map((log: any) => (
@@ -98,6 +104,7 @@ export default async function RemindersPage() {
                 <span>{titleCase(log.status)}</span>
                 <span>{new Date(log.scheduled_for).toLocaleString()}</span>
                 <span>{log.sent_at ? new Date(log.sent_at).toLocaleString() : '-'}</span>
+                <span>{log.failure_reason ?? '-'}</span>
               </div>
             ))}
           </div>

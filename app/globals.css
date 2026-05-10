@@ -895,6 +895,13 @@ svg {
   max-width: 760px;
 }
 
+.header-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .filter-panel {
   display: grid;
   gap: 18px;
@@ -968,7 +975,7 @@ svg {
 }
 
 .reminder-table .work-table-row {
-  grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1.4fr) minmax(100px, 0.4fr) minmax(170px, 0.6fr) minmax(170px, 0.6fr);
+  grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1.4fr) minmax(100px, 0.4fr) minmax(170px, 0.6fr) minmax(170px, 0.6fr) minmax(160px, 0.75fr);
 }
 
 .work-table-row:hover:not(.work-table-head) {
