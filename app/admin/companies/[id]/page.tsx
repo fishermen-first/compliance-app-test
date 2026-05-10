@@ -256,8 +256,7 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
                 Role
                 <select name="role" defaultValue="office_user" disabled={!canInvite}>
                   <option value="owner">Customer Admin</option>
-                  <option value="office_admin">Office Admin</option>
-                  <option value="office_user">Office User</option>
+                  <option value="office_user">User</option>
                 </select>
               </label>
               <fieldset className="owner-code-checkboxes" disabled={!canInvite}>

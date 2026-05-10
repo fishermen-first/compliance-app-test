@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
-const companyRoles = ['owner', 'office_admin', 'office_user'] as const;
+const companyRoles = ['owner', 'office_user'] as const;
 const allowedRoles = ['app_admin', ...companyRoles] as const;
 
 function requiredString(formData: FormData, name: string) {
