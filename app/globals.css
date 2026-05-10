@@ -1628,6 +1628,14 @@ svg {
   grid-template-columns: minmax(120px, 0.8fr) minmax(260px, 1.4fr);
 }
 
+.owner-mapping-list article > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
 .owner-mapping-list strong,
 .owner-mapping-list span,
 .owner-mapping-list a {
@@ -2719,6 +2727,17 @@ svg {
   min-height: 60px;
   padding: 12px 18px;
   border-bottom: 1px solid var(--line);
+}
+
+.support-item-table article > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.support-item-table article > div > strong,
+.support-item-table article > div > span {
+  display: block;
 }
 
 .support-vessel-list article {
