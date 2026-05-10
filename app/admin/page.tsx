@@ -11,12 +11,13 @@ import {
   Users
 } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
+import { createCompany } from '@/app/actions/companies';
 import { createInvitation } from '@/app/actions/invitations';
 import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
 type AdminPageProps = {
-  searchParams?: { message?: string };
+  searchParams?: { message?: string; companyId?: string };
 };
 
 type CompanyHealth = {
@@ -24,9 +25,11 @@ type CompanyHealth = {
   name: string;
   vessels: number;
   customerUsers: number;
+  totalItems: number;
   openItems: number;
   overdueItems: number;
   dueSoonItems: number;
+  reminderRules: number;
   pendingInvites: number;
   failedEmails: number;
 };
@@ -57,6 +60,15 @@ function profileEmail(row: any) {
   return relation(row.profiles)?.email ?? 'Profile pending';
 }
 
+function setupStatus(company: CompanyHealth) {
+  const hasData = company.totalItems > 0 || company.vessels > 0 || company.reminderRules > 0;
+
+  if (hasData && company.customerUsers === 0) return 'Data loaded, no users';
+  if (!hasData && company.customerUsers === 0) return 'Empty workspace';
+  if (!hasData && company.customerUsers > 0) return 'Users invited, setup needed';
+  return 'Active workspace';
+}
+
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const supabase = createClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -83,6 +95,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     { data: appAdmins },
     { data: vessels },
     { data: items },
+    { data: reminderRules },
     { data: reminderLogs },
     { data: emailQueue }
   ] = await Promise.all([
@@ -103,6 +116,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .select('id, company_id, item_name, owner_current, expiration_date, start_working_on, status, companies(name), vessels(name)')
       .order('expiration_date', { ascending: true, nullsFirst: false })
       .limit(400),
+    supabase.from('compliance_item_reminder_rules').select('id, company_id'),
     supabase
       .from('reminder_send_log')
       .select('company_id, recipient_email, subject, status, scheduled_for, sent_at, failure_reason, companies(name)')
@@ -121,6 +135,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const appAdminRows = appAdmins ?? [];
   const vesselRows = vessels ?? [];
   const itemRows = items ?? [];
+  const reminderRuleRows = reminderRules ?? [];
   const appAdminEmailSet = new Set(appAdminRows.map((admin) => admin.email.toLowerCase()));
   const customerMembershipRows = membershipRows.filter((membership) => !appAdminEmailSet.has(profileEmail(membership).toLowerCase()));
   const message = searchParams?.message;
@@ -143,6 +158,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       name: company.name,
       vessels: vesselRows.filter((vessel) => vessel.company_id === company.id && vessel.active).length,
       customerUsers: customerMembershipRows.filter((membership) => membership.company_id === company.id).length,
+      totalItems: itemRows.filter((item) => item.company_id === company.id).length,
       openItems: companyItems.length,
       overdueItems: companyItems.filter((item) => item.expiration_date && new Date(item.expiration_date) < today).length,
       dueSoonItems: companyItems.filter((item) => {
@@ -150,6 +166,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         const date = new Date(item.expiration_date);
         return date >= today && date <= twoWeeksFromNow;
       }).length,
+      reminderRules: reminderRuleRows.filter((rule) => rule.company_id === company.id).length,
       pendingInvites: pendingInvites.filter((invite) => invite.company_id === company.id).length,
       failedEmails: failedEmails.filter((row) => row.company_id === company.id).length
     };
@@ -163,7 +180,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       <aside className="admin-rail">
         <div className="admin-mark">FF</div>
         <nav className="admin-rail-nav" aria-label="Admin console sections">
-          <a href="#workspaces"><Building2 aria-hidden="true" /><span>Workspaces</span></a>
+          <a href="#companies"><Building2 aria-hidden="true" /><span>Companies</span></a>
+          <a href="#setup"><ClipboardList aria-hidden="true" /><span>Setup</span></a>
           <a href="#access"><Users aria-hidden="true" /><span>Access</span></a>
           <a href="#health"><MailWarning aria-hidden="true" /><span>Health</span></a>
         </nav>
@@ -215,11 +233,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </section>
 
         <section className="admin-grid-main">
-          <section className="panel admin-panel" id="workspaces">
+          <section className="panel admin-panel" id="companies">
             <div className="admin-panel-heading">
               <div>
-                <span>Customer workspaces</span>
-                <h2>Support overview</h2>
+                <span>Companies</span>
+                <h2>Customer workspaces</h2>
               </div>
             </div>
             <div className="admin-company-list">
@@ -231,53 +249,106 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                       {company.overdueItems || company.failedEmails ? 'Attention' : 'Normal'}
                     </span>
                   </div>
+                  <span>{setupStatus(company)}</span>
                   <span>{company.customerUsers} users</span>
-                  <span>{company.vessels} vessels</span>
-                  <span>{company.openItems} open</span>
-                  <span>{company.overdueItems} overdue</span>
-                  <Link href={`/admin/companies/${company.id}`}>
-                    Support view
-                    <ArrowUpRight aria-hidden="true" />
-                  </Link>
+                  <span>{company.totalItems} items</span>
+                  <span>{company.reminderRules} reminders</span>
+                  <div className="admin-row-actions">
+                    <Link href={`/admin/companies/${company.id}`}>
+                      Open setup
+                      <ArrowUpRight aria-hidden="true" />
+                    </Link>
+                    <Link href={`/admin?companyId=${company.id}#access`}>Invite users</Link>
+                  </div>
                 </article>
               ))}
             </div>
           </section>
 
-          <section className="panel admin-panel" id="access">
-            <div className="admin-panel-heading">
-              <div>
-                <span>Access</span>
-                <h2>Add or update a user</h2>
+          <div className="admin-side-stack">
+            <section className="panel admin-panel">
+              <div className="admin-panel-heading">
+                <div>
+                  <span>New company</span>
+                  <h2>Create workspace</h2>
+                </div>
+                <Building2 aria-hidden="true" />
               </div>
-              <UserPlus aria-hidden="true" />
+              <form action={createCompany} className="admin-role-form">
+                <label>
+                  Company name
+                  <input name="companyName" placeholder="Company name" required />
+                </label>
+                <label className="wide-admin-field">
+                  Timezone
+                  <select name="timezone" defaultValue="America/Los_Angeles">
+                    <option value="America/Los_Angeles">Pacific Time</option>
+                    <option value="America/Anchorage">Alaska Time</option>
+                    <option value="America/New_York">Eastern Time</option>
+                  </select>
+                </label>
+                <button type="submit">Create company</button>
+              </form>
+            </section>
+
+            <section className="panel admin-panel" id="access">
+              <div className="admin-panel-heading">
+                <div>
+                  <span>Access</span>
+                  <h2>Invite users to an existing company</h2>
+                </div>
+                <UserPlus aria-hidden="true" />
+              </div>
+              <form action={createInvitation} className="admin-role-form">
+                <label>
+                  Email
+                  <input name="email" type="email" placeholder="name@company.com" required />
+                </label>
+                <label>
+                  Role
+                  <select name="role" defaultValue="office_user">
+                    <option value="owner">Customer Admin</option>
+                    <option value="office_admin">Office Admin</option>
+                    <option value="office_user">Office User</option>
+                    <option value="app_admin">FF Admin</option>
+                  </select>
+                </label>
+                <label>
+                  Company
+                  <select name="companyId" defaultValue={searchParams?.companyId ?? ''}>
+                    <option value="">FF admin only</option>
+                    {companyRows.map((company) => (
+                      <option value={company.id} key={company.id}>{company.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <button type="submit">Save access</button>
+              </form>
+            </section>
+          </div>
+        </section>
+
+        <section className="panel admin-panel" id="setup">
+          <div className="admin-panel-heading">
+            <div>
+              <span>Company setup</span>
+              <h2>Where each workspace stands</h2>
             </div>
-            <form action={createInvitation} className="admin-role-form">
-              <label>
-                Email
-                <input name="email" type="email" placeholder="name@company.com" required />
-              </label>
-              <label>
-                Role
-                <select name="role" defaultValue="office_user">
-                  <option value="app_admin">FF Admin</option>
-                  <option value="owner">Customer Admin</option>
-                  <option value="office_admin">Office Admin</option>
-                  <option value="office_user">Office User</option>
-                </select>
-              </label>
-              <label>
-                Company
-                <select name="companyId">
-                  <option value="">No customer workspace</option>
-                  {companyRows.map((company) => (
-                    <option value={company.id} key={company.id}>{company.name}</option>
-                  ))}
-                </select>
-              </label>
-              <button type="submit">Save access</button>
-            </form>
-          </section>
+          </div>
+          <div className="admin-setup-list">
+            {companyHealth.map((company) => (
+              <article key={company.id}>
+                <div>
+                  <strong>{company.name}</strong>
+                  <span>{setupStatus(company)}</span>
+                </div>
+                <span>{company.vessels} vessels</span>
+                <span>{company.totalItems} imported items</span>
+                <span>{company.reminderRules} reminder rules</span>
+                <Link href={`/admin/companies/${company.id}`}>Open setup</Link>
+              </article>
+            ))}
+          </div>
         </section>
 
         <section className="admin-grid-secondary" id="health">

@@ -1352,6 +1352,7 @@ svg {
 }
 
 .admin-company-list,
+.admin-setup-list,
 .admin-user-table,
 .admin-admin-list,
 .admin-risk-list,
@@ -1365,7 +1366,7 @@ svg {
 
 .admin-company-list article {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 82px 82px 82px 82px minmax(120px, auto);
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.8fr) 82px 82px 96px minmax(170px, auto);
   gap: 12px;
   align-items: center;
   min-height: 64px;
@@ -1374,6 +1375,7 @@ svg {
 }
 
 .admin-company-list article:last-child,
+.admin-setup-list article:last-child,
 .admin-user-table article:last-child,
 .admin-admin-list article:last-child,
 .admin-risk-list article:last-child,
@@ -1393,7 +1395,15 @@ svg {
   min-width: 0;
 }
 
+.admin-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .admin-company-name strong,
+.admin-setup-list strong,
 .admin-user-table strong,
 .admin-admin-list strong,
 .admin-risk-list strong,
@@ -1408,7 +1418,8 @@ svg {
   font-size: 15px;
 }
 
-.admin-company-list a {
+.admin-company-list a,
+.admin-setup-list a {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
@@ -1417,6 +1428,11 @@ svg {
   font-size: 13px;
   font-weight: 900;
   text-decoration: none;
+}
+
+.admin-side-stack {
+  display: grid;
+  gap: 18px;
 }
 
 .admin-role-form {
@@ -1437,6 +1453,10 @@ svg {
 }
 
 .admin-role-form label:first-child {
+  grid-column: 1 / -1;
+}
+
+.admin-role-form .wide-admin-field {
   grid-column: 1 / -1;
 }
 
@@ -1478,10 +1498,21 @@ svg {
   border-bottom: 1px solid var(--line);
 }
 
+.admin-setup-list article {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 100px 140px 140px minmax(100px, auto);
+  gap: 12px;
+  align-items: center;
+  min-height: 58px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
 .support-access-list article {
   grid-template-columns: minmax(0, 1fr) minmax(128px, auto);
 }
 
+.admin-setup-list span,
 .admin-user-table span,
 .admin-invite-list span,
 .admin-risk-list span,
@@ -1702,6 +1733,7 @@ svg {
   .admin-topbar,
   .admin-role-form,
   .admin-company-list article,
+  .admin-setup-list article,
   .admin-user-table article,
   .admin-risk-list article,
   .admin-invite-list article,
