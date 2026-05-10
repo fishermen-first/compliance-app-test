@@ -187,5 +187,5 @@ export async function createInvitation(formData: FormData) {
     authUserStatus === 'created'
       ? 'User added. They can request a login link when you are ready.'
       : 'User access updated. Existing user can request a login link when you are ready.';
-  redirect(`${redirectTo}?message=${encodeURIComponent(message)}#access`);
+  redirect(`${redirectTo}?message=${encodeURIComponent(message)}&accessFormReset=${Date.now()}#access`);
 }

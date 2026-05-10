@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/server';
 
 type CompanyAdminPageProps = {
   params: { id: string };
-  searchParams?: { message?: string };
+  searchParams?: { message?: string; accessFormReset?: string };
 };
 
 function formatDate(value?: string | null) {
@@ -125,7 +125,9 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
   const hasOwnerCodes = ownerCodeRows.length > 0;
   const ownerMappingComplete = hasOwnerCodes && mappedOwnerCodes.length === ownerCodeRows.length;
   const hasAccessStarted = customerMemberships.length > 0 || pendingInvites.length > 0;
+  const hasCustomerAccessRows = customerMemberships.length > 0 || pendingInvites.length > 0;
   const canInvite = hasData && ownerMappingComplete;
+  const addUserFormKey = searchParams?.accessFormReset ?? 'add-customer-user';
   const nextStep =
     !hasData
       ? 'Import the compliance workbook'
@@ -245,7 +247,7 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
             {!canInvite ? (
               <p className="admin-guard-note">User access unlocks after the workbook is imported and every detected owner code has an assigned email.</p>
             ) : null}
-            <form action={createInvitation} className="admin-role-form">
+            <form action={createInvitation} className="admin-role-form" key={addUserFormKey} autoComplete="off">
               <input type="hidden" name="companyId" value={companyId} />
               <input type="hidden" name="redirectTo" value={`/admin/companies/${companyId}`} />
               <label>
@@ -271,22 +273,31 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
               <button type="submit" disabled={!canInvite}>Add user</button>
             </form>
             <div className="support-access-list">
+              {hasCustomerAccessRows ? (
+                <div className="support-access-header" aria-hidden="true">
+                  <span>User</span>
+                  <span>Status</span>
+                  <span>Role</span>
+                </div>
+              ) : null}
               {customerMemberships.map((membership) => (
                 <article key={`${membership.user_id}-${membership.company_id}`}>
-                  <div>
+                  <div className="support-access-person">
                     <strong>{profileName(membership)}</strong>
                     <span>{profileEmail(membership)}</span>
                   </div>
-                  <span>{accessRoleLabel(membership.role)}</span>
+                  <span className="support-access-status">Active</span>
+                  <span className="support-access-role">{accessRoleLabel(membership.role)}</span>
                 </article>
               ))}
               {pendingInvites.map((invite) => (
                 <article key={`${invite.email}-${invite.created_at}`}>
-                  <div>
+                  <div className="support-access-person">
                     <strong>{invite.email}</strong>
-                    <span>Added, login pending · {formatDate(invite.created_at)}</span>
+                    <span>Added {formatDate(invite.created_at)}</span>
                   </div>
-                  <span>{accessRoleLabel(invite.role)}</span>
+                  <span className="support-access-status">Login pending</span>
+                  <span className="support-access-role">{accessRoleLabel(invite.role)}</span>
                 </article>
               ))}
               {customerMemberships.length === 0 && pendingInvites.length === 0 ? <p className="muted-panel-copy">No customer users added yet.</p> : null}
