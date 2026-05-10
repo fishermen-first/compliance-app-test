@@ -1366,12 +1366,18 @@ svg {
 
 .admin-company-list article {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.8fr) 82px 82px 96px minmax(170px, auto);
+  grid-template-columns: minmax(170px, 1.25fr) minmax(130px, 0.9fr) minmax(64px, 0.45fr) minmax(78px, 0.5fr) minmax(88px, 0.55fr) minmax(130px, 0.7fr);
   gap: 12px;
   align-items: center;
   min-height: 64px;
+  min-width: 0;
   padding: 12px 18px;
   border-bottom: 1px solid var(--line);
+}
+
+.admin-company-list article > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .admin-company-list article:last-child,
@@ -1400,6 +1406,7 @@ svg {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .admin-company-name strong,
@@ -1424,10 +1431,18 @@ svg {
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
+  min-width: 0;
   color: var(--teal-dark);
   font-size: 13px;
   font-weight: 900;
+  line-height: 1.2;
   text-decoration: none;
+}
+
+.admin-row-actions a {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 .admin-side-stack {
