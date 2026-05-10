@@ -103,6 +103,13 @@ def parse_owner_current(owner_raw: str | None) -> str | None:
     return value
 
 
+def owner_code(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
 def infer_recurrence(frequency: str | None) -> tuple[str, int | None]:
     label = (frequency or "").strip().lower()
     if not label or label in {"na", "n/a"}:
@@ -202,6 +209,7 @@ def load_records(workbook: Path, sheet_name: str | None) -> tuple[str, list[dict
 
 def generate_sql(company_name: str, sheet_name: str, records: list[dict[str, Any]]) -> str:
     vessel_names = sorted({r["vessel"] for r in records if r["vessel"] and r["vessel"].strip().lower() not in COMPANY_WIDE_NAMES})
+    owner_codes = sorted({owner_code(r["owner_current"]) for r in records if owner_code(r["owner_current"])})
     lines = [
         "begin;",
         "",
@@ -221,6 +229,12 @@ def generate_sql(company_name: str, sheet_name: str, records: list[dict[str, Any
         lines.append(f"  insert into public.vessels (company_id, name) values (target_company_id, {sql(vessel)}) on conflict (company_id, name) do update set active = true, updated_at = now();")
 
     if vessel_names:
+        lines.append("")
+
+    for code in owner_codes:
+        lines.append(f"  insert into public.company_owner_codes (company_id, code) values (target_company_id, {sql(code)}) on conflict (company_id, code) do update set updated_at = now();")
+
+    if owner_codes:
         lines.append("")
 
     for record in records:
@@ -304,6 +318,7 @@ def main() -> None:
         "vessels": Counter(r["vessel"] or "Company-wide" for r in records).most_common(),
         "statuses": Counter(r["status"] for r in records).most_common(),
         "compliance_areas": Counter(r["compliance_area"] for r in records).most_common(),
+        "owner_codes": Counter(r["owner_current"] or "Unassigned" for r in records).most_common(),
         "warnings": warnings,
     }
     warning_out.write_text(json.dumps(summary, indent=2, default=str), encoding="utf-8")

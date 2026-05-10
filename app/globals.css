@@ -1583,6 +1583,101 @@ svg {
   font-weight: 750;
 }
 
+.owner-notice-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(18, 120, 109, 0.22);
+  border-radius: 8px;
+  background: #eef8f4;
+  color: var(--teal-dark);
+}
+
+.owner-notice-panel strong {
+  white-space: nowrap;
+}
+
+.owner-notice-panel span {
+  min-width: 0;
+  color: var(--muted);
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.owner-mapping-list {
+  display: grid;
+  gap: 10px;
+  margin: 22px;
+}
+
+.owner-mapping-list article {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(100px, auto) minmax(260px, 1.4fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.owner-mapping-list-admin article {
+  grid-template-columns: minmax(120px, 0.8fr) minmax(260px, 1.4fr);
+}
+
+.owner-mapping-list strong,
+.owner-mapping-list span,
+.owner-mapping-list a {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.owner-mapping-list span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.owner-mapping-list a {
+  color: var(--teal-dark);
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.owner-mapping-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+.owner-mapping-form input {
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.owner-mapping-form button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--teal);
+  color: #fff;
+  font-weight: 900;
+}
+
 .admin-console {
   display: grid;
   grid-template-columns: 232px minmax(0, 1fr);
@@ -1905,6 +2000,15 @@ svg {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   padding: 16px 18px 18px;
+}
+
+.admin-flow-note {
+  margin: 0;
+  padding: 12px 18px 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.4;
 }
 
 .admin-role-form label {

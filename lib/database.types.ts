@@ -198,6 +198,54 @@ export type Database = {
           },
         ]
       }
+      company_owner_codes: {
+        Row: {
+          code: string
+          company_id: string
+          created_at: string
+          display_name: string | null
+          id: string
+          pending_email: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          code: string
+          company_id: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          pending_email?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          code?: string
+          company_id?: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          pending_email?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_owner_codes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_owner_codes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       compliance_events: {
         Row: {
           category: Database["public"]["Enums"]["event_category"]

@@ -38,13 +38,21 @@ export function titleCase(value: string) {
   return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-export function ownerCodeForUser(name: string, email?: string | null) {
-  const source = `${name} ${email ?? ''}`.toLowerCase();
-  if (source.includes('sarah')) return 'SN';
-  if (source.includes('emma')) return 'ES';
-  if (source.includes('meagan') || source.includes('meghan')) return 'MA';
-  return null;
-}
+export type CompanyOwnerCode = {
+  id: string;
+  company_id: string;
+  code: string;
+  display_name: string | null;
+  user_id: string | null;
+  pending_email: string | null;
+  profiles?: {
+    email: string | null;
+    full_name: string | null;
+  } | {
+    email: string | null;
+    full_name: string | null;
+  }[] | null;
+};
 
 export async function getCustomerContext(options: { allowAppAdmin?: boolean; requireWritable?: boolean } = {}) {
   const supabase = createClient();
@@ -96,4 +104,15 @@ export async function getCustomerItems(companyId: string) {
     .order('expiration_date', { ascending: true, nullsFirst: false });
 
   return (rawItems ?? []).map(mapComplianceItem);
+}
+
+export async function getCompanyOwnerCodes(companyId: string) {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from('company_owner_codes')
+    .select('id, company_id, code, display_name, user_id, pending_email, profiles(email, full_name)')
+    .eq('company_id', companyId)
+    .order('code');
+
+  return (data ?? []) as unknown as CompanyOwnerCode[];
 }

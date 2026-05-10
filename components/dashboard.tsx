@@ -7,7 +7,7 @@ import {
   daysUntil,
   shortDate
 } from '@/lib/compliance';
-import { itemVessel } from '@/lib/customer-data';
+import { type CompanyOwnerCode, itemVessel } from '@/lib/customer-data';
 
 function initials(name: string) {
   return name
@@ -27,21 +27,25 @@ export function Dashboard({
   items,
   currentUserName,
   currentUserRole,
-  currentOwnerCode,
+  selectedOwnerCodes,
   showAllOwners,
+  hasOwnerMapping,
+  ownerCodes,
   canCreateItems
 }: {
   companyName: string;
   items: ComplianceItem[];
   currentUserName: string;
   currentUserRole: string;
-  currentOwnerCode: string | null;
+  selectedOwnerCodes: string[];
   showAllOwners: boolean;
+  hasOwnerMapping: boolean;
+  ownerCodes: CompanyOwnerCode[];
   canCreateItems: boolean;
 }) {
   const openItems = items.filter((item) => !['complete', 'discontinued'].includes(item.status));
-  const ownerItems = currentOwnerCode && !showAllOwners
-    ? openItems.filter((item) => item.owner_current === currentOwnerCode)
+  const ownerItems = selectedOwnerCodes.length > 0 && !showAllOwners
+    ? openItems.filter((item) => item.owner_current && selectedOwnerCodes.includes(item.owner_current))
     : openItems;
   const actionableItems = sortedByStart(ownerItems.filter((item) => {
     const state = displayState(item);
@@ -52,7 +56,8 @@ export function Dashboard({
   const inProgressItems = openItems.filter((item) => item.status === 'in_progress');
   const submittedItems = openItems.filter((item) => item.status === 'submitted');
   const upcomingItems = openItems.filter((item) => displayState(item) === 'Upcoming');
-  const ownerCodes = Array.from(new Set(openItems.map((item) => item.owner_current).filter(Boolean) as string[])).sort();
+  const importedOwnerCodes = Array.from(new Set(openItems.map((item) => item.owner_current).filter(Boolean) as string[]));
+  const ownerCodeRows = Array.from(new Set([...ownerCodes.map((owner) => owner.code), ...importedOwnerCodes])).sort();
   const soonItems = openItems.filter((item) => {
     const expirationDays = daysUntil(item.expiration_date);
     return expirationDays !== null && expirationDays >= 0 && expirationDays <= 30;
@@ -81,10 +86,17 @@ export function Dashboard({
           <button className="user-pill" type="button" aria-label={`Current user ${currentUserName}`}>
             <span>{initials(currentUserName)}</span>
             <strong>{currentUserName}</strong>
-            <small>{accessRoleLabel(currentUserRole)}{currentOwnerCode ? ` · ${currentOwnerCode}` : ''}</small>
+            <small>{accessRoleLabel(currentUserRole)}{selectedOwnerCodes.length ? ` · ${selectedOwnerCodes.join(', ')}` : ''}</small>
           </button>
         </div>
       </header>
+
+      {!hasOwnerMapping ? (
+        <section className="owner-notice-panel">
+          <strong>No owner code assigned</strong>
+          <span>You are seeing all open work until an admin maps your login to the owner initials from the imported sheet.</span>
+        </section>
+      ) : null}
 
       <section className="workflow-tabs" aria-label="Workflow summary">
         <Link href="/items?status=ready">
@@ -129,7 +141,7 @@ export function Dashboard({
           <section className="panel priority-panel queue-panel">
             <div className="panel-heading">
               <div>
-                <span>{showAllOwners ? 'All owners' : currentOwnerCode ? `Owner ${currentOwnerCode}` : 'Actionable work'}</span>
+                <span>{showAllOwners ? 'All owners' : selectedOwnerCodes.length ? `Owner ${selectedOwnerCodes.join(', ')}` : 'Actionable work'}</span>
                 <h2>{showAllOwners ? 'Current work queue' : 'My work queue'}</h2>
               </div>
               <div className="queue-actions">
@@ -172,10 +184,10 @@ export function Dashboard({
                 <strong>All owners</strong>
                 <span>{openItems.length}</span>
               </Link>
-              {ownerCodes.map((owner) => {
+              {ownerCodeRows.map((owner) => {
                 const count = openItems.filter((item) => item.owner_current === owner).length;
                 return (
-                  <Link href={`/?owner=${owner}`} key={owner} className={currentOwnerCode === owner && !showAllOwners ? 'active' : ''}>
+                  <Link href={`/?owner=${encodeURIComponent(owner)}`} key={owner} className={selectedOwnerCodes.length === 1 && selectedOwnerCodes[0] === owner && !showAllOwners ? 'active' : ''}>
                     <strong>{owner}</strong>
                     <span>{count}</span>
                   </Link>

@@ -42,10 +42,75 @@ async function provisionAuthUser(email: string) {
   throw new Error(`Invitation saved, but Supabase could not provision the auth user: ${error.message}`);
 }
 
+function parseOwnerCodes(value: FormDataEntryValue | null) {
+  return Array.from(new Set(
+    String(value ?? '')
+      .split(',')
+      .map((code) => code.trim())
+      .filter(Boolean)
+  ));
+}
+
+async function assignPendingOwnerCodes(companyId: string, email: string, ownerCodes: string[]) {
+  if (ownerCodes.length === 0) return;
+
+  const supabaseAdmin = createAdminClient();
+  let userId: string | null = null;
+
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .limit(1)
+    .maybeSingle();
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
+
+  if (profile?.id) {
+    const { data: membership, error: membershipError } = await supabaseAdmin
+      .from('company_memberships')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('user_id', profile.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (membershipError) {
+      throw new Error(membershipError.message);
+    }
+
+    if (membership) {
+      userId = profile.id;
+    }
+  }
+
+  for (const code of ownerCodes) {
+    const { error } = await supabaseAdmin
+      .from('company_owner_codes')
+      .upsert(
+        {
+          company_id: companyId,
+          code,
+          user_id: userId,
+          pending_email: userId ? null : email,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'company_id,code' }
+      );
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+}
+
 export async function createInvitation(formData: FormData) {
   const companyId = String(formData.get('companyId') ?? '').trim();
   const email = requiredString(formData, 'email').toLowerCase();
   const role = requiredString(formData, 'role');
+  const ownerCodes = parseOwnerCodes(formData.get('ownerCodes'));
   const supabase = createClient();
   const supabaseAdmin = createAdminClient();
 
@@ -105,8 +170,10 @@ export async function createInvitation(formData: FormData) {
   }
 
   const authUserStatus = await provisionAuthUser(email);
+  await assignPendingOwnerCodes(companyId, email, ownerCodes);
 
   revalidatePath('/admin');
+  revalidatePath(`/admin/companies/${companyId}`);
   const message =
     authUserStatus === 'created'
       ? 'Invitation saved. User can request a login link.'

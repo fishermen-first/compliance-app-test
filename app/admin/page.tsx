@@ -30,6 +30,7 @@ type CompanyHealth = {
   overdueItems: number;
   dueSoonItems: number;
   reminderRules: number;
+  ownerCodes: number;
   pendingInvites: number;
   failedEmails: number;
 };
@@ -95,9 +96,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     { data: appAdmins },
     { data: vessels },
     { data: items },
-    { data: reminderRules },
-    { data: reminderLogs },
-    { data: emailQueue }
+	    { data: reminderRules },
+	    { data: ownerCodes },
+	    { data: reminderLogs },
+	    { data: emailQueue }
   ] = await Promise.all([
     supabase.from('companies').select('id, name, timezone, created_at').order('name'),
     supabase
@@ -117,6 +119,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .order('expiration_date', { ascending: true, nullsFirst: false })
       .limit(400),
     supabase.from('compliance_item_reminder_rules').select('id, company_id'),
+    supabase.from('company_owner_codes').select('id, company_id'),
     supabase
       .from('reminder_send_log')
       .select('company_id, recipient_email, subject, status, scheduled_for, sent_at, failure_reason, companies(name)')
@@ -136,6 +139,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const vesselRows = vessels ?? [];
   const itemRows = items ?? [];
   const reminderRuleRows = reminderRules ?? [];
+  const ownerCodeRows = ownerCodes ?? [];
   const appAdminEmailSet = new Set(appAdminRows.map((admin) => admin.email.toLowerCase()));
   const customerMembershipRows = membershipRows.filter((membership) => !appAdminEmailSet.has(profileEmail(membership).toLowerCase()));
   const message = searchParams?.message;
@@ -167,6 +171,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         return date >= today && date <= twoWeeksFromNow;
       }).length,
       reminderRules: reminderRuleRows.filter((rule) => rule.company_id === company.id).length,
+      ownerCodes: ownerCodeRows.filter((owner) => owner.company_id === company.id).length,
       pendingInvites: pendingInvites.filter((invite) => invite.company_id === company.id).length,
       failedEmails: failedEmails.filter((row) => row.company_id === company.id).length
     };
@@ -298,10 +303,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               <div className="admin-panel-heading">
                 <div>
                   <span>Access</span>
-                  <h2>Invite users to an existing company</h2>
+                  <h2>Invite after owner mapping</h2>
                 </div>
                 <UserPlus aria-hidden="true" />
               </div>
+              <p className="admin-flow-note">Use this after company creation, data import, and owner-code mapping. Optional owner codes can be comma-separated.</p>
               <form action={createInvitation} className="admin-role-form">
                 <label>
                   Email
@@ -325,6 +331,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     ))}
                   </select>
                 </label>
+                <label className="wide-admin-field">
+                  Owner codes
+                  <input name="ownerCodes" placeholder="ES, SN/BJ" />
+                </label>
                 <button type="submit">Save access</button>
               </form>
             </section>
@@ -347,7 +357,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 </div>
                 <span>{company.vessels} vessels</span>
                 <span>{company.totalItems} imported items</span>
-                <span>{company.reminderRules} reminder rules</span>
+                <span>{company.ownerCodes} owner codes</span>
                 <Link href={`/admin/companies/${company.id}`}>View workspace</Link>
               </article>
             ))}

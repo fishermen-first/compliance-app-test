@@ -3,7 +3,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { AuthScreen } from '@/components/auth-screen';
 import { Dashboard } from '@/components/dashboard';
 import { NoAccessScreen } from '@/components/no-access-screen';
-import { getCustomerItems, ownerCodeForUser } from '@/lib/customer-data';
+import { getCompanyOwnerCodes, getCustomerItems } from '@/lib/customer-data';
 import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
@@ -42,17 +42,27 @@ export default async function Home({ searchParams }: HomeProps) {
     return <NoAccessScreen email={userData.user.email} />;
   }
 
-  const [{ data: company }, { data: profile }, items] = await Promise.all([
+  const [{ data: company }, { data: profile }, items, ownerCodes] = await Promise.all([
     supabase.from('companies').select('name').eq('id', membership.company_id).single(),
     supabase.from('profiles').select('full_name').eq('id', userData.user.id).maybeSingle(),
-    getCustomerItems(membership.company_id)
+    getCustomerItems(membership.company_id),
+    getCompanyOwnerCodes(membership.company_id)
   ]);
 
   const currentUserName = profile?.full_name ?? userData.user.email ?? 'User';
-  const userOwnerCode = ownerCodeForUser(currentUserName, userData.user.email);
   const requestedOwner = searchParams?.owner;
-  const showAllOwners = requestedOwner === 'all' || (!requestedOwner && !userOwnerCode);
-  const currentOwnerCode = requestedOwner && requestedOwner !== 'all' ? requestedOwner : userOwnerCode;
+  const mappedOwnerCodes = ownerCodes.filter((owner) => owner.user_id === userData.user?.id).map((owner) => owner.code);
+  const requestedOwnerCode = requestedOwner && requestedOwner !== 'all' ? decodeURIComponent(requestedOwner) : null;
+  const validOwnerCodes = new Set([
+    ...ownerCodes.map((owner) => owner.code),
+    ...items.map((item) => item.owner_current).filter(Boolean) as string[]
+  ]);
+  const showAllOwners = requestedOwner === 'all' || (!requestedOwner && mappedOwnerCodes.length === 0);
+  const selectedOwnerCodes = requestedOwnerCode && validOwnerCodes.has(requestedOwnerCode)
+    ? [requestedOwnerCode]
+    : showAllOwners
+      ? []
+      : mappedOwnerCodes;
   const canCreateItems = ['owner', 'office_admin', 'office_user'].includes(membership.role);
 
   return (
@@ -63,8 +73,10 @@ export default async function Home({ searchParams }: HomeProps) {
         items={items}
         currentUserName={currentUserName}
         currentUserRole={membership.role}
-        currentOwnerCode={currentOwnerCode}
+        selectedOwnerCodes={selectedOwnerCodes}
         showAllOwners={showAllOwners}
+        hasOwnerMapping={mappedOwnerCodes.length > 0}
+        ownerCodes={ownerCodes}
         canCreateItems={canCreateItems}
       />
     </div>

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { ArrowLeft, AlertTriangle, ClipboardList, MailWarning, Ship, Users } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
+import { saveOwnerCodeMapping } from '@/app/actions/owner-codes';
 import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
@@ -56,9 +57,10 @@ export default async function CompanyAdminPage({ params }: CompanyAdminPageProps
     { data: invitations },
     { data: vessels },
     { data: items },
-    { data: reminderLogs },
-    { data: emailQueue },
-    { data: appAdmins }
+	    { data: reminderLogs },
+	    { data: emailQueue },
+	    { data: ownerCodes },
+	    { data: appAdmins }
   ] = await Promise.all([
     supabase.from('companies').select('id, name, timezone, created_at').eq('id', companyId).maybeSingle(),
     supabase
@@ -90,6 +92,11 @@ export default async function CompanyAdminPage({ params }: CompanyAdminPageProps
       .eq('company_id', companyId)
       .order('created_at', { ascending: false })
       .limit(20),
+    supabase
+      .from('company_owner_codes')
+      .select('id, company_id, code, display_name, user_id, pending_email, profiles(email, full_name)')
+      .eq('company_id', companyId)
+      .order('code'),
     supabase.from('app_admins').select('email')
   ]);
 
@@ -107,6 +114,11 @@ export default async function CompanyAdminPage({ params }: CompanyAdminPageProps
   const pendingInvites = (invitations ?? []).filter((invite) => !invite.accepted_at);
   const appAdminEmailSet = new Set((appAdmins ?? []).map((admin) => admin.email.toLowerCase()));
   const customerMemberships = (memberships ?? []).filter((membership) => !appAdminEmailSet.has(profileEmail(membership).toLowerCase()));
+  const importedOwnerCodes = Array.from(new Set(itemRows.map((item) => item.owner_current).filter(Boolean) as string[])).sort();
+  const ownerCodeMap = new Map<string, any>();
+  importedOwnerCodes.forEach((code) => ownerCodeMap.set(code, { code, user_id: null, pending_email: null, profiles: null }));
+  (ownerCodes ?? []).forEach((owner) => ownerCodeMap.set(owner.code, owner));
+  const ownerCodeRows = Array.from(ownerCodeMap.values()).sort((a, b) => a.code.localeCompare(b.code));
 
   return (
     <main className="admin-console admin-detail-console">
@@ -218,6 +230,38 @@ export default async function CompanyAdminPage({ params }: CompanyAdminPageProps
         </section>
 
         <section className="admin-grid-secondary">
+          <section className="panel admin-panel">
+            <div className="admin-panel-heading">
+              <div>
+                <span>Owner mapping</span>
+                <h2>Sheet owners to users</h2>
+              </div>
+            </div>
+            <div className="owner-mapping-list owner-mapping-list-admin">
+              {ownerCodeRows.map((owner: any) => {
+                const profile = relation(owner.profiles);
+                const assigned = profile?.email ?? owner.pending_email ?? '';
+                const count = itemRows.filter((item) => item.owner_current === owner.code).length;
+                return (
+                  <article key={owner.code}>
+                    <div>
+                      <strong>{owner.code}</strong>
+                      <span>{count} records · {owner.user_id ? 'Mapped user' : owner.pending_email ? 'Pending invite' : 'Unmapped'}</span>
+                    </div>
+                    <form action={saveOwnerCodeMapping} className="owner-mapping-form">
+                      <input type="hidden" name="companyId" value={companyId} />
+                      <input type="hidden" name="code" value={owner.code} />
+                      <input type="hidden" name="redirectTo" value={`/admin/companies/${companyId}`} />
+                      <input name="assignmentEmail" type="email" placeholder="email@company.com" defaultValue={assigned} aria-label={`Assign owner ${owner.code}`} />
+                      <button type="submit">Save</button>
+                    </form>
+                  </article>
+                );
+              })}
+              {ownerCodeRows.length === 0 ? <p className="muted-panel-copy">No owner codes imported yet.</p> : null}
+            </div>
+          </section>
+
           <section className="panel admin-panel">
             <div className="admin-panel-heading">
               <div>
