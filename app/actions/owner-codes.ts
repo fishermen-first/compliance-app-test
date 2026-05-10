@@ -16,6 +16,11 @@ function optionalEmail(formData: FormData, name: string) {
   return value || null;
 }
 
+function optionalString(formData: FormData, name: string) {
+  const value = String(formData.get(name) ?? '').trim();
+  return value || null;
+}
+
 function safeRedirectPath(value: FormDataEntryValue | null) {
   const path = String(value ?? '').trim();
   if (path === '/settings') return path;
@@ -48,7 +53,8 @@ async function requireOwnerCodeAdmin(companyId: string) {
 export async function saveOwnerCodeMapping(formData: FormData) {
   const companyId = requiredString(formData, 'companyId');
   const code = requiredString(formData, 'code');
-  const assignmentEmail = optionalEmail(formData, 'assignmentEmail');
+  const personName = optionalString(formData, 'personName') ?? optionalString(formData, 'displayName');
+  const loginEmail = optionalEmail(formData, 'loginEmail') ?? optionalEmail(formData, 'assignmentEmail');
   const redirectTo = safeRedirectPath(formData.get('redirectTo'));
 
   await requireOwnerCodeAdmin(companyId);
@@ -57,11 +63,11 @@ export async function saveOwnerCodeMapping(formData: FormData) {
   let userId: string | null = null;
   let pendingEmail: string | null = null;
 
-  if (assignmentEmail) {
+  if (loginEmail) {
     const { data: profile, error: profileError } = await admin
       .from('profiles')
       .select('id')
-      .eq('email', assignmentEmail)
+      .eq('email', loginEmail)
       .limit(1)
       .maybeSingle();
 
@@ -81,10 +87,10 @@ export async function saveOwnerCodeMapping(formData: FormData) {
       if (membership) {
         userId = profile.id;
       } else {
-        pendingEmail = assignmentEmail;
+        pendingEmail = loginEmail;
       }
     } else {
-      pendingEmail = assignmentEmail;
+      pendingEmail = loginEmail;
     }
   }
 
@@ -94,6 +100,7 @@ export async function saveOwnerCodeMapping(formData: FormData) {
       {
         company_id: companyId,
         code,
+        display_name: personName,
         user_id: userId,
         pending_email: pendingEmail,
         updated_at: new Date().toISOString()

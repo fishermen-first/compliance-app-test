@@ -40,7 +40,7 @@ export default async function SettingsPage() {
 
   const importedOwnerCodes = Array.from(new Set(items.map((item) => item.owner_current).filter(Boolean) as string[])).sort();
   const ownerCodeMap = new Map<string, any>();
-  importedOwnerCodes.forEach((code) => ownerCodeMap.set(code, { code, user_id: null, pending_email: null, profiles: null }));
+  importedOwnerCodes.forEach((code) => ownerCodeMap.set(code, { code, display_name: null, user_id: null, pending_email: null, profiles: null }));
   ownerCodes.forEach((owner) => ownerCodeMap.set(owner.code, owner));
   const ownerCodeRows = Array.from(ownerCodeMap.values()).sort((a, b) => a.code.localeCompare(b.code));
   const activeRules = (reminderRules ?? []).filter((rule) => rule.active);
@@ -115,13 +115,15 @@ export default async function SettingsPage() {
             <div className="owner-mapping-list">
               {ownerCodeRows.map((owner: any) => {
                 const profile = relation(owner.profiles);
-                const assigned = profile?.email ?? owner.pending_email ?? 'Unmapped';
+                const personName = owner.display_name ?? profile?.full_name ?? '';
+                const loginEmail = profile?.email ?? owner.pending_email ?? '';
                 const count = items.filter((item) => item.owner_current === owner.code).length;
+                const status = owner.user_id ? 'Mapped user' : owner.pending_email ? 'Pending login' : personName ? 'Needs login email' : 'Unmapped';
                 return (
                   <article key={owner.code}>
                     <div>
                       <strong>{owner.code}</strong>
-                      <span>{count} records · {owner.user_id ? 'Mapped user' : owner.pending_email ? 'Pending login' : 'Unmapped'}</span>
+                      <span>{count} records · {status}</span>
                     </div>
                     <Link href={`/items?owner=${encodeURIComponent(owner.code)}`}>View records</Link>
                     {canManageOwnerCodes ? (
@@ -129,11 +131,12 @@ export default async function SettingsPage() {
                         <input type="hidden" name="companyId" value={membership.company_id} />
                         <input type="hidden" name="code" value={owner.code} />
                         <input type="hidden" name="redirectTo" value="/settings" />
-                        <input name="assignmentEmail" type="email" placeholder="email@company.com" defaultValue={assigned === 'Unmapped' ? '' : assigned} aria-label={`Assign owner ${owner.code}`} />
+                        <input className="owner-person-input" name="personName" type="text" placeholder="Full name" defaultValue={personName} aria-label={`Person name for owner ${owner.code}`} />
+                        <input className="owner-email-input" name="loginEmail" type="email" placeholder="email@company.com" defaultValue={loginEmail} aria-label={`Login email for owner ${owner.code}`} />
                         <button type="submit">Save</button>
                       </form>
                     ) : (
-                      <span>{assigned}</span>
+                      <span>{[personName, loginEmail].filter(Boolean).join(' · ') || 'Unmapped'}</span>
                     )}
                   </article>
                 );

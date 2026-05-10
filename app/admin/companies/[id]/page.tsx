@@ -39,6 +39,13 @@ function vesselName(row: any) {
   return relation(row.vessels)?.name ?? 'Company-wide';
 }
 
+function ownerMappingStatus(owner: any) {
+  if (owner.user_id) return 'Mapped user';
+  if (owner.pending_email) return 'Pending login';
+  if (owner.display_name) return 'Needs login email';
+  return 'Unmapped';
+}
+
 function stepState(complete: boolean, active: boolean) {
   if (complete) return 'complete';
   if (active) return 'active';
@@ -109,7 +116,7 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
   const customerMemberships = (memberships ?? []).filter((membership) => !appAdminEmailSet.has(profileEmail(membership).toLowerCase()));
   const importedOwnerCodes = Array.from(new Set(itemRows.map((item) => item.owner_current).filter(Boolean) as string[])).sort();
   const ownerCodeMap = new Map<string, any>();
-  importedOwnerCodes.forEach((code) => ownerCodeMap.set(code, { code, user_id: null, pending_email: null, profiles: null }));
+  importedOwnerCodes.forEach((code) => ownerCodeMap.set(code, { code, display_name: null, user_id: null, pending_email: null, profiles: null }));
   (ownerCodes ?? []).forEach((owner) => ownerCodeMap.set(owner.code, owner));
   const ownerCodeRows = Array.from(ownerCodeMap.values()).sort((a, b) => a.code.localeCompare(b.code));
   const mappedOwnerCodes = ownerCodeRows.filter((owner) => owner.user_id || owner.pending_email);
@@ -301,23 +308,26 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
                 <div className="owner-mapping-header" aria-hidden="true">
                   <span>Owner code</span>
                   <span>Records</span>
-                  <span>Assignment email</span>
+                  <span>Person name</span>
+                  <span>Login email</span>
                   <span>Action</span>
                 </div>
               ) : null}
               {ownerCodeRows.map((owner: any) => {
                 const profile = relation(owner.profiles);
-                const assigned = profile?.email ?? owner.pending_email ?? '';
+                const personName = owner.display_name ?? profile?.full_name ?? '';
+                const loginEmail = profile?.email ?? owner.pending_email ?? '';
                 const count = itemRows.filter((item) => item.owner_current === owner.code).length;
                 return (
                   <article key={owner.code}>
                     <strong>{owner.code}</strong>
-                    <span>{count} {count === 1 ? 'record' : 'records'} · {owner.user_id ? 'Mapped user' : owner.pending_email ? 'Pending login' : 'Unmapped'}</span>
+                    <span>{count} {count === 1 ? 'record' : 'records'} · {ownerMappingStatus(owner)}</span>
                     <form action={saveOwnerCodeMapping} className="owner-mapping-form">
                       <input type="hidden" name="companyId" value={companyId} />
                       <input type="hidden" name="code" value={owner.code} />
                       <input type="hidden" name="redirectTo" value={`/admin/companies/${companyId}`} />
-                      <input name="assignmentEmail" type="email" placeholder="email@company.com" defaultValue={assigned} aria-label={`Assign owner ${owner.code}`} />
+                      <input className="owner-person-input" name="personName" type="text" placeholder="Full name" defaultValue={personName} aria-label={`Person name for owner ${owner.code}`} />
+                      <input className="owner-email-input" name="loginEmail" type="email" placeholder="email@company.com" defaultValue={loginEmail} aria-label={`Login email for owner ${owner.code}`} />
                       <button type="submit">Save</button>
                     </form>
                   </article>
