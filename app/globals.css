@@ -1281,7 +1281,7 @@ svg {
 }
 
 .queue-table-row {
-  grid-template-columns: 92px minmax(122px, 0.72fr) minmax(300px, 1.6fr) 126px 126px 118px;
+  grid-template-columns: 82px minmax(118px, 0.55fr) minmax(0, 1fr) 82px 104px;
 }
 
 .all-items-table .work-table-row {
@@ -1320,6 +1320,8 @@ svg {
 .queue-table-row strong {
   display: grid;
   gap: 4px;
+  overflow: visible;
+  line-height: 1.18;
 }
 
 .queue-table-row strong small {

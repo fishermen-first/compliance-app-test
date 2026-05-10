@@ -4,9 +4,8 @@ import { accessRoleLabel } from '@/lib/roles';
 import {
   type ComplianceItem,
   displayState,
-  formatDate,
   daysUntil,
-  stateClassName
+  shortDate
 } from '@/lib/compliance';
 import { itemVessel } from '@/lib/customer-data';
 
@@ -159,7 +158,6 @@ export function Dashboard({
                 <span>Item</span>
                 <span>Start</span>
                 <span>Expiration</span>
-                <span>Status</span>
               </div>
               {actionableItems.length === 0 ? (
                 <div className="empty-state">
@@ -167,19 +165,15 @@ export function Dashboard({
                   <h3>No actionable items right now</h3>
                   <p>Items will appear here when their start-working date arrives, or when they are in progress, submitted, or overdue.</p>
                 </div>
-              ) : actionableItems.slice(0, 12).map((item) => {
-                const state = displayState(item);
-                return (
-                  <Link className="work-table-row queue-table-row" href={`/items/${item.id}`} role="row" key={item.id}>
-                    <span>{item.owner_current ?? 'Unassigned'}</span>
-                    <span>{itemVessel(item)}</span>
-                    <strong>{item.item_name}<small>{item.agency_type ?? 'No agency'} · {item.compliance_area ?? 'Other'}</small></strong>
-                    <span>{formatDate(item.start_working_on)}</span>
-                    <span>{formatDate(item.expiration_date)}</span>
-                    <span className={`status-chip state-${stateClassName(state)}`}>{state}</span>
-                  </Link>
-                );
-              })}
+              ) : actionableItems.slice(0, 12).map((item) => (
+                <Link className="work-table-row queue-table-row" href={`/items/${item.id}`} role="row" key={item.id}>
+                  <span>{item.owner_current ?? 'Unassigned'}</span>
+                  <span>{itemVessel(item)}</span>
+                  <strong>{item.item_name}<small>{item.agency_type ?? 'No agency'} · {item.compliance_area ?? 'Other'}</small></strong>
+                  <span>{shortDate(item.start_working_on)}</span>
+                  <span>{shortDate(item.expiration_date)}</span>
+                </Link>
+              ))}
             </div>
           </section>
         </div>
