@@ -2099,6 +2099,199 @@ svg {
   gap: 20px;
 }
 
+.admin-wizard-console .admin-workspace {
+  align-content: start;
+  gap: 22px;
+}
+
+.admin-wizard-shell {
+  display: grid;
+  gap: 24px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.admin-wizard-intro {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-wizard-intro span,
+.admin-wizard-step span,
+.admin-wizard-next-action span,
+.admin-wizard-create-form label,
+.admin-empty-note span {
+  color: #89938f;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-wizard-intro h2 {
+  max-width: 900px;
+  margin: 0;
+  font-size: clamp(34px, 4.2vw, 64px);
+  line-height: 0.98;
+}
+
+.admin-wizard-intro p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 17px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.admin-wizard-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-wizard-step {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 150px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8f7f2;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.admin-wizard-step svg {
+  width: 24px;
+  height: 24px;
+  color: var(--teal);
+}
+
+.admin-wizard-step p {
+  min-width: 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.admin-wizard-step-active {
+  border-color: rgba(18, 120, 109, 0.42);
+  background: #e9f4ef;
+}
+
+.admin-wizard-step-done {
+  background: #fffefa;
+}
+
+.admin-wizard-step-ready {
+  background: #fffefa;
+}
+
+.admin-wizard-step-locked {
+  opacity: 0.62;
+}
+
+.admin-wizard-step-locked svg {
+  color: #89938f;
+}
+
+.admin-wizard-create-form,
+.admin-wizard-next-action {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.1fr) minmax(180px, 0.75fr) auto;
+  gap: 14px;
+  align-items: end;
+  padding-top: 4px;
+}
+
+.admin-wizard-create-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-wizard-create-form input,
+.admin-wizard-create-form select {
+  min-height: 48px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.admin-wizard-create-form button,
+.admin-wizard-next-action a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--teal);
+  color: #fff;
+  font-weight: 900;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.admin-wizard-next-action {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8f7f2;
+}
+
+.admin-wizard-next-action strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.admin-wizard-next-action p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.admin-workspace-overview {
+  overflow: hidden;
+}
+
+.admin-empty-note {
+  padding: 22px 24px;
+}
+
+.admin-empty-note p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.admin-workspace-list-compact article {
+  grid-template-columns: minmax(220px, 0.9fr) minmax(360px, 1.3fr) auto;
+}
+
 .admin-setup-hero {
   display: flex;
   align-items: center;
@@ -2750,6 +2943,14 @@ svg {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .admin-wizard-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-wizard-create-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .admin-stepper {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -2801,7 +3002,9 @@ svg {
   .admin-setup-summary,
   .admin-stepper,
   .admin-import-status,
-  .admin-workspace-checks {
+  .admin-workspace-checks,
+  .admin-wizard-steps,
+  .admin-wizard-next-action {
     grid-template-columns: 1fr;
   }
 
