@@ -218,27 +218,27 @@ export function Dashboard({
       </section>
 
       <section className="status-tabs" aria-label="Workflow summary">
-        <Link className={filters.status === 'ready' ? 'active' : ''} href={dashboardHref(filters, { status: 'ready' })}>
+        <Link className={filters.status === 'ready' ? 'active' : ''} href={dashboardHref(filters, { status: 'ready' })} scroll={false}>
           <span className="name">Ready</span>
           <span className="num">{scopedReadyItems.length}</span>
           <span className="desc">{showAllOwners ? 'All owners ready' : 'Selected scope ready'}</span>
         </Link>
-        <Link className={filters.status === 'in_progress' ? 'active' : ''} href={dashboardHref(filters, { status: 'in_progress' })}>
+        <Link className={filters.status === 'in_progress' ? 'active' : ''} href={dashboardHref(filters, { status: 'in_progress' })} scroll={false}>
           <span className="name">In progress</span>
           <span className="num">{scopedInProgressItems.length}</span>
           <span className="desc">Being worked now</span>
         </Link>
-        <Link className={filters.status === 'submitted' ? 'active' : ''} href={dashboardHref(filters, { status: 'submitted' })}>
+        <Link className={filters.status === 'submitted' ? 'active' : ''} href={dashboardHref(filters, { status: 'submitted' })} scroll={false}>
           <span className="name">Submitted</span>
           <span className="num">{scopedSubmittedItems.length}</span>
           <span className="desc">Waiting on response</span>
         </Link>
-        <Link className={filters.status === 'upcoming' ? 'active' : ''} href={dashboardHref(filters, { status: 'upcoming' })}>
+        <Link className={filters.status === 'upcoming' ? 'active' : ''} href={dashboardHref(filters, { status: 'upcoming' })} scroll={false}>
           <span className="name">Upcoming</span>
           <span className="num">{scopedUpcomingItems.length}</span>
           <span className="desc">Not ready yet</span>
         </Link>
-        <Link className={filters.status === 'overdue' ? 'active' : ''} href={dashboardHref(filters, { status: 'overdue' })}>
+        <Link className={filters.status === 'overdue' ? 'active' : ''} href={dashboardHref(filters, { status: 'overdue' })} scroll={false}>
           <span className="name">Overdue</span>
           <span className="num">{scopedOverdueItems.length}</span>
           <span className="desc">Past expiration</span>
@@ -251,43 +251,43 @@ export function Dashboard({
             <span>Queue filters</span>
             <h2>Refine work queue</h2>
           </div>
-          {(filters.owner || hasColumnFilters) ? <Link className="secondary-link" href="/">Clear filters</Link> : null}
+          {(filters.owner || hasColumnFilters) ? <Link className="secondary-link" href="/" scroll={false}>Clear filters</Link> : null}
         </div>
         <div className="queue-filter-rows">
           <div className="queue-filter-row">
             <span>Owner</span>
-            <Link className={!filters.owner ? 'active' : ''} href={dashboardHref(filters, { owner: undefined })}>{defaultOwnerLabel}</Link>
-            {isCustomerAdmin ? <Link className={filters.owner === 'all' ? 'active' : ''} href={dashboardHref(filters, { owner: 'all' })}>All owners</Link> : null}
+            <Link className={!filters.owner ? 'active' : ''} href={dashboardHref(filters, { owner: undefined })} scroll={false}>{defaultOwnerLabel}</Link>
+            {isCustomerAdmin ? <Link className={filters.owner === 'all' ? 'active' : ''} href={dashboardHref(filters, { owner: 'all' })} scroll={false}>All owners</Link> : null}
             {ownerFilterCodes.map((owner) => (
-              <Link className={filters.owner === owner ? 'active' : ''} href={dashboardHref(filters, { owner })} key={owner}>{owner}</Link>
+              <Link className={filters.owner === owner ? 'active' : ''} href={dashboardHref(filters, { owner })} key={owner} scroll={false}>{owner}</Link>
             ))}
           </div>
           <div className="queue-filter-row">
             <span>Status</span>
-            <Link className={!filters.status ? 'active' : ''} href={dashboardHref(filters, { status: undefined })}>All active</Link>
+            <Link className={!filters.status ? 'active' : ''} href={dashboardHref(filters, { status: undefined })} scroll={false}>All active</Link>
             {statusFilterOptions.map((option) => (
-              <Link className={filters.status === option.value ? 'active' : ''} href={dashboardHref(filters, { status: option.value })} key={option.value}>{option.label}</Link>
+              <Link className={filters.status === option.value ? 'active' : ''} href={dashboardHref(filters, { status: option.value })} key={option.value} scroll={false}>{option.label}</Link>
             ))}
           </div>
           <div className="queue-filter-row">
             <span>Agency/Type</span>
-            <Link className={!filters.type ? 'active' : ''} href={dashboardHref(filters, { type: undefined })}>All types</Link>
+            <Link className={!filters.type ? 'active' : ''} href={dashboardHref(filters, { type: undefined })} scroll={false}>All types</Link>
             {limitedOptions(typeOptions, filters.type).map((type) => (
-              <Link className={filters.type === type ? 'active' : ''} href={dashboardHref(filters, { type })} key={type}>{type}</Link>
+              <Link className={filters.type === type ? 'active' : ''} href={dashboardHref(filters, { type })} key={type} scroll={false}>{type}</Link>
             ))}
           </div>
           <div className="queue-filter-row">
             <span>Vessel</span>
-            <Link className={!filters.vessel ? 'active' : ''} href={dashboardHref(filters, { vessel: undefined })}>All vessels</Link>
+            <Link className={!filters.vessel ? 'active' : ''} href={dashboardHref(filters, { vessel: undefined })} scroll={false}>All vessels</Link>
             {limitedOptions(vesselOptions, filters.vessel).map((vessel) => (
-              <Link className={filters.vessel === vessel ? 'active' : ''} href={dashboardHref(filters, { vessel })} key={vessel}>{vessel}</Link>
+              <Link className={filters.vessel === vessel ? 'active' : ''} href={dashboardHref(filters, { vessel })} key={vessel} scroll={false}>{vessel}</Link>
             ))}
           </div>
           <div className="queue-filter-row">
             <span>Frequency</span>
-            <Link className={!filters.frequency ? 'active' : ''} href={dashboardHref(filters, { frequency: undefined })}>All frequencies</Link>
+            <Link className={!filters.frequency ? 'active' : ''} href={dashboardHref(filters, { frequency: undefined })} scroll={false}>All frequencies</Link>
             {limitedOptions(frequencyOptions, filters.frequency).map((frequency) => (
-              <Link className={filters.frequency === frequency ? 'active' : ''} href={dashboardHref(filters, { frequency })} key={frequency}>{frequency}</Link>
+              <Link className={filters.frequency === frequency ? 'active' : ''} href={dashboardHref(filters, { frequency })} key={frequency} scroll={false}>{frequency}</Link>
             ))}
           </div>
         </div>
