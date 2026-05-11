@@ -3341,6 +3341,11 @@ svg {
   margin: 0;
 }
 
+.admin-index-console .admin-workspace {
+  align-content: start;
+  gap: 18px;
+}
+
 .admin-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3396,6 +3401,13 @@ svg {
 .admin-mapping-review-grid {
   display: grid;
   grid-template-columns: minmax(840px, 1.55fr) minmax(320px, 0.45fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.admin-index-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
   gap: 18px;
   align-items: start;
 }
@@ -3538,6 +3550,56 @@ svg {
 .admin-side-stack {
   display: grid;
   gap: 18px;
+}
+
+.admin-create-form {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+
+.admin-create-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-create-form input,
+.admin-create-form select {
+  min-height: 44px;
+  min-width: 0;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.admin-create-form button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--teal);
+  color: #fff;
+  font-weight: 900;
+}
+
+.admin-create-form button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .admin-role-form {
@@ -4665,6 +4727,7 @@ svg {
   .admin-console,
   .admin-grid-main,
   .admin-grid-secondary,
+  .admin-index-grid,
   .admin-onboarding-grid {
     grid-template-columns: 1fr;
   }

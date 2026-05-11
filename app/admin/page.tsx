@@ -1,17 +1,20 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ArrowUpRight, Building2, CheckCircle2, ClipboardList, Database, LogOut, Upload, UserPlus, Users } from 'lucide-react';
+import { ArrowUpRight, Building2, CheckCircle2, Database, LogOut, Plus, Ship, UserPlus, Users } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
 import { createCompany } from '@/app/actions/companies';
+import { getAppAdminClassification } from '@/lib/app-admins';
 import { createClient } from '@/lib/supabase/server';
 
 type AdminPageProps = {
   searchParams?: { message?: string };
 };
 
-type CompanySetup = {
+type CompanyIndexRow = {
   id: string;
   name: string;
+  timezone: string;
+  createdAt: string;
   vessels: number;
   users: number;
   totalItems: number;
@@ -32,54 +35,53 @@ function customerConsoleHref(companyId: string) {
   return `/admin/customers/${companyId}/users`;
 }
 
-function setupStage(company: CompanySetup) {
+function handoffStage(company: CompanyIndexRow) {
   if (company.totalItems === 0 && company.vessels === 0) {
     return {
-      label: 'Import workbook',
-      detail: 'Workspace exists. Import the customer workbook next.',
-      action: 'Open customer',
+      label: 'Workbook needed',
+      detail: 'No imported workbook data yet.',
       href: customerConsoleHref(company.id),
-      tone: 'active'
+      tone: 'attention'
     };
   }
 
   if (company.ownerCodes === 0) {
     return {
       label: 'Review import',
-      detail: 'Imported data needs review before users are added.',
-      action: 'Open customer',
+      detail: 'Imported data is present. Owner codes need review.',
       href: customerConsoleHref(company.id),
-      tone: 'active'
+      tone: 'attention'
     };
   }
 
   if (company.mappedOwnerCodes < company.ownerCodes) {
     return {
       label: 'Map owners',
-      detail: `${company.ownerCodes - company.mappedOwnerCodes} owner codes still need people.`,
-      action: 'Open customer',
+      detail: `${company.ownerCodes - company.mappedOwnerCodes} owner code${company.ownerCodes - company.mappedOwnerCodes === 1 ? '' : 's'} need a customer email.`,
       href: customerConsoleHref(company.id),
-      tone: 'active'
+      tone: 'attention'
     };
   }
 
   if (company.users === 0 && company.pendingInvites === 0) {
     return {
       label: 'Add users',
-      detail: 'Owner mapping is ready. Add customer users to the workspace.',
-      action: 'Open customer',
+      detail: 'Owner mapping is ready. Add customer users next.',
       href: customerConsoleHref(company.id),
-      tone: 'ready'
+      tone: 'attention'
     };
   }
 
   return {
-    label: 'Verify access',
-    detail: `${company.users} active users · ${company.pendingInvites} pending login.`,
-    action: 'Open customer',
+    label: 'Users active',
+    detail: `${company.users} active user${company.users === 1 ? '' : 's'} · ${company.pendingInvites} pending invite${company.pendingInvites === 1 ? '' : 's'}.`,
     href: customerConsoleHref(company.id),
     tone: 'ready'
   };
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
 }
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
@@ -90,9 +92,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     redirect('/');
   }
 
-  const { data: isAppAdmin } = await supabase.rpc('is_app_admin');
+  const classification = await getAppAdminClassification();
+  const viewerEmail = userData.user.email?.trim().toLowerCase();
 
-  if (!isAppAdmin) {
+  if (classification.status === 'unverified' || !viewerEmail || !classification.appAdminEmails.has(viewerEmail)) {
     redirect('/');
   }
 
@@ -100,12 +103,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     { data: companies },
     { data: memberships },
     { data: invitations },
-    { data: appAdmins },
     { data: vessels },
     { data: items },
     { data: ownerCodes }
   ] = await Promise.all([
-    supabase.from('companies').select('id, name, timezone, created_at').order('created_at', { ascending: true }),
+    supabase.from('companies').select('id, name, timezone, created_at').order('name', { ascending: true }),
     supabase
       .from('company_memberships')
       .select('company_id, user_id, role, created_at, profiles(email, full_name)')
@@ -114,22 +116,27 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       .from('company_invitations')
       .select('email, role, accepted_at, created_at, company_id')
       .order('created_at', { ascending: false }),
-    supabase.from('app_admins').select('email, created_at'),
     supabase.from('vessels').select('id, company_id, active'),
     supabase.from('compliance_items').select('id, company_id'),
     supabase.from('company_owner_codes').select('id, company_id, user_id, pending_email')
   ]);
 
   const companyRows = companies ?? [];
-  const appAdminEmailSet = new Set((appAdmins ?? []).map((admin) => admin.email.toLowerCase()));
-  const customerMembershipRows = (memberships ?? []).filter((membership) => !appAdminEmailSet.has(profileEmail(membership).toLowerCase()));
-  const pendingInvites = (invitations ?? []).filter((invite) => !invite.accepted_at);
+  const customerMembershipRows = (memberships ?? []).filter(
+    (membership) => !classification.appAdminEmails.has(profileEmail(membership).toLowerCase())
+  );
+  const pendingInvites = (invitations ?? []).filter(
+    (invite) => !invite.accepted_at && !classification.appAdminEmails.has((invite.email ?? '').toLowerCase())
+  );
 
-  const companySetup: CompanySetup[] = companyRows.map((company) => {
+  const customerRows: CompanyIndexRow[] = companyRows.map((company) => {
     const companyOwnerCodes = (ownerCodes ?? []).filter((owner) => owner.company_id === company.id);
+
     return {
       id: company.id,
       name: company.name,
+      timezone: company.timezone,
+      createdAt: company.created_at,
       vessels: (vessels ?? []).filter((vessel) => vessel.company_id === company.id && vessel.active).length,
       users: customerMembershipRows.filter((membership) => membership.company_id === company.id).length,
       totalItems: (items ?? []).filter((item) => item.company_id === company.id).length,
@@ -139,48 +146,19 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     };
   });
 
-  const activeCompany = companySetup.find((company) => setupStage(company).tone === 'active') ?? companySetup[0];
-  const activeStage = activeCompany ? setupStage(activeCompany) : null;
-  const hasWorkspaces = companySetup.length > 0;
-
-  const wizardSteps = [
-    {
-      label: 'Create workspace',
-      description: hasWorkspaces ? `${companySetup.length} workspace${companySetup.length === 1 ? '' : 's'} created` : 'Start with the customer company name.',
-      state: hasWorkspaces ? 'done' : 'active',
-      icon: Building2,
-      href: '#create-workspace'
-    },
-    {
-      label: 'Import workbook',
-      description: hasWorkspaces ? 'Open a workspace and upload the customer sheet.' : 'Available after a workspace exists.',
-      state: hasWorkspaces && activeStage?.label === 'Import workbook' ? 'active' : hasWorkspaces ? 'ready' : 'locked',
-      icon: Upload,
-      href: activeCompany ? customerConsoleHref(activeCompany.id) : '#create-workspace'
-    },
-    {
-      label: 'Map owners',
-      description: hasWorkspaces ? 'Connect detected owner codes to customer emails.' : 'Owner codes appear after import.',
-      state: hasWorkspaces && activeStage?.label === 'Map owners' ? 'active' : hasWorkspaces ? 'ready' : 'locked',
-      icon: Users,
-      href: activeCompany ? customerConsoleHref(activeCompany.id) : '#create-workspace'
-    },
-    {
-      label: 'Add users',
-      description: hasWorkspaces ? 'Add users after owner mapping is ready.' : 'Users are added after mapping.',
-      state: hasWorkspaces && activeStage?.label === 'Add users' ? 'active' : hasWorkspaces ? 'ready' : 'locked',
-      icon: UserPlus,
-      href: activeCompany ? customerConsoleHref(activeCompany.id) : '#create-workspace'
-    }
-  ];
+  const totalItems = customerRows.reduce((sum, company) => sum + company.totalItems, 0);
+  const totalUsers = customerRows.reduce((sum, company) => sum + company.users, 0);
+  const pendingInvitationCount = customerRows.reduce((sum, company) => sum + company.pendingInvites, 0);
+  const customersNeedingWork = customerRows.filter((company) => handoffStage(company).tone === 'attention').length;
+  const hasCustomers = customerRows.length > 0;
 
   return (
-    <main className="admin-console admin-setup-console admin-wizard-console">
+    <main className="admin-console admin-index-console">
       <aside className="admin-rail">
         <div className="admin-mark">FF</div>
-        <nav className="admin-rail-nav" aria-label="Admin setup sections">
-          <a href="#setup-flow"><ClipboardList aria-hidden="true" /><span>Setup flow</span></a>
-          <a href="#workspaces"><Building2 aria-hidden="true" /><span>Workspaces</span></a>
+        <nav className="admin-rail-nav" aria-label="Admin sections">
+          <a href="#customers"><Building2 aria-hidden="true" /><span>Customers</span></a>
+          <a href="#new-customer"><Plus aria-hidden="true" /><span>Add customer</span></a>
         </nav>
         <div className="admin-rail-footer">
           <span>Signed in</span>
@@ -192,49 +170,95 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       </aside>
 
       <section className="admin-workspace">
-        <header className="admin-topbar admin-setup-topbar">
+        <header className="admin-topbar">
           <div>
             <p className="eyebrow">Private FF workspace</p>
-            <h1>Customer setup</h1>
+            <h1>Customers</h1>
           </div>
-          <span className="admin-subtle-pill">Solo admin</span>
+          <span className="admin-subtle-pill">{customerRows.length} customer{customerRows.length === 1 ? '' : 's'}</span>
         </header>
 
         {searchParams?.message ? <p className="form-message admin-message">{searchParams.message}</p> : null}
 
-        <section className="admin-wizard-shell" id="setup-flow" aria-label="Customer setup wizard">
-          <div className="admin-wizard-intro">
-            <span>Guided setup</span>
-            <h2>{activeCompany && activeStage ? `${activeStage.action} for ${activeCompany.name}` : 'Create your first customer workspace'}</h2>
-            <p>{activeStage?.detail ?? 'Create the workspace first. Import, owner mapping, and user access happen from that workspace page.'}</p>
-          </div>
+        <section className="admin-stat-grid" aria-label="Customer portfolio summary">
+          <article>
+            <Building2 aria-hidden="true" />
+            <span>Customers</span>
+            <strong>{customerRows.length}</strong>
+            <p>{customersNeedingWork} need handoff work</p>
+          </article>
+          <article>
+            <Database aria-hidden="true" />
+            <span>Imported work</span>
+            <strong>{totalItems}</strong>
+            <p>Compliance items across workspaces</p>
+          </article>
+          <article>
+            <Users aria-hidden="true" />
+            <span>Customer users</span>
+            <strong>{totalUsers}</strong>
+            <p>{pendingInvitationCount} pending invite{pendingInvitationCount === 1 ? '' : 's'}</p>
+          </article>
+          <article>
+            <Ship aria-hidden="true" />
+            <span>Active vessels</span>
+            <strong>{customerRows.reduce((sum, company) => sum + company.vessels, 0)}</strong>
+            <p>Across all customer workspaces</p>
+          </article>
+        </section>
 
-          <div className="admin-wizard-steps" aria-label="Setup steps">
-            {wizardSteps.map((step) => {
-              const Icon = step.icon;
-              const isLocked = step.state === 'locked';
-              const content = (
-                <>
-                  <Icon aria-hidden="true" />
-                  <span>{step.label}</span>
-                  <p>{step.description}</p>
-                </>
-              );
+        <section className="admin-index-grid">
+          <section className="panel admin-panel admin-workspace-overview" id="customers">
+            <div className="admin-panel-heading">
+              <div>
+                <span>All customers</span>
+                <h2>{hasCustomers ? 'Customer workspaces' : 'No customers yet'}</h2>
+              </div>
+            </div>
 
-              return isLocked ? (
-                <article className={`admin-wizard-step admin-wizard-step-${step.state}`} key={step.label}>
-                  {content}
-                </article>
-              ) : (
-                <Link className={`admin-wizard-step admin-wizard-step-${step.state}`} href={step.href} key={step.label}>
-                  {content}
-                </Link>
-              );
-            })}
-          </div>
+            {hasCustomers ? (
+              <div className="admin-workspace-list admin-workspace-list-compact">
+                {customerRows.map((company) => {
+                  const stage = handoffStage(company);
+                  return (
+                    <article key={company.id}>
+                      <div className="admin-workspace-primary">
+                        <strong>{company.name}</strong>
+                        <span className={`setup-chip setup-chip-${stage.tone}`}>{stage.label}</span>
+                        <p>Created {formatDate(company.createdAt)} · {company.timezone}</p>
+                      </div>
+                      <div className="admin-workspace-checks" aria-label={`${company.name} readiness checks`}>
+                        <span className={company.totalItems > 0 ? 'complete' : ''}><Database aria-hidden="true" /> {company.totalItems} items</span>
+                        <span className={company.ownerCodes > 0 && company.mappedOwnerCodes === company.ownerCodes ? 'complete' : ''}>
+                          <CheckCircle2 aria-hidden="true" /> {company.mappedOwnerCodes}/{company.ownerCodes} owners
+                        </span>
+                        <span className={company.users > 0 || company.pendingInvites > 0 ? 'complete' : ''}>
+                          <UserPlus aria-hidden="true" /> {company.users} users · {company.pendingInvites} pending
+                        </span>
+                      </div>
+                      <Link href={stage.href} aria-label={`Open ${company.name}`}>
+                        Open customer
+                        <ArrowUpRight aria-hidden="true" />
+                      </Link>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="admin-empty-note">
+                <p>Create the first customer workspace, then open it to import the workbook, map owner codes, and manage users.</p>
+              </div>
+            )}
+          </section>
 
-          {!hasWorkspaces ? (
-            <form action={createCompany} className="admin-wizard-create-form" id="create-workspace">
+          <section className="panel admin-panel" id="new-customer">
+            <div className="admin-panel-heading">
+              <div>
+                <span>Add customer</span>
+                <h2>New workspace</h2>
+              </div>
+            </div>
+            <form action={createCompany} className="admin-create-form">
               <label>
                 Customer company name
                 <input name="companyName" placeholder="Arctic Storm Management Group" required />
@@ -247,62 +271,12 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   <option value="America/New_York">Eastern Time</option>
                 </select>
               </label>
-              <button type="submit">Create workspace</button>
-            </form>
-          ) : activeCompany && activeStage ? (
-            <div className="admin-wizard-next-action">
-              <div>
-                <span>Current workspace</span>
-                <strong>{activeCompany.name}</strong>
-                <p>{activeStage.detail}</p>
-              </div>
-              <Link href={activeStage.href}>
-                {activeStage.action}
+              <button type="submit">
+                Create customer
                 <ArrowUpRight aria-hidden="true" />
-              </Link>
-            </div>
-          ) : null}
-        </section>
-
-        <section className="panel admin-panel admin-workspace-overview" id="workspaces">
-          <div className="admin-panel-heading">
-            <div>
-              <span>Customer workspaces</span>
-              <h2>{hasWorkspaces ? 'Workspace status' : 'No workspaces yet'}</h2>
-            </div>
-          </div>
-          {hasWorkspaces ? (
-            <div className="admin-workspace-list admin-workspace-list-compact">
-              {companySetup.map((company) => {
-                const stage = setupStage(company);
-                return (
-                  <article key={company.id}>
-                    <div className="admin-workspace-primary">
-                      <strong>{company.name}</strong>
-                      <span className={`setup-chip setup-chip-${stage.tone === 'active' ? 'attention' : 'ready'}`}>{stage.label}</span>
-                    </div>
-                    <div className="admin-workspace-checks" aria-label={`${company.name} setup checks`}>
-                      <span className={company.totalItems > 0 ? 'complete' : ''}><Database aria-hidden="true" /> {company.totalItems} items</span>
-                      <span className={company.ownerCodes > 0 && company.mappedOwnerCodes === company.ownerCodes ? 'complete' : ''}>
-                        <CheckCircle2 aria-hidden="true" /> {company.mappedOwnerCodes}/{company.ownerCodes} owners
-                      </span>
-                      <span className={company.users > 0 || company.pendingInvites > 0 ? 'complete' : ''}>
-                        <UserPlus aria-hidden="true" /> {company.users} users · {company.pendingInvites} pending
-                      </span>
-                    </div>
-                    <Link href={stage.href}>
-                      {stage.action}
-                      <ArrowUpRight aria-hidden="true" />
-                    </Link>
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="admin-empty-note">
-              <p>No customer workspaces exist yet. The setup flow above is the only action you need right now.</p>
-            </div>
-          )}
+              </button>
+            </form>
+          </section>
         </section>
       </section>
     </main>
