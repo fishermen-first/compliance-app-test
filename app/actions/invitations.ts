@@ -2,11 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { assertOwnerEmailMappable, isOwnerCodeEmailRejectedError } from '@/lib/app-admins';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
 const companyRoles = ['owner', 'office_user'] as const;
 const allowedRoles = ['app_admin', ...companyRoles] as const;
+const ownerCodeRejectedMessage = 'This email cannot be used for customer owner-code mapping.';
 
 function requiredString(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? '').trim();
@@ -24,8 +26,7 @@ function isExistingAuthUserError(message: string) {
   return normalized.includes('already') && (normalized.includes('registered') || normalized.includes('exists'));
 }
 
-async function provisionAuthUser(email: string) {
-  const supabaseAdmin = createAdminClient();
+async function provisionAuthUser(email: string, supabaseAdmin: ReturnType<typeof createAdminClient>) {
   const { error } = await supabaseAdmin.auth.admin.createUser({
     email,
     email_confirm: true
@@ -59,10 +60,21 @@ function safeRedirectPath(value: FormDataEntryValue | null) {
   return '/admin';
 }
 
-async function assignPendingOwnerCodes(companyId: string, email: string, ownerCodes: string[]) {
+function rejectionRedirectPath(path: string, message: string, hash?: string) {
+  const safePath = safeRedirectPath(path);
+  const params = new URLSearchParams();
+  params.set('message', message);
+  return `${safePath}?${params.toString()}${hash ? `#${hash}` : ''}`;
+}
+
+async function assignPendingOwnerCodes(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+  companyId: string,
+  email: string,
+  ownerCodes: string[]
+) {
   if (ownerCodes.length === 0) return;
 
-  const supabaseAdmin = createAdminClient();
   let userId: string | null = null;
 
   const { data: profile, error: profileError } = await supabaseAdmin
@@ -121,7 +133,6 @@ export async function createInvitation(formData: FormData) {
   const ownerCodes = parseOwnerCodes(formData);
   const redirectTo = safeRedirectPath(formData.get('redirectTo'));
   const supabase = createClient();
-  const supabaseAdmin = createAdminClient();
 
   if (!allowedRoles.includes(role as (typeof allowedRoles)[number])) {
     redirect('/admin?message=Choose%20a%20valid%20role.');
@@ -140,6 +151,7 @@ export async function createInvitation(formData: FormData) {
   }
 
   if (role === 'app_admin') {
+    const supabaseAdmin = createAdminClient();
     const { error } = await supabaseAdmin
       .from('app_admins')
       .upsert({ email }, { onConflict: 'email' });
@@ -148,7 +160,7 @@ export async function createInvitation(formData: FormData) {
       throw new Error(error.message);
     }
 
-    const authUserStatus = await provisionAuthUser(email);
+    const authUserStatus = await provisionAuthUser(email, supabaseAdmin);
 
     revalidatePath('/admin');
     const message =
@@ -162,6 +174,19 @@ export async function createInvitation(formData: FormData) {
     redirect('/admin?message=Choose%20a%20company%20for%20company%20roles.');
   }
 
+  if (ownerCodes.length > 0) {
+    try {
+      await assertOwnerEmailMappable(email);
+    } catch (error) {
+      if (isOwnerCodeEmailRejectedError(error)) {
+        redirect(rejectionRedirectPath(redirectTo, ownerCodeRejectedMessage, redirectTo === '/admin' ? undefined : 'access'));
+      }
+
+      throw error;
+    }
+  }
+
+  const supabaseAdmin = createAdminClient();
   const { error } = await supabaseAdmin
     .from('company_invitations')
     .upsert(
@@ -178,8 +203,8 @@ export async function createInvitation(formData: FormData) {
     throw new Error(error.message);
   }
 
-  const authUserStatus = await provisionAuthUser(email);
-  await assignPendingOwnerCodes(companyId, email, ownerCodes);
+  const authUserStatus = await provisionAuthUser(email, supabaseAdmin);
+  await assignPendingOwnerCodes(supabaseAdmin, companyId, email, ownerCodes);
 
   revalidatePath('/admin');
   revalidatePath(`/admin/companies/${companyId}`);

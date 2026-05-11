@@ -2,8 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { assertOwnerEmailMappable, isOwnerCodeEmailRejectedError } from '@/lib/app-admins';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+
+const ownerCodeRejectedMessage = 'This email cannot be used for customer owner-code mapping.';
 
 function requiredString(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? '').trim();
@@ -16,6 +19,14 @@ function optionalEmail(formData: FormData, name: string) {
   return value || null;
 }
 
+function ownerLoginEmail(formData: FormData) {
+  if (formData.has('loginEmail')) {
+    return optionalEmail(formData, 'loginEmail');
+  }
+
+  return optionalEmail(formData, 'assignmentEmail');
+}
+
 function optionalString(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? '').trim();
   return value || null;
@@ -26,6 +37,13 @@ function safeRedirectPath(value: FormDataEntryValue | null) {
   if (path === '/settings') return path;
   if (/^\/admin\/companies\/[0-9a-f-]+$/i.test(path)) return path;
   return '/settings';
+}
+
+function rejectionRedirectPath(path: string, message: string, hash?: string) {
+  const safePath = safeRedirectPath(path);
+  const params = new URLSearchParams();
+  params.set('message', message);
+  return `${safePath}?${params.toString()}${hash ? `#${hash}` : ''}`;
 }
 
 async function requireOwnerCodeAdmin(companyId: string) {
@@ -54,14 +72,27 @@ export async function saveOwnerCodeMapping(formData: FormData) {
   const companyId = requiredString(formData, 'companyId');
   const code = requiredString(formData, 'code');
   const personName = optionalString(formData, 'personName') ?? optionalString(formData, 'displayName');
-  const loginEmail = optionalEmail(formData, 'loginEmail') ?? optionalEmail(formData, 'assignmentEmail');
+  const loginEmail = ownerLoginEmail(formData);
   const redirectTo = safeRedirectPath(formData.get('redirectTo'));
 
   await requireOwnerCodeAdmin(companyId);
 
-  const admin = createAdminClient();
   let userId: string | null = null;
   let pendingEmail: string | null = null;
+
+  if (loginEmail) {
+    try {
+      await assertOwnerEmailMappable(loginEmail);
+    } catch (error) {
+      if (isOwnerCodeEmailRejectedError(error)) {
+        redirect(rejectionRedirectPath(redirectTo, ownerCodeRejectedMessage, redirectTo === '/settings' ? undefined : 'mapping'));
+      }
+
+      throw error;
+    }
+  }
+
+  const admin = createAdminClient();
 
   if (loginEmail) {
     const { data: profile, error: profileError } = await admin

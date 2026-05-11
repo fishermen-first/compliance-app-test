@@ -36,15 +36,32 @@ function profileEmail(row: any) {
   return relation(row.profiles)?.email ?? 'Profile pending';
 }
 
+function normalizedEmail(email?: string | null) {
+  return email?.trim().toLowerCase() ?? '';
+}
+
 function vesselName(row: any) {
   return relation(row.vessels)?.name ?? 'Company-wide';
 }
 
-function ownerMappingStatus(owner: any) {
+function ownerMappingStatus(owner: any, appAdminEmailSet: Set<string> | null) {
+  const profile = relation(owner.profiles);
+  const mappedEmail = normalizedEmail(profile?.email ?? owner.pending_email);
+
+  if (appAdminEmailSet && mappedEmail && appAdminEmailSet.has(mappedEmail)) {
+    return 'Needs customer user';
+  }
+
+  if (owner.user_id && !profile?.email) return 'Needs profile email';
   if (owner.user_id) return 'Mapped user';
   if (owner.pending_email) return 'Pending login';
   if (owner.display_name) return 'Needs login email';
   return 'Unmapped';
+}
+
+function isValidOwnerMapping(owner: any, appAdminEmailSet: Set<string> | null) {
+  const status = ownerMappingStatus(owner, appAdminEmailSet);
+  return status === 'Mapped user' || status === 'Pending login';
 }
 
 function stepState(complete: boolean, active: boolean) {
@@ -76,7 +93,7 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
     { data: items },
     { data: reminderRules },
     { data: ownerCodes },
-    { data: appAdmins }
+    { data: appAdmins, error: appAdminsError }
   ] = await Promise.all([
     supabase.from('companies').select('id, name, timezone, created_at').eq('id', companyId).maybeSingle(),
     supabase
@@ -113,14 +130,17 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
   const activeVessels = (vessels ?? []).filter((vessel) => vessel.active);
   const openItems = itemRows.filter((item) => isOpenItem(item.status));
   const pendingInvites = (invitations ?? []).filter((invite) => !invite.accepted_at);
-  const appAdminEmailSet = new Set((appAdmins ?? []).map((admin) => admin.email.toLowerCase()));
-  const customerMemberships = (memberships ?? []).filter((membership) => !appAdminEmailSet.has(profileEmail(membership).toLowerCase()));
+  const appAdminEmailSet = appAdminsError ? null : new Set((appAdmins ?? []).map((admin) => normalizedEmail(admin.email)).filter(Boolean));
+  const customerMemberships = (memberships ?? []).filter((membership) => {
+    const email = normalizedEmail(profileEmail(membership));
+    return !appAdminEmailSet || !appAdminEmailSet.has(email);
+  });
   const importedOwnerCodes = Array.from(new Set(itemRows.map((item) => item.owner_current).filter(Boolean) as string[])).sort();
   const ownerCodeMap = new Map<string, any>();
   importedOwnerCodes.forEach((code) => ownerCodeMap.set(code, { code, display_name: null, user_id: null, pending_email: null, profiles: null }));
   (ownerCodes ?? []).forEach((owner) => ownerCodeMap.set(owner.code, owner));
   const ownerCodeRows = Array.from(ownerCodeMap.values()).sort((a, b) => a.code.localeCompare(b.code));
-  const mappedOwnerCodes = ownerCodeRows.filter((owner) => owner.user_id || owner.pending_email);
+  const mappedOwnerCodes = ownerCodeRows.filter((owner) => isValidOwnerMapping(owner, appAdminEmailSet));
 
   const hasData = itemRows.length > 0 || activeVessels.length > 0;
   const hasOwnerCodes = ownerCodeRows.length > 0;
@@ -180,6 +200,9 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
         </header>
 
         {searchParams?.message ? <p className="form-message admin-message">{searchParams.message}</p> : null}
+        {appAdminsError ? (
+          <p className="form-message admin-message">FF-admin owner-code validation could not be verified.</p>
+        ) : null}
 
         <section className="admin-setup-hero admin-company-hero" aria-label="Next setup step">
           <div>
@@ -336,7 +359,7 @@ export default async function CompanyAdminPage({ params, searchParams }: Company
                 return (
                   <article key={owner.code}>
                     <strong>{owner.code}</strong>
-                    <span>{count} {count === 1 ? 'record' : 'records'} · {ownerMappingStatus(owner)}</span>
+                    <span>{count} {count === 1 ? 'record' : 'records'} · {ownerMappingStatus(owner, appAdminEmailSet)}</span>
                     <form action={saveOwnerCodeMapping} className="owner-mapping-form">
                       <input type="hidden" name="companyId" value={companyId} />
                       <input type="hidden" name="code" value={owner.code} />
