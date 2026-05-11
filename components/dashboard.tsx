@@ -140,26 +140,26 @@ export function Dashboard({
 
   return (
     <main className="workspace">
-      <header className="customer-page-header">
+      <header className="page-header">
         <div>
           <p className="eyebrow">{companyName}</p>
           <h1>Work queue</h1>
-          <p>Track active renewals, submissions, and upcoming compliance work from the imported due-date sheet.</p>
+          <p className="intro">Track active renewals, submissions, and upcoming compliance work from the imported due-date sheet.</p>
         </div>
 
-        <div className="customer-header-actions">
-          <Link className="secondary-action" href="/calendar">
+        <div className="header-actions">
+          <Link className="btn" href="/calendar">
             <CalendarDays aria-hidden="true" />
             <span>Calendar</span>
           </Link>
           {canCreateItems ? (
-            <Link className="primary-action" href="/items/new">
+            <Link className="btn primary" href="/items/new">
               <Plus aria-hidden="true" />
               <span>New item</span>
             </Link>
           ) : null}
           <button className="user-pill" type="button" aria-label={`Current user ${currentUserName}`}>
-            <span>{initials(currentUserName)}</span>
+            <span className="avatar">{initials(currentUserName)}</span>
             <strong>{currentUserName}</strong>
             <small>{accessRoleLabel(currentUserRole)}{selectedOwnerCodes.length ? ` · ${selectedOwnerCodes.join(', ')}` : ''}</small>
           </button>
@@ -167,10 +167,11 @@ export function Dashboard({
       </header>
 
       {!hasOwnerMapping && isCustomerAdmin ? (
-        <section className="owner-notice-panel admin-view-notice">
-          <strong>Admin view</strong>
-          <span>No owner code is mapped to your login, so this workspace opens to all company work. Map an owner code if you want a personal queue.</span>
-        </section>
+        <div className="admin-notice">
+          <span className="pill">Admin view</span>
+          <span>No owner code is mapped to your login - this workspace opens to <strong>all company work</strong>. Map an owner code for a personal queue.</span>
+          <Link href="/settings">Map owner code</Link>
+        </div>
       ) : null}
 
       {isUnmappedRegularUser ? (
@@ -180,61 +181,67 @@ export function Dashboard({
         </section>
       ) : null}
 
-      <section className={`queue-overview-grid${isCustomerAdmin ? '' : ' single-card'}`} aria-label="Queue snapshot">
-        <section className="panel week-panel">
-          <span>Due in 30 days</span>
-          <strong>{soonItems.length}</strong>
-          <p>Expirations approaching soon in the selected queue. Review these alongside submitted and ready work.</p>
-          <Link href="/calendar">Open calendar</Link>
-        </section>
+      <section className={`snapshot${isCustomerAdmin ? '' : ' single-card'}`} aria-label="Queue snapshot">
+        <article className="card due">
+          <div className="label-block">
+            <div className="label-row">
+              <span className="num">{soonItems.length}</span>
+              <p className="label">Due in 30 days</p>
+            </div>
+            <p className="copy">Expirations approaching soon in the selected queue.</p>
+          </div>
+          <span />
+          <Link className="btn-link" href="/calendar">
+            <span>Open calendar</span>
+          </Link>
+        </article>
 
         {isCustomerAdmin ? (
-          <section className="panel activity-panel risk-count-panel">
-            <span>Company risk</span>
-            <ul>
-              <li><strong>{overdueItems.length}</strong> overdue across all owners</li>
-              <li><strong>{readyItems.length}</strong> ready across all owners</li>
-              <li><strong>{submittedItems.length}</strong> submitted across all owners</li>
-            </ul>
-          </section>
+          <article className="card risk">
+            <p className="label">Company risk</p>
+            <div className="risk-rows">
+              <div>
+                <span className="num danger">{overdueItems.length}</span>
+                <span className="lbl">Overdue across all owners</span>
+              </div>
+              <div>
+                <span className="num ok">{readyItems.length}</span>
+                <span className="lbl">Ready across all owners</span>
+              </div>
+              <div>
+                <span className="num warn">{submittedItems.length}</span>
+                <span className="lbl">Submitted across all owners</span>
+              </div>
+            </div>
+          </article>
         ) : null}
       </section>
 
-      <section className="workflow-tabs" aria-label="Workflow summary">
+      <section className="status-tabs" aria-label="Workflow summary">
         <Link className={filters.status === 'ready' ? 'active' : ''} href={dashboardHref(filters, { status: 'ready' })}>
-          <div>
-            <span>Ready</span>
-            <strong>{scopedReadyItems.length}</strong>
-          </div>
-          <p>{showAllOwners ? 'All owners ready' : 'Selected scope ready'}</p>
+          <span className="name">Ready</span>
+          <span className="num">{scopedReadyItems.length}</span>
+          <span className="desc">{showAllOwners ? 'All owners ready' : 'Selected scope ready'}</span>
         </Link>
         <Link className={filters.status === 'in_progress' ? 'active' : ''} href={dashboardHref(filters, { status: 'in_progress' })}>
-          <div>
-            <span>In progress</span>
-            <strong>{scopedInProgressItems.length}</strong>
-          </div>
-          <p>Being worked now</p>
+          <span className="name">In progress</span>
+          <span className="num">{scopedInProgressItems.length}</span>
+          <span className="desc">Being worked now</span>
         </Link>
         <Link className={filters.status === 'submitted' ? 'active' : ''} href={dashboardHref(filters, { status: 'submitted' })}>
-          <div>
-            <span>Submitted</span>
-            <strong>{scopedSubmittedItems.length}</strong>
-          </div>
-          <p>Waiting on response</p>
+          <span className="name">Submitted</span>
+          <span className="num">{scopedSubmittedItems.length}</span>
+          <span className="desc">Waiting on response</span>
         </Link>
         <Link className={filters.status === 'upcoming' ? 'active' : ''} href={dashboardHref(filters, { status: 'upcoming' })}>
-          <div>
-            <span>Upcoming</span>
-            <strong>{scopedUpcomingItems.length}</strong>
-          </div>
-          <p>Not ready yet</p>
+          <span className="name">Upcoming</span>
+          <span className="num">{scopedUpcomingItems.length}</span>
+          <span className="desc">Not ready yet</span>
         </Link>
         <Link className={filters.status === 'overdue' ? 'active' : ''} href={dashboardHref(filters, { status: 'overdue' })}>
-          <div>
-            <span>Overdue</span>
-            <strong>{scopedOverdueItems.length}</strong>
-          </div>
-          <p>Past expiration</p>
+          <span className="name">Overdue</span>
+          <span className="num">{scopedOverdueItems.length}</span>
+          <span className="desc">Past expiration</span>
         </Link>
       </section>
 
