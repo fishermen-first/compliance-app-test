@@ -1,15 +1,19 @@
 import { redirect } from 'next/navigation';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AuthScreen } from '@/components/auth-screen';
-import { Dashboard } from '@/components/dashboard';
+import { Dashboard, type DashboardFilters } from '@/components/dashboard';
 import { NoAccessScreen } from '@/components/no-access-screen';
 import { getCompanyOwnerCodes, getCustomerItems } from '@/lib/customer-data';
 import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
 type HomeProps = {
-  searchParams?: { message?: string; owner?: string };
+  searchParams?: { message?: string; owner?: string; status?: string; type?: string; vessel?: string; frequency?: string };
 };
+
+function filterValue(value?: string) {
+  return value?.trim() || undefined;
+}
 
 export default async function Home({ searchParams }: HomeProps) {
   const supabase = createClient();
@@ -58,13 +62,33 @@ export default async function Home({ searchParams }: HomeProps) {
     ...ownerCodes.map((owner) => owner.code),
     ...items.map((item) => item.owner_current).filter(Boolean) as string[]
   ]);
-  const showAllOwners = requestedOwner === 'all' || (!requestedOwner && mappedOwnerCodes.length === 0 && isCustomerAdmin);
-  const selectedOwnerCodes = requestedOwnerCode && validOwnerCodes.has(requestedOwnerCode)
+  const requestedOwnerAllowed = Boolean(
+    requestedOwnerCode
+    && validOwnerCodes.has(requestedOwnerCode)
+    && (isCustomerAdmin || mappedOwnerCodes.includes(requestedOwnerCode))
+  );
+  const showAllOwners = isCustomerAdmin && (requestedOwner === 'all' || (!requestedOwner && mappedOwnerCodes.length === 0));
+  const selectedOwnerCodes = requestedOwnerAllowed && requestedOwnerCode
     ? [requestedOwnerCode]
     : showAllOwners
       ? []
       : mappedOwnerCodes;
   const canCreateItems = isCustomerAdmin || mappedOwnerCodes.length > 0;
+  const validOwnerFilter = requestedOwner === 'all' && isCustomerAdmin
+    ? 'all'
+    : requestedOwnerAllowed && requestedOwnerCode
+      ? requestedOwnerCode
+      : undefined;
+  const ownerFilterCodes = isCustomerAdmin
+    ? Array.from(validOwnerCodes).sort((a, b) => a.localeCompare(b))
+    : mappedOwnerCodes;
+  const filters: DashboardFilters = {
+    owner: filterValue(validOwnerFilter),
+    status: filterValue(searchParams?.status),
+    type: filterValue(searchParams?.type),
+    vessel: filterValue(searchParams?.vessel),
+    frequency: filterValue(searchParams?.frequency)
+  };
 
   return (
     <div className="app-shell">
@@ -77,8 +101,9 @@ export default async function Home({ searchParams }: HomeProps) {
         selectedOwnerCodes={selectedOwnerCodes}
         showAllOwners={showAllOwners}
         hasOwnerMapping={mappedOwnerCodes.length > 0}
-        ownerCodes={ownerCodes}
+        ownerFilterCodes={ownerFilterCodes}
         canCreateItems={canCreateItems}
+        filters={filters}
       />
     </div>
   );

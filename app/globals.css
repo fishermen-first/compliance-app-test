@@ -391,6 +391,11 @@ svg {
   background: #f7fbf8;
 }
 
+.workflow-tabs a.active {
+  background: #edf7f1;
+  box-shadow: inset 0 3px 0 var(--teal);
+}
+
 .workflow-tabs div {
   display: flex;
   align-items: baseline;
@@ -427,6 +432,100 @@ svg {
 
 .queue-grid {
   grid-template-columns: minmax(0, 1fr) 280px;
+}
+
+.queue-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.82fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.queue-overview-grid.single-card {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.queue-overview-grid .week-panel,
+.queue-overview-grid .activity-panel {
+  min-height: 188px;
+}
+
+.queue-overview-grid .week-panel > strong {
+  font-size: 48px;
+}
+
+.queue-filter-panel {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.queue-filter-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.queue-filter-heading span {
+  display: block;
+  margin-bottom: 5px;
+  color: #9aa3a0;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.queue-filter-heading h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.08;
+}
+
+.queue-filter-rows {
+  display: grid;
+  gap: 12px;
+}
+
+.queue-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.queue-filter-row > span {
+  min-width: 100px;
+  color: #66716e;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.queue-filter-row a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: min(100%, 280px);
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffefa;
+  color: var(--ink);
+  font-weight: 850;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  text-align: center;
+  text-decoration: none;
+}
+
+.queue-filter-row a.active {
+  border-color: transparent;
+  background: var(--teal);
+  color: #fff;
 }
 
 .main-column,
@@ -771,8 +870,18 @@ svg {
 
   .metric-strip,
   .workflow-tabs,
+  .queue-overview-grid,
   .right-column {
     grid-template-columns: 1fr;
+  }
+
+  .queue-filter-heading {
+    display: grid;
+  }
+
+  .queue-filter-row > span {
+    width: 100%;
+    min-width: 0;
   }
 
   .metric-strip article + article {
@@ -1877,6 +1986,7 @@ svg {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .risk-count-panel strong {
