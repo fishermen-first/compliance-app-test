@@ -17,7 +17,7 @@ function nextItem(items: ComplianceItem[]) {
 }
 
 export default async function VesselsPage() {
-  const { supabase, membership, company, isAppAdmin } = await getCustomerContext({ allowAppAdmin: true });
+  const { supabase, membership, company } = await getCustomerContext();
   const [{ data: vessels }, items] = await Promise.all([
     supabase.from('vessels').select('id, name, active').eq('company_id', membership.company_id).order('name'),
     getCustomerItems(membership.company_id)
@@ -29,7 +29,7 @@ export default async function VesselsPage() {
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} isAppAdmin={isAppAdmin} activePath="/vessels" />
+      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} activePath="/vessels" />
       <main className="workspace list-workspace">
         <header className="list-header">
           <div>

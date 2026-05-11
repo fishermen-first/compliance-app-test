@@ -39,19 +39,11 @@ export function titleCase(value: string) {
 }
 
 export type CompanyOwnerCode = {
-  id: string;
-  company_id: string;
   code: string;
   display_name: string | null;
-  user_id: string | null;
-  pending_email: string | null;
-  profiles?: {
-    email: string | null;
-    full_name: string | null;
-  } | {
-    email: string | null;
-    full_name: string | null;
-  }[] | null;
+  records: number;
+  is_assigned_to_current_user: boolean;
+  is_visible_to_current_user: boolean;
 };
 
 export async function getCustomerContext(options: { allowAppAdmin?: boolean; requireWritable?: boolean } = {}) {
@@ -66,14 +58,19 @@ export async function getCustomerContext(options: { allowAppAdmin?: boolean; req
     redirect('/admin');
   }
 
-  const { data: membership } = await supabase
+  const { data: memberships } = await supabase
     .from('company_memberships')
     .select('company_id, role')
     .eq('user_id', userData.user.id)
-    .limit(1)
-    .maybeSingle();
+    .order('created_at', { ascending: true });
 
-  if (!membership) redirect('/');
+  if (!memberships || memberships.length === 0) redirect('/');
+
+  if (!isAppAdmin && memberships.length > 1) {
+    redirect('/workspace-blocked');
+  }
+
+  const membership = memberships[0];
 
   if (options.requireWritable && !['owner', 'office_admin', 'office_user'].includes(membership.role)) {
     redirect('/');
@@ -108,11 +105,11 @@ export async function getCustomerItems(companyId: string) {
 
 export async function getCompanyOwnerCodes(companyId: string) {
   const supabase = createClient();
-  const { data } = await supabase
-    .from('company_owner_codes')
-    .select('id, company_id, code, display_name, user_id, pending_email, profiles!company_owner_codes_user_id_fkey(email, full_name)')
-    .eq('company_id', companyId)
-    .order('code');
+  const { data, error } = await supabase.rpc('get_queue_owner_codes', { target_company_id: companyId });
+
+  if (error) {
+    throw new Error(error.message);
+  }
 
   return (data ?? []) as unknown as CompanyOwnerCode[];
 }

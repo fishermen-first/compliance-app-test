@@ -9,7 +9,7 @@ type ItemsPageProps = {
 };
 
 export default async function ItemsPage({ searchParams }: ItemsPageProps) {
-  const { membership, company, isAppAdmin } = await getCustomerContext({ allowAppAdmin: true });
+  const { membership, company } = await getCustomerContext();
   const allItems = await getCustomerItems(membership.company_id);
   const owners = Array.from(new Set(allItems.map((item) => item.owner_current).filter(Boolean) as string[])).sort();
   const vessels = Array.from(new Set(allItems.map((item) => item.vessel_name).filter(Boolean) as string[])).sort();
@@ -27,7 +27,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} isAppAdmin={Boolean(isAppAdmin)} activePath="" />
+      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} activePath="" />
       <main className="workspace list-workspace">
         <header className="list-header">
           <div>

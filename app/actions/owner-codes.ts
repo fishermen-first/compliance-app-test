@@ -54,19 +54,20 @@ async function requireOwnerCodeAdmin(companyId: string) {
   if (!userData.user) redirect('/');
 
   const { data: isAppAdmin } = await supabase.rpc('is_app_admin');
-  if (isAppAdmin) return;
 
-  const { data: membership } = await supabase
-    .from('company_memberships')
-    .select('role')
-    .eq('company_id', companyId)
-    .eq('user_id', userData.user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership || !['owner', 'office_admin'].includes(membership.role)) {
+  if (!isAppAdmin) {
     redirect('/');
   }
+
+  const admin = createAdminClient();
+  const { data: company, error } = await admin
+    .from('companies')
+    .select('id')
+    .eq('id', companyId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!company) throw new Error('Customer workspace not found.');
 }
 
 export async function saveOwnerCodeMapping(formData: FormData) {

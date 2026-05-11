@@ -1,0 +1,119 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { type Database } from '@/lib/database.types';
+import { createClient } from '@/lib/supabase/server';
+
+type AppRole = Database['public']['Enums']['app_role'];
+
+const roleValues = new Set<AppRole>(['owner', 'office_admin', 'office_user', 'vessel_user']);
+
+function requiredString(formData: FormData, name: string) {
+  const value = String(formData.get(name) ?? '').trim();
+
+  if (!value) {
+    throw new Error(`Missing required field: ${name}`);
+  }
+
+  return value;
+}
+
+function requiredRole(formData: FormData, name: string) {
+  const value = requiredString(formData, name);
+
+  if (!roleValues.has(value as AppRole)) {
+    throw new Error('Choose a valid workspace role.');
+  }
+
+  return value as AppRole;
+}
+
+function ownerCodes(formData: FormData) {
+  return Array.from(new Set(
+    formData
+      .getAll('ownerCodes')
+      .map((value) => String(value ?? '').trim())
+      .filter(Boolean)
+  ));
+}
+
+function settingsRedirect(message: string) {
+  const params = new URLSearchParams();
+  params.set('message', message);
+  redirect(`/settings?${params.toString()}`);
+}
+
+function rpcMessage(error: { message?: string } | null) {
+  const message = error?.message ?? 'Settings update failed.';
+
+  if (message.includes('MULTI_COMPANY_CONTEXT_BLOCKED')) {
+    return 'This account is tied to more than one workspace. Ask FF Admin to review access.';
+  }
+
+  if (message.includes('FF admins must use')) {
+    return 'FF Admins manage customer access from the admin console.';
+  }
+
+  return message;
+}
+
+async function callSettingsRpc<TArgs extends Record<string, unknown>>(name: string, args: TArgs) {
+  const supabase = createClient();
+  const { error } = await supabase.rpc(name as never, args as never);
+
+  if (error) {
+    settingsRedirect(rpcMessage(error));
+  }
+
+  revalidatePath('/settings');
+}
+
+export async function updateMemberRole(formData: FormData) {
+  await callSettingsRpc('settings_update_member_access', {
+    target_company_id: requiredString(formData, 'companyId'),
+    target_membership_id: requiredString(formData, 'targetId'),
+    next_role: requiredRole(formData, 'role')
+  });
+
+  settingsRedirect('Member role updated.');
+}
+
+export async function removeMemberAccess(formData: FormData) {
+  await callSettingsRpc('settings_remove_member_access', {
+    target_company_id: requiredString(formData, 'companyId'),
+    target_membership_id: requiredString(formData, 'targetId')
+  });
+
+  settingsRedirect('Member access removed.');
+}
+
+export async function updatePendingInviteRole(formData: FormData) {
+  await callSettingsRpc('settings_update_pending_invite_access', {
+    target_company_id: requiredString(formData, 'companyId'),
+    target_invitation_id: requiredString(formData, 'targetId'),
+    next_role: requiredRole(formData, 'role')
+  });
+
+  settingsRedirect('Pending invitation updated.');
+}
+
+export async function cancelPendingInvite(formData: FormData) {
+  await callSettingsRpc('settings_cancel_pending_invite', {
+    target_company_id: requiredString(formData, 'companyId'),
+    target_invitation_id: requiredString(formData, 'targetId')
+  });
+
+  settingsRedirect('Pending invitation canceled.');
+}
+
+export async function updateOwnerCodeAssignment(formData: FormData) {
+  await callSettingsRpc('settings_update_owner_code_assignment', {
+    target_company_id: requiredString(formData, 'companyId'),
+    target_kind: requiredString(formData, 'targetKind'),
+    target_id: requiredString(formData, 'targetId'),
+    owner_codes: ownerCodes(formData)
+  });
+
+  settingsRedirect('Owner-code assignments updated.');
+}

@@ -11,7 +11,7 @@ export function NoAccessScreen({ email }: { email?: string | null }) {
           {email ? `${email} is signed in, but it has not been added to a compliance workspace.` : 'This account has not been added to a compliance workspace yet.'}
         </p>
         <p className="auth-copy">
-          Ask an FF admin or company admin to add this email before demoing client data.
+          Ask FF Admin to review this email before opening customer workspace data.
         </p>
         <form action={signOut} className="auth-form">
           <button type="submit">Sign out</button>

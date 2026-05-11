@@ -14,9 +14,10 @@ const statusLabel: Record<CustomerUser['status'], string> = {
 };
 
 const roleLabel: Record<CustomerRole, string> = {
-  customer_admin: 'Customer Admin',
-  crew: 'Crew',
-  read_only: 'Read-only'
+  owner: 'Owner',
+  office_admin: 'Customer Admin',
+  office_user: 'Office User',
+  vessel_user: 'Vessel User'
 };
 
 function keyId(userKey: string) {
@@ -184,9 +185,10 @@ export function UserEditDrawer({
               <div className="field">
                 <label htmlFor="d-role">Workspace role</label>
                 <select id="d-role" value={role} onChange={(event) => setRole(event.target.value as CustomerRole)}>
-                  <option value="customer_admin">Customer Admin - full edit + manage users</option>
-                  <option value="crew">Crew - edit assigned work, no admin</option>
-                  <option value="read_only">Read-only - view only</option>
+                  <option value="owner">owner - workspace owner</option>
+                  <option value="office_admin">office_admin - customer admin</option>
+                  <option value="office_user">office_user - edit assigned work</option>
+                  <option value="vessel_user">vessel_user - view only</option>
                 </select>
               </div>
             </div>

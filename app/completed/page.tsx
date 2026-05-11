@@ -5,7 +5,7 @@ import { getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer
 import { accessRoleLabel } from '@/lib/roles';
 
 export default async function CompletedPage() {
-  const { membership, company, isAppAdmin } = await getCustomerContext({ allowAppAdmin: true });
+  const { membership, company } = await getCustomerContext();
   const items = await getCustomerItems(membership.company_id);
   const completedItems = items
     .filter((item) => item.status === 'complete')
@@ -13,7 +13,7 @@ export default async function CompletedPage() {
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} isAppAdmin={isAppAdmin} activePath="/completed" />
+      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} activePath="/completed" />
       <main className="workspace list-workspace">
         <header className="list-header">
           <div>

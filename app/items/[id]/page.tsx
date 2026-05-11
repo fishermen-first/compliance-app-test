@@ -7,7 +7,7 @@ import { accessRoleLabel } from '@/lib/roles';
 type ItemDetailPageProps = { params: { id: string } };
 
 export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
-  const { supabase, membership, company, user } = await getCustomerContext();
+  const { supabase, membership, company } = await getCustomerContext();
 
   const [{ data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }, ownerCodes] = await Promise.all([
     supabase
@@ -45,7 +45,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
     || (
       membership.role === 'office_user'
       && Boolean(item.owner_current)
-      && ownerCodes.some((owner) => owner.code === item.owner_current && owner.user_id === user.id)
+      && ownerCodes.some((owner) => owner.code === item.owner_current && owner.is_assigned_to_current_user)
     );
 
   return (

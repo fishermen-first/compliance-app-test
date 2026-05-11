@@ -4,7 +4,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify:settings-access": "node scripts/verify_customer_settings_access.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",

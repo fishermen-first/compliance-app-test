@@ -372,7 +372,7 @@ function inviteFailuresFromAudit(row: AuditRow): InviteFailureRow[] {
 }
 
 function visibleRecordsFor(user: CustomerUser, totalItems: number, ownerCounts: Map<string, number>) {
-  if (user.role === 'customer_admin') {
+  if (user.role === 'owner' || user.role === 'office_admin') {
     return totalItems;
   }
 
@@ -590,7 +590,7 @@ export async function getAdminCustomerWorkspace(customerId: string): Promise<Adm
         role: user.role,
         codes: user.codes,
         visibleRecords: visibleRecordsFor(user, items.length, ownerCounts),
-        note: user.role === 'customer_admin' ? 'Customer admin sees all workspace items' : 'Derived from assigned owner codes'
+        note: user.role === 'owner' || user.role === 'office_admin' ? 'Customer admin sees all workspace items' : 'Derived from assigned owner codes'
       }))
     },
     danger: {

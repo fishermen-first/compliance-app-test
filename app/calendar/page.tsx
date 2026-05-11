@@ -128,7 +128,7 @@ function PlanningRow({ item }: { item: ComplianceItem }) {
 }
 
 export default async function CalendarPage({ searchParams }: CalendarPageProps) {
-  const { membership, company, isAppAdmin, user } = await getCustomerContext({ allowAppAdmin: true });
+  const { membership, company } = await getCustomerContext();
   const [items, ownerCodes] = await Promise.all([
     getCustomerItems(membership.company_id),
     getCompanyOwnerCodes(membership.company_id)
@@ -138,8 +138,8 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     ...ownerCodes.map((owner) => owner.code),
     ...openItems.map((item) => item.owner_current).filter(Boolean) as string[]
   ])).sort();
-  const mappedOwnerCodes = ownerCodes.filter((owner) => owner.user_id === user.id).map((owner) => owner.code);
-  const canViewAllOwners = Boolean(isAppAdmin) || ['owner', 'office_admin'].includes(membership.role);
+  const mappedOwnerCodes = ownerCodes.filter((owner) => owner.is_assigned_to_current_user).map((owner) => owner.code);
+  const canViewAllOwners = ['owner', 'office_admin'].includes(membership.role);
   const requestedOwner = searchParams?.owner && searchParams.owner !== 'all' ? decodeURIComponent(searchParams.owner) : null;
   const hasValidRequestedOwner = requestedOwner ? ownerCodeRows.includes(requestedOwner) : false;
   const showAllOwners = canViewAllOwners && (
@@ -169,7 +169,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} isAppAdmin={isAppAdmin} activePath="/calendar" />
+      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} activePath="/calendar" />
       <main className="workspace list-workspace">
         <header className="list-header">
           <div>

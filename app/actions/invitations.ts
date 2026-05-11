@@ -6,9 +6,10 @@ import { assertOwnerEmailMappable, isOwnerCodeEmailRejectedError } from '@/lib/a
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
-const companyRoles = ['owner', 'office_user', 'vessel_user'] as const;
+const companyRoles = ['owner', 'office_admin', 'office_user', 'vessel_user'] as const;
 const allowedRoles = ['app_admin', ...companyRoles] as const;
-const ownerCodeRejectedMessage = 'FF admin emails cannot be invited as customer users.';
+const ownerCodeRejectedMessage = 'This email cannot be used for a customer user.';
+const crossCompanyMessage = 'This email is already tied to another workspace. Ask FF Admin to review access.';
 
 function requiredString(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? '').trim();
@@ -131,6 +132,40 @@ async function assignPendingOwnerCodes(
   }
 }
 
+async function assertNoActiveMembershipInAnotherCompany(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+  companyId: string,
+  email: string
+) {
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .limit(1)
+    .maybeSingle();
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
+
+  if (!profile?.id) {
+    return;
+  }
+
+  const { data: memberships, error: membershipError } = await supabaseAdmin
+    .from('company_memberships')
+    .select('company_id')
+    .eq('user_id', profile.id);
+
+  if (membershipError) {
+    throw new Error(membershipError.message);
+  }
+
+  if ((memberships ?? []).some((membership) => membership.company_id !== companyId)) {
+    throw new Error(crossCompanyMessage);
+  }
+}
+
 export async function createInvitation(formData: FormData) {
   const companyId = String(formData.get('companyId') ?? '').trim();
   const email = requiredString(formData, 'email').toLowerCase();
@@ -190,6 +225,16 @@ export async function createInvitation(formData: FormData) {
   }
 
   const supabaseAdmin = createAdminClient();
+  try {
+    await assertNoActiveMembershipInAnotherCompany(supabaseAdmin, companyId, email);
+  } catch (error) {
+    if (error instanceof Error && error.message === crossCompanyMessage) {
+      redirect(rejectionRedirectPath(redirectTo, crossCompanyMessage, redirectTo === '/admin' ? undefined : 'access'));
+    }
+
+    throw error;
+  }
+
   const { error } = await supabaseAdmin
     .from('company_invitations')
     .upsert(
@@ -197,6 +242,7 @@ export async function createInvitation(formData: FormData) {
         company_id: companyId,
         email,
         role: role as (typeof companyRoles)[number],
+        invited_by: userData.user.id,
         accepted_at: null
       },
       { onConflict: 'company_id,email' }

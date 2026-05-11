@@ -45,7 +45,7 @@ type ItemOwnerRow = {
   owner_current: string | null;
 };
 
-export type CustomerRole = 'customer_admin' | 'crew' | 'read_only';
+export type CustomerRole = AppRole;
 
 export type CustomerUserStatus = 'active' | 'pending' | 'expired' | 'needs-email';
 
@@ -103,22 +103,23 @@ export function normalizedEmail(email?: string | null) {
 }
 
 export function toCustomerRole(role: string): CustomerRole {
-  if (role === 'owner' || role === 'office_admin') return 'customer_admin';
-  if (role === 'vessel_user') return 'read_only';
-  return 'crew';
+  if (role === 'owner' || role === 'office_admin' || role === 'office_user' || role === 'vessel_user') {
+    return role;
+  }
+
+  return 'office_user';
 }
 
 export function toAppRole(role: CustomerRole): AppRole {
-  if (role === 'customer_admin') return 'owner';
-  if (role === 'read_only') return 'vessel_user';
-  return 'office_user';
+  return role;
 }
 
 function roleLabel(role: CustomerRole) {
   const labels: Record<CustomerRole, string> = {
-    customer_admin: 'Customer Admin',
-    crew: 'Crew',
-    read_only: 'Read-only'
+    owner: 'Owner',
+    office_admin: 'Customer Admin',
+    office_user: 'Office User',
+    vessel_user: 'Vessel User'
   };
 
   return labels[role];
@@ -451,7 +452,8 @@ export async function getCustomerUsers(customerId: string): Promise<CustomerUser
 }
 
 export const customerRoleLabel: Record<CustomerRole, string> = {
-  customer_admin: roleLabel('customer_admin'),
-  crew: roleLabel('crew'),
-  read_only: roleLabel('read_only')
+  owner: roleLabel('owner'),
+  office_admin: roleLabel('office_admin'),
+  office_user: roleLabel('office_user'),
+  vessel_user: roleLabel('vessel_user')
 };

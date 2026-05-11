@@ -3121,8 +3121,8 @@ svg {
 .settings-setup-page .access-rows-head,
 .settings-setup-page .access-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1.3fr) minmax(220px, 1.6fr) 140px 160px;
-  gap: 24px;
+  grid-template-columns: minmax(150px, 1.1fr) minmax(190px, 1.25fr) minmax(118px, max-content) minmax(170px, 1.05fr) minmax(180px, 1.1fr) minmax(132px, max-content);
+  gap: 18px;
   align-items: center;
   padding: 12px 28px;
 }
@@ -3161,10 +3161,108 @@ svg {
   font-weight: 900;
 }
 
+.settings-setup-page .access-row .person small {
+  display: block;
+  margin-top: 3px;
+  color: #842a1a;
+  font-size: 11px;
+  font-weight: 850;
+}
+
 .settings-setup-page .access-row .email {
   color: var(--muted);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
+}
+
+.settings-setup-page .settings-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.settings-setup-page .settings-inline-form select {
+  min-width: 132px;
+  max-width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.settings-setup-page .settings-inline-form button,
+.settings-setup-page .danger-action {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.settings-setup-page .danger-action {
+  border-color: rgba(196, 85, 112, 0.45);
+  color: #842a1a;
+}
+
+.settings-setup-page .save-btn.muted {
+  border-color: var(--line);
+  background: var(--stone-soft);
+  color: var(--muted);
+}
+
+.settings-setup-page .access-row .owner-editor-details {
+  display: block;
+  margin-top: 8px;
+}
+
+.settings-setup-page .access-row .edit-toggle,
+.settings-setup-page .access-row .read-only-note {
+  grid-column: auto;
+  justify-self: start;
+}
+
+.settings-setup-page .access-row .editor {
+  margin-top: 10px;
+}
+
+.settings-setup-page .access-row:has(.access-editor-details[open]) .editor {
+  display: block;
+}
+
+.settings-setup-page .settings-code-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 12px 0 14px;
+}
+
+.settings-setup-page .settings-code-checks label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.settings-setup-page .settings-code-checks small {
+  grid-column: 2;
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .settings-setup-page .reminder-metrics {

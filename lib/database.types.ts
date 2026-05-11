@@ -982,7 +982,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      accept_company_invite: { Args: { full_name?: string }; Returns: string }
+      accept_company_invite: { Args: { full_name?: string }; Returns: string | null }
       can_manage_compliance_item: {
         Args: { target_item_id: string }
         Returns: boolean
@@ -1041,6 +1041,16 @@ export type Database = {
         Returns: undefined
       }
       current_user_email: { Args: never; Returns: string }
+      get_queue_owner_codes: {
+        Args: { target_company_id: string }
+        Returns: {
+          code: string
+          display_name: string | null
+          records: number
+          is_assigned_to_current_user: boolean
+          is_visible_to_current_user: boolean
+        }[]
+      }
       has_company_role: {
         Args: {
           allowed_roles: Database["public"]["Enums"]["app_role"][]
@@ -1081,6 +1091,58 @@ export type Database = {
       schedule_due_reminders: {
         Args: { target_company_id: string; target_run_date?: string }
         Returns: number
+      }
+      settings_cancel_pending_invite: {
+        Args: { target_company_id: string; target_invitation_id: string }
+        Returns: undefined
+      }
+      settings_get_access_rows: {
+        Args: { target_company_id: string }
+        Returns: {
+          target_kind: string
+          target_id: string
+          email: string | null
+          display_name: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+          owner_codes: string[]
+          app_admin_contamination: boolean
+          can_update_role: boolean
+          can_remove: boolean
+          can_cancel: boolean
+          can_update_owner_codes: boolean
+          can_clear_owner_codes: boolean
+          created_at: string
+        }[]
+      }
+      settings_remove_member_access: {
+        Args: { target_company_id: string; target_membership_id: string }
+        Returns: undefined
+      }
+      settings_update_member_access: {
+        Args: {
+          target_company_id: string
+          target_membership_id: string
+          next_role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: undefined
+      }
+      settings_update_owner_code_assignment: {
+        Args: {
+          target_company_id: string
+          target_kind: string
+          target_id: string
+          owner_codes: string[]
+        }
+        Returns: undefined
+      }
+      settings_update_pending_invite_access: {
+        Args: {
+          target_company_id: string
+          target_invitation_id: string
+          next_role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: undefined
       }
       update_compliance_item_status: {
         Args: {

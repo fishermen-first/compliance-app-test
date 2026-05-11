@@ -24,10 +24,10 @@ function loginErrorMessage(message: string) {
 
 async function hasLoginAccess(email: string) {
   const admin = createAdminClient();
-  const [{ data: appAdmin, error: appAdminError }, { data: invitation, error: invitationError }, { data: profile, error: profileError }] =
+  const [{ data: appAdmin, error: appAdminError }, { data: invitations, error: invitationError }, { data: profile, error: profileError }] =
     await Promise.all([
       admin.from('app_admins').select('email').eq('email', email).maybeSingle(),
-      admin.from('company_invitations').select('email').eq('email', email).limit(1).maybeSingle(),
+      admin.from('company_invitations').select('company_id, email, accepted_at').eq('email', email).is('accepted_at', null),
       admin.from('profiles').select('id').eq('email', email).limit(1).maybeSingle()
     ]);
 
@@ -35,26 +35,44 @@ async function hasLoginAccess(email: string) {
     throw new Error(appAdminError?.message ?? invitationError?.message ?? profileError?.message);
   }
 
-  if (appAdmin || invitation) {
-    return true;
+  if (appAdmin) {
+    return { allowed: true };
   }
 
   if (!profile) {
-    return false;
+    return { allowed: (invitations ?? []).length > 0 };
   }
 
-  const { data: membership, error: membershipError } = await admin
+  const { data: memberships, error: membershipError } = await admin
     .from('company_memberships')
     .select('company_id')
-    .eq('user_id', profile.id)
-    .limit(1)
-    .maybeSingle();
+    .eq('user_id', profile.id);
 
   if (membershipError) {
     throw new Error(membershipError.message);
   }
 
-  return Boolean(membership);
+  if ((memberships ?? []).length > 0) {
+    return { allowed: true };
+  }
+
+  const membershipCompanies = new Set((memberships ?? []).map((membership) => membership.company_id));
+  const validInvites = (invitations ?? []).filter((invitation) => (
+    membershipCompanies.size === 0 || membershipCompanies.has(invitation.company_id)
+  ));
+
+  if (validInvites.length > 0) {
+    return { allowed: true };
+  }
+
+  if ((invitations ?? []).length > 0) {
+    return {
+      allowed: false,
+      message: 'This email is already tied to another workspace. Ask FF Admin to review access.'
+    };
+  }
+
+  return { allowed: false };
 }
 
 function loginEmailHtml(loginUrl: string) {
@@ -83,17 +101,17 @@ export async function signInWithMagicLink(formData: FormData) {
     redirect('/login?message=Login%20email%20is%20not%20configured%20yet.');
   }
 
-  let canLogIn = false;
+  let loginAccess: Awaited<ReturnType<typeof hasLoginAccess>> = { allowed: false };
 
   try {
-    canLogIn = await hasLoginAccess(email);
+    loginAccess = await hasLoginAccess(email);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to verify login access.';
     redirect(`/login?message=${encodeURIComponent(message)}`);
   }
 
-  if (!canLogIn) {
-    redirect('/login?message=This%20email%20has%20not%20been%20added%20yet.%20Ask%20an%20FF%20admin%20to%20add%20you%20first.');
+  if (!loginAccess.allowed) {
+    redirect(`/login?message=${encodeURIComponent(loginAccess.message ?? 'This email has not been added yet. Ask an FF admin to add you first.')}`);
   }
 
   const supabaseAdmin = createAdminClient();

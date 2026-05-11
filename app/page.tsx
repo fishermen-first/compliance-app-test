@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Dashboard, type DashboardFilters } from '@/components/dashboard';
 import { NoAccessScreen } from '@/components/no-access-screen';
+import { WorkspaceBlockedScreen } from '@/components/workspace-blocked-screen';
 import { getCompanyOwnerCodes, getCustomerItems } from '@/lib/customer-data';
 import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
@@ -31,15 +32,22 @@ export default async function Home({ searchParams }: HomeProps) {
     redirect('/admin');
   }
 
-  const { data: membership } = await supabase
+  const { data: memberships } = await supabase
     .from('company_memberships')
     .select('company_id, role')
     .eq('user_id', userData.user.id)
-    .limit(1)
-    .maybeSingle();
+    .order('created_at', { ascending: true });
 
-  if (!membership) {
-    const { data: acceptedCompanyId } = await supabase.rpc('accept_company_invite', { full_name: userData.user.email?.split('@')[0] ?? 'User' });
+  if (!memberships || memberships.length === 0) {
+    const { data: acceptedCompanyId, error: acceptError } = await supabase.rpc('accept_company_invite', { full_name: userData.user.email?.split('@')[0] ?? 'User' });
+
+    if (acceptError?.message.includes('MULTI_COMPANY_MEMBERSHIP_BLOCKED')) {
+      return <WorkspaceBlockedScreen email={userData.user.email} />;
+    }
+
+    if (acceptError) {
+      return <NoAccessScreen email={userData.user.email} />;
+    }
 
     if (acceptedCompanyId) {
       redirect('/');
@@ -47,6 +55,12 @@ export default async function Home({ searchParams }: HomeProps) {
 
     return <NoAccessScreen email={userData.user.email} />;
   }
+
+  if (memberships.length > 1) {
+    return <WorkspaceBlockedScreen email={userData.user.email} />;
+  }
+
+  const membership = memberships[0];
 
   const [{ data: company }, { data: profile }, items, ownerCodes] = await Promise.all([
     supabase.from('companies').select('name').eq('id', membership.company_id).single(),
@@ -57,7 +71,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
   const currentUserName = profile?.full_name ?? userData.user.email ?? 'User';
   const requestedOwner = searchParams?.owner;
-  const mappedOwnerCodes = ownerCodes.filter((owner) => owner.user_id === userData.user?.id).map((owner) => owner.code);
+  const mappedOwnerCodes = ownerCodes.filter((owner) => owner.is_assigned_to_current_user).map((owner) => owner.code);
   const isCustomerAdmin = ['owner', 'office_admin'].includes(membership.role);
   const requestedOwnerCode = requestedOwner && requestedOwner !== 'all' ? decodeURIComponent(requestedOwner) : null;
   const validOwnerCodes = new Set([

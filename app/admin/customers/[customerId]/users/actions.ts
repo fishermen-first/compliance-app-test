@@ -116,6 +116,36 @@ async function assertCustomerEmail(email: string) {
   return normalized;
 }
 
+async function assertNoActiveMembershipInAnotherCompany(
+  admin: ReturnType<typeof createAdminClient>,
+  customerId: string,
+  email: string
+) {
+  const normalized = normalizedEmail(email);
+  if (!normalized) return;
+
+  const { data: profile, error: profileError } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('email', normalized)
+    .limit(1)
+    .maybeSingle();
+
+  if (profileError) throw new Error(profileError.message);
+  if (!profile?.id) return;
+
+  const { data: memberships, error: membershipError } = await admin
+    .from('company_memberships')
+    .select('company_id')
+    .eq('user_id', profile.id);
+
+  if (membershipError) throw new Error(membershipError.message);
+
+  if ((memberships ?? []).some((membership) => membership.company_id !== customerId)) {
+    throw new Error('This email is already tied to another workspace. Ask FF Admin to review access.');
+  }
+}
+
 async function updateOwnerCodeAssignments(
   admin: ReturnType<typeof createAdminClient>,
   customerId: string,
@@ -202,6 +232,7 @@ async function sendInvitationLink(admin: ReturnType<typeof createAdminClient>, i
   if (invitation.accepted_at) throw new Error('This invitation has already been accepted.');
 
   const email = await assertCustomerEmail(invitation.email ?? '');
+  await assertNoActiveMembershipInAnotherCompany(admin, invitation.company_id, email);
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
@@ -268,6 +299,10 @@ export async function updateUserAccess(input: {
     const nextEmail = input.email === undefined ? previousEmail : await assertCustomerEmail(input.email);
     const nextName = input.name?.trim();
 
+    if (nextEmail) {
+      await assertNoActiveMembershipInAnotherCompany(admin, input.customerId, nextEmail);
+    }
+
     if (input.role) {
       const { error: roleError } = await admin
         .from('company_memberships')
@@ -330,6 +365,8 @@ export async function updateUserAccess(input: {
     const previousEmail = invitation.email;
     const nextEmail = input.email === undefined ? invitation.email : await assertCustomerEmail(input.email);
     if (!nextEmail) throw new Error('Customer email is required.');
+
+    await assertNoActiveMembershipInAnotherCompany(admin, input.customerId, nextEmail);
 
     const update: { email?: string; role?: ReturnType<typeof toAppRole> } = {};
     if (input.email !== undefined) update.email = nextEmail;
