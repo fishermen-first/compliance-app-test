@@ -74,13 +74,13 @@ export async function signInWithMagicLink(formData: FormData) {
   const email = String(formData.get('email') ?? '').trim().toLowerCase();
 
   if (!email) {
-    redirect('/?message=Enter%20an%20email%20address');
+    redirect('/login?message=Enter%20an%20email%20address');
   }
 
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
-    redirect('/?message=Login%20email%20is%20not%20configured%20yet.');
+    redirect('/login?message=Login%20email%20is%20not%20configured%20yet.');
   }
 
   let canLogIn = false;
@@ -89,11 +89,11 @@ export async function signInWithMagicLink(formData: FormData) {
     canLogIn = await hasLoginAccess(email);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to verify login access.';
-    redirect(`/?message=${encodeURIComponent(message)}`);
+    redirect(`/login?message=${encodeURIComponent(message)}`);
   }
 
   if (!canLogIn) {
-    redirect('/?message=This%20email%20has%20not%20been%20added%20yet.%20Ask%20an%20FF%20admin%20to%20add%20you%20first.');
+    redirect('/login?message=This%20email%20has%20not%20been%20added%20yet.%20Ask%20an%20FF%20admin%20to%20add%20you%20first.');
   }
 
   const supabaseAdmin = createAdminClient();
@@ -106,13 +106,13 @@ export async function signInWithMagicLink(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/?message=${encodeURIComponent(loginErrorMessage(error.message))}`);
+    redirect(`/login?message=${encodeURIComponent(loginErrorMessage(error.message))}`);
   }
 
   const tokenHash = data.properties?.hashed_token;
 
   if (!tokenHash) {
-    redirect('/?message=Could%20not%20create%20a%20login%20link.');
+    redirect('/login?message=Could%20not%20create%20a%20login%20link.');
   }
 
   const loginUrl = `${env.appBaseUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink`;
@@ -126,14 +126,14 @@ export async function signInWithMagicLink(formData: FormData) {
   });
 
   if (sent.error) {
-    redirect(`/?message=${encodeURIComponent(sent.error.message)}`);
+    redirect(`/login?message=${encodeURIComponent(sent.error.message)}`);
   }
 
-  redirect('/?message=Check%20your%20email%20for%20the%20login%20link');
+  redirect('/login?message=Check%20your%20email%20for%20the%20login%20link');
 }
 
 export async function signOut() {
   const supabase = createClient();
   await supabase.auth.signOut();
-  redirect('/');
+  redirect('/login');
 }

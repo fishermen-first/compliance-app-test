@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { type CustomerOwnerCode, type CustomerRole, type CustomerUser } from '@/lib/customer-detail';
+import { UserAddDrawer } from './user-add-drawer';
 import { UserBulkBar } from './user-bulk-bar';
 import { UserEditDrawer } from './user-edit-drawer';
 import { UserFilterBar, type UserFilter } from './user-filter-bar';
@@ -72,7 +73,8 @@ export function UsersTable({
   const [filter, setFilter] = useState<UserFilter>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(new Set<string>());
-  const [editing, setEditing] = useState<CustomerUser | null>(users[0] ?? null);
+  const [editing, setEditing] = useState<CustomerUser | null>(null);
+  const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
   const counts = useMemo(
@@ -138,7 +140,7 @@ export function UsersTable({
 
   return (
     <>
-      <UserFilterBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} counts={counts} />
+      <UserFilterBar filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} counts={counts} onAddUser={() => setAdding(true)} />
 
       {message ? <div className="cd-inline-message" role="status">{message}</div> : null}
 
@@ -185,12 +187,8 @@ export function UsersTable({
               </div>
             </div>
             <div className={`email-cell${user.email ? '' : ' empty'}`}>{user.email || 'No email on file'}</div>
-            <div className="role-cell" onClick={(event) => event.stopPropagation()}>
-              <select defaultValue={user.role} aria-label={`Role for ${user.name ?? user.email ?? 'customer user'}`}>
-                <option value="customer_admin">Customer Admin</option>
-                <option value="crew">Crew</option>
-                <option value="read_only">Read-only</option>
-              </select>
+            <div className="role-cell">
+              <span className="cd-role-label">{roleLabel[user.role]}</span>
             </div>
             <div className={`codes-cell${user.codes.length === 0 ? ' empty' : ''}`}>
               {user.codes.length === 0
@@ -216,6 +214,7 @@ export function UsersTable({
       </div>
 
       {editing ? <UserEditDrawer customerId={customerId} ownerCodes={ownerCodes} user={editing} onClose={() => setEditing(null)} /> : null}
+      {adding ? <UserAddDrawer customerId={customerId} ownerCodes={ownerCodes} onClose={() => setAdding(false)} /> : null}
     </>
   );
 }

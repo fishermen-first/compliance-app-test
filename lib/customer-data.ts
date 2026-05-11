@@ -110,7 +110,7 @@ export async function getCompanyOwnerCodes(companyId: string) {
   const supabase = createClient();
   const { data } = await supabase
     .from('company_owner_codes')
-    .select('id, company_id, code, display_name, user_id, pending_email, profiles(email, full_name)')
+    .select('id, company_id, code, display_name, user_id, pending_email, profiles!company_owner_codes_user_id_fkey(email, full_name)')
     .eq('company_id', companyId)
     .order('code');
 

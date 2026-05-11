@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getAppAdminClassification } from '@/lib/app-admins';
+import { toAdminCustomerNavData } from '@/lib/admin-customer-workspace';
 import { getCustomerDetail } from '@/lib/customer-detail';
 import { createClient } from '@/lib/supabase/server';
 import { CustomerNav } from './_components/customer-nav';
@@ -30,12 +31,13 @@ async function requireFfAdminViewer() {
 export default async function CustomerLayout({ children, params }: CustomerLayoutProps) {
   const user = await requireFfAdminViewer();
   const customer = await getCustomerDetail(params.customerId);
+  const navCustomer = toAdminCustomerNavData(customer);
 
   return (
     <div className="cd-shell">
       <GlobalRail userEmail={user.email ?? null} />
-      <CustomerNav customer={customer} />
-      <main className="cd-main" data-screen-label="01 Customer Detail · Users">
+      <CustomerNav customer={navCustomer} />
+      <main className="cd-main" data-screen-label="FF Admin Customer Cockpit">
         <StatusBar customer={customer} />
         {children}
       </main>

@@ -63,6 +63,8 @@ export async function queueCompanyReminders(formData: FormData) {
 
   revalidatePath('/reminders');
   revalidatePath(`/admin/companies/${companyId}`);
+  revalidatePath(`/admin/customers/${companyId}/diagnostics`);
+  revalidatePath(`/admin/customers/${companyId}/overview`);
 }
 
 export async function sendQueuedReminders() {

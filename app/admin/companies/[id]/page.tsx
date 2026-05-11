@@ -5,5 +5,5 @@ type CompanyAdminPageProps = {
 };
 
 export default function CompanyAdminPage({ params }: CompanyAdminPageProps) {
-  redirect(`/admin/customers/${params.id}/users`);
+  redirect(`/admin/customers/${params.id}/overview`);
 }

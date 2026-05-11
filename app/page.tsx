@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import { AppSidebar } from '@/components/app-sidebar';
-import { AuthScreen } from '@/components/auth-screen';
 import { Dashboard, type DashboardFilters } from '@/components/dashboard';
 import { NoAccessScreen } from '@/components/no-access-screen';
 import { getCompanyOwnerCodes, getCustomerItems } from '@/lib/customer-data';
@@ -20,7 +19,10 @@ export default async function Home({ searchParams }: HomeProps) {
   const { data: userData } = await supabase.auth.getUser();
 
   if (!userData.user) {
-    return <AuthScreen message={searchParams?.message} />;
+    const params = new URLSearchParams();
+    if (searchParams?.message) params.set('message', searchParams.message);
+    const qs = params.toString();
+    redirect(qs ? `/login?${qs}` : '/login');
   }
 
   const { data: isAppAdmin } = await supabase.rpc('is_app_admin');

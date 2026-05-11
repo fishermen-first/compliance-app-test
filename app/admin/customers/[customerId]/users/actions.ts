@@ -25,6 +25,8 @@ type OwnerCodeRow = {
   code: string;
   user_id: string | null;
   pending_email: string | null;
+  handoff_exempt: boolean;
+  handoff_exemption_reason: string | null;
 };
 
 function assertValidEmail(email: string) {
@@ -35,6 +37,39 @@ function assertValidEmail(email: string) {
   }
 
   return normalized;
+}
+
+type AuthUser = {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+};
+
+function metadataString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+async function ensureFfAdminProfile(user: AuthUser) {
+  const email = user.email?.trim().toLowerCase();
+
+  if (!email) {
+    throw new Error('FF admin email is required.');
+  }
+
+  const { error } = await createAdminClient().from('profiles').upsert(
+    {
+      id: user.id,
+      email,
+      full_name:
+        metadataString(user.user_metadata?.full_name) ||
+        metadataString(user.user_metadata?.name) ||
+        email.split('@')[0],
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: 'id' }
+  );
+
+  if (error) throw new Error(error.message);
 }
 
 async function requireFfAdmin() {
@@ -52,13 +87,22 @@ async function requireFfAdmin() {
     throw new Error('Only FF admins can manage customer access.');
   }
 
+  await ensureFfAdminProfile(userData.user);
+
   return userData.user;
 }
 
 function revalidateCustomer(customerId: string) {
   revalidatePath('/admin');
   revalidatePath(`/admin/companies/${customerId}`);
+  revalidatePath(`/admin/customers/${customerId}`);
+  revalidatePath(`/admin/customers/${customerId}/overview`);
+  revalidatePath(`/admin/customers/${customerId}/setup`);
+  revalidatePath(`/admin/customers/${customerId}/import`);
+  revalidatePath(`/admin/customers/${customerId}/codes`);
   revalidatePath(`/admin/customers/${customerId}/users`);
+  revalidatePath(`/admin/customers/${customerId}/diagnostics`);
+  revalidatePath(`/admin/customers/${customerId}/danger`);
 }
 
 async function assertCustomerEmail(email: string) {
@@ -88,7 +132,7 @@ async function updateOwnerCodeAssignments(
 
   const { data, error } = await admin
     .from('company_owner_codes')
-    .select('id, code, user_id, pending_email')
+    .select('id, code, user_id, pending_email, handoff_exempt, handoff_exemption_reason')
     .eq('company_id', customerId)
     .order('code');
 
@@ -115,6 +159,10 @@ async function updateOwnerCodeAssignments(
       ? {
           user_id: target.userId,
           pending_email: target.userId ? null : nextEmail,
+          handoff_exempt: false,
+          handoff_exemption_reason: null,
+          handoff_exempted_by: null,
+          handoff_exempted_at: null,
           updated_at: new Date().toISOString()
         }
       : {
@@ -153,7 +201,7 @@ async function sendInvitationLink(admin: ReturnType<typeof createAdminClient>, i
   if (!invitation) throw new Error('Invitation not found.');
   if (invitation.accepted_at) throw new Error('This invitation has already been accepted.');
 
-  const email = assertValidEmail(invitation.email);
+  const email = await assertCustomerEmail(invitation.email ?? '');
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
@@ -364,8 +412,160 @@ export async function bulkResendInvitations(invitationIds: string[]): Promise<Ac
 }
 
 export async function handoffCustomer(customerId: string): Promise<ActionResult> {
-  await requireFfAdmin();
+  const user = await requireFfAdmin();
+  const classification = await getAppAdminClassification();
+
+  if (classification.status === 'unverified') {
+    throw new Error('FF-admin classification could not be verified.');
+  }
+
+  const admin = createAdminClient();
+  const [
+    itemsResult,
+    ownerCodesResult,
+    membershipsResult,
+    invitationsResult
+  ] = await Promise.all([
+    admin.from('compliance_items').select('id', { count: 'exact', head: true }).eq('company_id', customerId),
+    admin
+      .from('company_owner_codes')
+      .select('id, code, user_id, pending_email, handoff_exempt, handoff_exemption_reason, profiles!company_owner_codes_user_id_fkey(email)')
+      .eq('company_id', customerId),
+    admin
+      .from('company_memberships')
+      .select('id, profiles(email)')
+      .eq('company_id', customerId),
+    admin
+      .from('company_invitations')
+      .select('id, email, accepted_at')
+      .eq('company_id', customerId)
+      .is('accepted_at', null)
+  ]);
+
+  const firstError = [itemsResult, ownerCodesResult, membershipsResult, invitationsResult].find((result) => result.error)?.error;
+  if (firstError) throw new Error(firstError.message);
+
+  const ownerCodes = (ownerCodesResult.data ?? []) as Array<OwnerCodeRow & { profiles?: { email: string | null } | { email: string | null }[] | null }>;
+  const memberships = (membershipsResult.data ?? []) as Array<{ profiles?: { email: string | null } | { email: string | null }[] | null }>;
+  const invitations = (invitationsResult.data ?? []) as Array<{ id: string; email: string | null }>;
+  const customerMembershipCount = memberships.filter((membership) => {
+    const profile = relation(membership.profiles);
+    return profile?.email && !classification.appAdminEmails.has(normalizedEmail(profile.email));
+  }).length;
+  const pendingInvitations = invitations.filter((invite) => {
+    const email = normalizedEmail(invite.email);
+    return email && !classification.appAdminEmails.has(email);
+  });
+  const ownerCodesReady = ownerCodes.length > 0 && ownerCodes.every((owner) => {
+    const profile = relation(owner.profiles);
+    const email = normalizedEmail(profile?.email ?? owner.pending_email);
+    if (email && classification.appAdminEmails.has(email)) return false;
+    if (owner.handoff_exempt && owner.handoff_exemption_reason?.trim()) return true;
+    return Boolean((owner.user_id || owner.pending_email) && email && !classification.appAdminEmails.has(email));
+  });
+
+  if ((itemsResult.count ?? 0) === 0) {
+    return { message: 'Import the customer workbook before sending invites.' };
+  }
+
+  if (!ownerCodesReady) {
+    return { message: 'Map or explicitly exempt every owner code before sending invites.' };
+  }
+
+  if (customerMembershipCount + pendingInvitations.length === 0) {
+    return { message: 'Stage at least one customer user before handoff.' };
+  }
+
+  if (pendingInvitations.length === 0) {
+    revalidateCustomer(customerId);
+    return { message: 'No pending invitations to send.' };
+  }
+
+  const sent: string[] = [];
+  const failed: Array<{ invitationId: string; email: string | null; message: string }> = [];
+
+  for (const invite of pendingInvitations) {
+    try {
+      await sendInvitationLink(admin, invite.id);
+      sent.push(invite.id);
+    } catch (error) {
+      failed.push({
+        invitationId: invite.id,
+        email: invite.email,
+        message: error instanceof Error ? error.message : 'Unknown invite send failure'
+      });
+    }
+  }
+
+  const { error: auditError } = await admin.from('audit_log').insert({
+    company_id: customerId,
+    actor_id: user.id,
+    entity_type: 'company',
+    entity_id: customerId,
+    action: 'handoff_invites_sent',
+    metadata: {
+      sent: sent.length,
+      failed: failed.length,
+      failedInvitations: failed
+    }
+  });
+
+  if (auditError) throw new Error(auditError.message);
+
   revalidateCustomer(customerId);
 
-  return { message: 'Coming soon.' };
+  if (failed.length > 0) {
+    return {
+      message: `${sent.length} invitation${sent.length === 1 ? '' : 's'} sent. ${failed.length} failed; review diagnostics.`
+    };
+  }
+
+  return { message: `${sent.length} pending invitation${sent.length === 1 ? '' : 's'} sent.` };
+}
+
+export async function setOwnerCodeExemption(formData: FormData) {
+  const user = await requireFfAdmin();
+  const customerId = String(formData.get('customerId') ?? '').trim();
+  const code = String(formData.get('code') ?? '').trim();
+  const exempt = String(formData.get('handoffExempt') ?? '') === 'true';
+  const reason = String(formData.get('reason') ?? '').trim();
+
+  if (!customerId || !code) {
+    throw new Error('Customer and owner code are required.');
+  }
+
+  if (exempt && !reason) {
+    throw new Error('An exemption reason is required.');
+  }
+
+  const admin = createAdminClient();
+  const { data: ownerCode, error } = await admin
+    .from('company_owner_codes')
+    .update({
+      handoff_exempt: exempt,
+      handoff_exemption_reason: exempt ? reason : null,
+      handoff_exempted_by: exempt ? user.id : null,
+      handoff_exempted_at: exempt ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString()
+    })
+    .eq('company_id', customerId)
+    .eq('code', code)
+    .select('id')
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!ownerCode) throw new Error('Owner code was not found.');
+
+  const { error: auditError } = await admin.from('audit_log').insert({
+    company_id: customerId,
+    actor_id: user.id,
+    entity_type: 'company_owner_code',
+    entity_id: ownerCode.id,
+    action: exempt ? 'owner_code_exempted' : 'owner_code_exemption_cleared',
+    metadata: { code, reason: exempt ? reason : null }
+  });
+
+  if (auditError) throw new Error(auditError.message);
+
+  revalidateCustomer(customerId);
 }

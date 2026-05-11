@@ -36,6 +36,7 @@ function safeRedirectPath(value: FormDataEntryValue | null) {
   const path = String(value ?? '').trim();
   if (path === '/settings') return path;
   if (/^\/admin\/companies\/[0-9a-f-]+$/i.test(path)) return path;
+  if (/^\/admin\/customers\/[0-9a-f-]+\/(overview|setup|import|codes|users|diagnostics|danger)$/i.test(path)) return path;
   return '/settings';
 }
 
@@ -125,19 +126,26 @@ export async function saveOwnerCodeMapping(formData: FormData) {
     }
   }
 
+  const payload = {
+    company_id: companyId,
+    code,
+    display_name: personName,
+    user_id: userId,
+    pending_email: pendingEmail,
+    updated_at: new Date().toISOString(),
+    ...(loginEmail
+      ? {
+          handoff_exempt: false,
+          handoff_exemption_reason: null,
+          handoff_exempted_by: null,
+          handoff_exempted_at: null
+        }
+      : {})
+  };
+
   const { error } = await admin
     .from('company_owner_codes')
-    .upsert(
-      {
-        company_id: companyId,
-        code,
-        display_name: personName,
-        user_id: userId,
-        pending_email: pendingEmail,
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: 'company_id,code' }
-    );
+    .upsert(payload, { onConflict: 'company_id,code' });
 
   if (error) throw new Error(error.message);
 
@@ -145,5 +153,9 @@ export async function saveOwnerCodeMapping(formData: FormData) {
   revalidatePath('/settings');
   revalidatePath('/admin');
   revalidatePath(`/admin/companies/${companyId}`);
+  revalidatePath(`/admin/customers/${companyId}`);
+  revalidatePath(`/admin/customers/${companyId}/overview`);
+  revalidatePath(`/admin/customers/${companyId}/codes`);
+  revalidatePath(`/admin/customers/${companyId}/users`);
   redirect(redirectTo);
 }

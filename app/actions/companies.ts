@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 
 function customerConsolePath(companyId: string, message?: string) {
   const query = message ? `?message=${encodeURIComponent(message)}` : '';
-  return `/admin/customers/${companyId}/users${query}`;
+  return `/admin/customers/${companyId}/overview${query}`;
 }
 
 function requiredString(formData: FormData, name: string) {

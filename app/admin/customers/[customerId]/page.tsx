@@ -5,5 +5,5 @@ type CustomerIndexPageProps = {
 };
 
 export default function CustomerIndexPage({ params }: CustomerIndexPageProps) {
-  redirect(`/admin/customers/${params.customerId}/users`);
+  redirect(`/admin/customers/${params.customerId}/overview`);
 }

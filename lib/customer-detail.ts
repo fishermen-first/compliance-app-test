@@ -35,6 +35,8 @@ type OwnerCodeRow = {
   display_name: string | null;
   user_id: string | null;
   pending_email: string | null;
+  handoff_exempt: boolean;
+  handoff_exemption_reason: string | null;
   profiles?: Relation<ProfileRelation>;
 };
 
@@ -59,6 +61,8 @@ export type CustomerOwnerCode = {
   code: string;
   displayName: string | null;
   records: number;
+  handoffExempt?: boolean;
+  handoffExemptionReason?: string | null;
 };
 
 export type CustomerDetail = {
@@ -167,7 +171,9 @@ function buildOwnerCodeOptions(ownerCodes: OwnerCodeRow[], items: ItemOwnerRow[]
     rows.set(owner.code, {
       code: owner.code,
       displayName: owner.display_name,
-      records: counts.get(owner.code) ?? 0
+      records: counts.get(owner.code) ?? 0,
+      handoffExempt: owner.handoff_exempt,
+      handoffExemptionReason: owner.handoff_exemption_reason
     });
   });
 
@@ -184,6 +190,10 @@ function ownerCodeMapped(owner: OwnerCodeRow, appAdminEmails: Set<string>) {
   const mappedEmail = profile?.email ?? owner.pending_email;
 
   if (isFfAdminEmail(mappedEmail, appAdminEmails)) return false;
+
+  if (owner.handoff_exempt && owner.handoff_exemption_reason?.trim()) {
+    return true;
+  }
 
   return Boolean(owner.user_id || owner.pending_email);
 }
@@ -225,7 +235,7 @@ export async function getCustomerDetail(customerId: string): Promise<CustomerDet
     admin.from('compliance_items').select('id, owner_current').eq('company_id', customerId),
     admin
       .from('company_owner_codes')
-      .select('id, code, display_name, user_id, pending_email, profiles(email, full_name)')
+      .select('id, code, display_name, user_id, pending_email, handoff_exempt, handoff_exemption_reason, profiles!company_owner_codes_user_id_fkey(email, full_name)')
       .eq('company_id', customerId)
       .order('code'),
     admin
@@ -274,6 +284,7 @@ export async function getCustomerDetail(customerId: string): Promise<CustomerDet
   const firstLoginVerified = customerMemberships.some((membership) => Boolean(lastSignIns.get(membership.user_id)));
   const mappedOwnerCodes = ownerCodes.filter((owner) => ownerCodeMapped(owner, appAdminEmails)).length;
   const firstUnmappedOwner = ownerCodes.find((owner) => !ownerCodeMapped(owner, appAdminEmails));
+  const stagedCustomerUsers = activeCustomerMemberships.length + pendingInvitations.length;
 
   let lastEditBy: string | null = null;
   const auditRow = auditResult.data;
@@ -299,7 +310,7 @@ export async function getCustomerDetail(customerId: string): Promise<CustomerDet
     {
       id: 'users',
       label: 'Customer users added',
-      done: activeCustomerMemberships.length > 0,
+      done: stagedCustomerUsers > 0,
       detail: `${activeCustomerMemberships.length} active · ${pendingInvitations.length} pending`
     },
     {
@@ -344,7 +355,7 @@ export async function getCustomerUsers(customerId: string): Promise<CustomerUser
       .order('created_at', { ascending: false }),
     admin
       .from('company_owner_codes')
-      .select('id, code, display_name, user_id, pending_email')
+      .select('id, code, display_name, user_id, pending_email, handoff_exempt, handoff_exemption_reason')
       .eq('company_id', customerId)
       .order('code')
   ]);

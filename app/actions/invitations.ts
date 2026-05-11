@@ -6,9 +6,9 @@ import { assertOwnerEmailMappable, isOwnerCodeEmailRejectedError } from '@/lib/a
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
-const companyRoles = ['owner', 'office_user'] as const;
+const companyRoles = ['owner', 'office_user', 'vessel_user'] as const;
 const allowedRoles = ['app_admin', ...companyRoles] as const;
-const ownerCodeRejectedMessage = 'This email cannot be used for customer owner-code mapping.';
+const ownerCodeRejectedMessage = 'FF admin emails cannot be invited as customer users.';
 
 function requiredString(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? '').trim();
@@ -57,6 +57,7 @@ function safeRedirectPath(value: FormDataEntryValue | null) {
   const path = String(value ?? '').trim();
   if (path === '/admin') return path;
   if (/^\/admin\/companies\/[0-9a-f-]+$/i.test(path)) return path;
+  if (/^\/admin\/customers\/[0-9a-f-]+\/(overview|setup|import|codes|users|diagnostics|danger)$/i.test(path)) return path;
   return '/admin';
 }
 
@@ -115,6 +116,10 @@ async function assignPendingOwnerCodes(
           code,
           user_id: userId,
           pending_email: userId ? null : email,
+          handoff_exempt: false,
+          handoff_exemption_reason: null,
+          handoff_exempted_by: null,
+          handoff_exempted_at: null,
           updated_at: new Date().toISOString()
         },
         { onConflict: 'company_id,code' }
@@ -174,16 +179,14 @@ export async function createInvitation(formData: FormData) {
     redirect('/admin?message=Choose%20a%20company%20for%20company%20roles.');
   }
 
-  if (ownerCodes.length > 0) {
-    try {
-      await assertOwnerEmailMappable(email);
-    } catch (error) {
-      if (isOwnerCodeEmailRejectedError(error)) {
-        redirect(rejectionRedirectPath(redirectTo, ownerCodeRejectedMessage, redirectTo === '/admin' ? undefined : 'access'));
-      }
-
-      throw error;
+  try {
+    await assertOwnerEmailMappable(email);
+  } catch (error) {
+    if (isOwnerCodeEmailRejectedError(error)) {
+      redirect(rejectionRedirectPath(redirectTo, ownerCodeRejectedMessage, redirectTo === '/admin' ? undefined : 'access'));
     }
+
+    throw error;
   }
 
   const supabaseAdmin = createAdminClient();
@@ -208,6 +211,10 @@ export async function createInvitation(formData: FormData) {
 
   revalidatePath('/admin');
   revalidatePath(`/admin/companies/${companyId}`);
+  revalidatePath(`/admin/customers/${companyId}`);
+  revalidatePath(`/admin/customers/${companyId}/overview`);
+  revalidatePath(`/admin/customers/${companyId}/codes`);
+  revalidatePath(`/admin/customers/${companyId}/users`);
   const message =
     authUserStatus === 'created'
       ? 'User added. They can request a login link when you are ready.'

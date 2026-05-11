@@ -159,6 +159,108 @@ export type Database = {
           },
         ]
       }
+      company_import_runs: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          imported_by: string | null
+          owner_code_count: number
+          record_count: number
+          sheet_name: string
+          vessel_count: number
+          warning_count: number
+          workbook_name: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          imported_by?: string | null
+          owner_code_count?: number
+          record_count?: number
+          sheet_name: string
+          vessel_count?: number
+          warning_count?: number
+          workbook_name?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          imported_by?: string | null
+          owner_code_count?: number
+          record_count?: number
+          sheet_name?: string
+          vessel_count?: number
+          warning_count?: number
+          workbook_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_import_runs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_import_runs_imported_by_fkey"
+            columns: ["imported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_import_warnings: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          import_run_id: string
+          issue: string
+          row_number: number | null
+          severity: string
+          value: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          import_run_id: string
+          issue: string
+          row_number?: number | null
+          severity?: string
+          value?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          import_run_id?: string
+          issue?: string
+          row_number?: number | null
+          severity?: string
+          value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_import_warnings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_import_warnings_import_run_id_fkey"
+            columns: ["import_run_id"]
+            isOneToOne: false
+            referencedRelation: "company_import_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_memberships: {
         Row: {
           company_id: string
@@ -204,6 +306,10 @@ export type Database = {
           company_id: string
           created_at: string
           display_name: string | null
+          handoff_exempt: boolean
+          handoff_exempted_at: string | null
+          handoff_exempted_by: string | null
+          handoff_exemption_reason: string | null
           id: string
           pending_email: string | null
           updated_at: string
@@ -214,6 +320,10 @@ export type Database = {
           company_id: string
           created_at?: string
           display_name?: string | null
+          handoff_exempt?: boolean
+          handoff_exempted_at?: string | null
+          handoff_exempted_by?: string | null
+          handoff_exemption_reason?: string | null
           id?: string
           pending_email?: string | null
           updated_at?: string
@@ -224,6 +334,10 @@ export type Database = {
           company_id?: string
           created_at?: string
           display_name?: string | null
+          handoff_exempt?: boolean
+          handoff_exempted_at?: string | null
+          handoff_exempted_by?: string | null
+          handoff_exemption_reason?: string | null
           id?: string
           pending_email?: string | null
           updated_at?: string
@@ -235,6 +349,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_owner_codes_handoff_exempted_by_fkey"
+            columns: ["handoff_exempted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {

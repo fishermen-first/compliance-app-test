@@ -1,16 +1,23 @@
 import Link from 'next/link';
-import { Eye, Send } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import { type CustomerDetail } from '@/lib/customer-detail';
-import { handoffCustomer } from '../users/actions';
+import { HandoffButton } from './handoff-button';
 
 export function StatusBar({ customer }: { customer: CustomerDetail }) {
   const done = customer.gates.filter((gate) => gate.done).length;
   const blocking = customer.gates.find((gate) => gate.current);
-  const allDone = done === customer.gates.length;
-  async function handoffAction() {
-    'use server';
-    await handoffCustomer(customer.id);
-  }
+  const workbookReady = customer.gates.find((gate) => gate.id === 'workbook')?.done ?? false;
+  const codesReady = customer.gates.find((gate) => gate.id === 'codes')?.done ?? false;
+  const usersReady = customer.gates.find((gate) => gate.id === 'users')?.done ?? false;
+  const verified = customer.gates.find((gate) => gate.id === 'verify')?.done ?? false;
+  const inviteReady = workbookReady && codesReady && usersReady;
+  const inviteDisabled = !inviteReady || verified || customer.pendingInvitationCount === 0;
+  const inviteLabel = verified ? 'Handoff verified' : customer.pendingInvitationCount > 0 ? 'Send pending invites' : 'Awaiting invite';
+  const inviteTitle = verified
+    ? 'A customer login has been verified.'
+    : inviteReady
+      ? 'Send login links to pending customer invitations.'
+      : `Disabled until ${blocking?.label ?? 'setup gates'} passes`;
 
   return (
     <div className="cd-status">
@@ -29,20 +36,10 @@ export function StatusBar({ customer }: { customer: CustomerDetail }) {
         {blocking ? <span className="blocking">· Blocking: <strong>{blocking.label}</strong></span> : null}
       </div>
       <div className="actions">
-        <Link className="ghost-btn" href={`/?as=${customer.id}`}>
-          <Eye aria-hidden="true" /> View as customer
+        <Link className="ghost-btn" href={`/admin/customers/${customer.id}/diagnostics#queue-visibility`}>
+          <Eye aria-hidden="true" /> Queue diagnostics
         </Link>
-        <form action={handoffAction}>
-          <button
-            className="primary-btn"
-            type="submit"
-            aria-disabled={!allDone}
-            disabled={!allDone}
-            title={allDone ? 'Send invite and hand off' : `Disabled until ${blocking?.label ?? 'all gates'} passes`}
-          >
-            <Send aria-hidden="true" /> Send invite &amp; hand off
-          </button>
-        </form>
+        <HandoffButton customerId={customer.id} disabled={inviteDisabled} label={inviteLabel} title={inviteTitle} />
       </div>
     </div>
   );

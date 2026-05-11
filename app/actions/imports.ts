@@ -12,6 +12,56 @@ function requiredString(formData: FormData, name: string) {
   return value;
 }
 
+function customerImportPath(companyId: string, message: string) {
+  return `/admin/customers/${companyId}/import?message=${encodeURIComponent(message)}`;
+}
+
+function customerCodesPath(companyId: string, message: string) {
+  return `/admin/customers/${companyId}/codes?message=${encodeURIComponent(message)}`;
+}
+
+function warningSeverity(issue: string) {
+  const normalized = issue.toLowerCase();
+  if (normalized.includes('skipped')) return 'fix';
+  if (normalized.includes('outlier')) return 'fix';
+  return 'review';
+}
+
+type ImporterUser = {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+};
+
+function metadataString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+async function ensureImporterProfile(admin: ReturnType<typeof createAdminClient>, user: ImporterUser) {
+  const email = user.email?.trim().toLowerCase();
+
+  if (!email) {
+    throw new Error('FF admin email is required before importing a workbook.');
+  }
+
+  const fullName =
+    metadataString(user.user_metadata?.full_name) ||
+    metadataString(user.user_metadata?.name) ||
+    email.split('@')[0];
+
+  const { error } = await admin.from('profiles').upsert(
+    {
+      id: user.id,
+      email,
+      full_name: fullName,
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: 'id' }
+  );
+
+  if (error) throw new Error(error.message);
+}
+
 async function requireAppAdmin() {
   const supabase = createClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -20,23 +70,25 @@ async function requireAppAdmin() {
 
   const { data: isAppAdmin } = await supabase.rpc('is_app_admin');
   if (!isAppAdmin) redirect('/');
+
+  return userData.user;
 }
 
 export async function importComplianceWorkbook(formData: FormData) {
   const companyId = requiredString(formData, 'companyId');
   const workbook = formData.get('workbook');
 
-  await requireAppAdmin();
+  const user = await requireAppAdmin();
 
   if (!(workbook instanceof File) || workbook.size === 0) {
-    redirect(`/admin/companies/${companyId}?message=${encodeURIComponent('Choose a workbook to import.')}#import`);
+    redirect(customerImportPath(companyId, 'Choose a workbook to import.'));
   }
 
   const buffer = await workbook.arrayBuffer();
   const { sheetName, records, summary } = await parseComplianceWorkbook(buffer);
 
   if (records.length === 0) {
-    redirect(`/admin/companies/${companyId}?message=${encodeURIComponent('No compliance rows were found in the workbook.')}#import`);
+    redirect(customerImportPath(companyId, 'No compliance rows were found in the workbook.'));
   }
 
   const admin = createAdminClient();
@@ -48,6 +100,8 @@ export async function importComplianceWorkbook(formData: FormData) {
 
   if (companyError) throw new Error(companyError.message);
   if (!company) redirect('/admin?message=Company%20not%20found.');
+
+  await ensureImporterProfile(admin, user);
 
   const vesselNames = Array.from(new Set(records.map((record) => record.vessel).filter((vessel) => !isCompanyWideVessel(vessel)) as string[])).sort();
   if (vesselNames.length > 0) {
@@ -134,13 +188,45 @@ export async function importComplianceWorkbook(formData: FormData) {
     if (error) throw new Error(error.message);
   }
 
+  const { data: importRun, error: importRunError } = await admin
+    .from('company_import_runs')
+    .insert({
+      company_id: companyId,
+      sheet_name: sheetName,
+      workbook_name: workbook.name || null,
+      record_count: summary.recordCount,
+      vessel_count: summary.vesselCount,
+      owner_code_count: summary.ownerCodes.length,
+      warning_count: summary.warnings.length,
+      imported_by: user.id
+    })
+    .select('id')
+    .single();
+
+  if (importRunError) throw new Error(importRunError.message);
+
+  if (summary.warnings.length > 0) {
+    const { error: warningsError } = await admin.from('company_import_warnings').insert(
+      summary.warnings.map((warning) => ({
+        import_run_id: importRun.id,
+        company_id: companyId,
+        row_number: warning.row,
+        issue: warning.issue,
+        value: warning.value ?? null,
+        severity: warningSeverity(warning.issue)
+      }))
+    );
+
+    if (warningsError) throw new Error(warningsError.message);
+  }
+
   revalidatePath('/admin');
   revalidatePath(`/admin/companies/${companyId}`);
+  revalidatePath(`/admin/customers/${companyId}`);
+  revalidatePath(`/admin/customers/${companyId}/overview`);
+  revalidatePath(`/admin/customers/${companyId}/import`);
+  revalidatePath(`/admin/customers/${companyId}/codes`);
 
   const warningCopy = summary.warnings.length > 0 ? ` ${summary.warnings.length} import warnings need review.` : '';
-  redirect(
-    `/admin/companies/${companyId}?message=${encodeURIComponent(
-      `Imported ${summary.recordCount} items, ${summary.vesselCount} vessels, and ${summary.ownerCodes.length} owner codes.${warningCopy}`
-    )}#mapping`
-  );
+  redirect(customerCodesPath(companyId, `Imported ${summary.recordCount} items, ${summary.vesselCount} vessels, and ${summary.ownerCodes.length} owner codes.${warningCopy}`));
 }

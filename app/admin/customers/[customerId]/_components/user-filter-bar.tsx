@@ -10,9 +10,10 @@ type UserFilterBarProps = {
   search: string;
   setSearch: (search: string) => void;
   counts: Record<UserFilter, number>;
+  onAddUser: () => void;
 };
 
-export function UserFilterBar({ filter, setFilter, search, setSearch, counts }: UserFilterBarProps) {
+export function UserFilterBar({ filter, setFilter, search, setSearch, counts, onAddUser }: UserFilterBarProps) {
   const tabs = [
     { id: 'all' as const, label: 'All', count: counts.all },
     { id: 'active' as const, label: 'Active', count: counts.active },
@@ -45,7 +46,7 @@ export function UserFilterBar({ filter, setFilter, search, setSearch, counts }: 
           </button>
         ))}
       </div>
-      <button className="cd-add-user" type="button" title="Add user">
+      <button className="cd-add-user" type="button" title="Add user" onClick={onAddUser}>
         <UserPlus aria-hidden="true" /> Add user
       </button>
     </div>

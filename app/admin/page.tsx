@@ -32,7 +32,7 @@ function profileEmail(row: any) {
 }
 
 function customerConsoleHref(companyId: string) {
-  return `/admin/customers/${companyId}/users`;
+  return `/admin/customers/${companyId}/overview`;
 }
 
 function handoffStage(company: CompanyIndexRow) {

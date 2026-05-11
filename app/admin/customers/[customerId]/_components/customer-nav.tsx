@@ -1,19 +1,45 @@
+'use client';
+
 import Link from 'next/link';
-import { Activity, Bell, BookOpen, ChevronLeft, Eye, Grid2X2, Settings, ShieldAlert, Tag, UsersRound } from 'lucide-react';
-import { type CustomerDetail } from '@/lib/customer-detail';
+import { usePathname } from 'next/navigation';
+import { Activity, ChevronLeft, Database, Eye, Grid2X2, ShieldAlert, SlidersHorizontal, Tag, UserPlus, UsersRound } from 'lucide-react';
+
+type Gate = {
+  id: 'workbook' | 'codes' | 'users' | 'verify';
+  label: string;
+  done: boolean;
+  detail: string;
+  current: boolean;
+};
+
+export type CustomerNavData = {
+  id: string;
+  name: string;
+  timezone: string;
+  createdAt: string;
+  vesselCount: number;
+  itemCount: number;
+  ownerCodeCount: number;
+  userCount: number;
+  pendingInvitationCount: number;
+  gates: Gate[];
+  lastEditAt: string;
+  lastEditBy: string | null;
+};
 
 const sections = [
   { id: 'overview', label: 'Overview', icon: Grid2X2 },
-  { id: 'workbook', label: 'Workbook & items', icon: BookOpen },
+  { id: 'setup', label: 'Setup', icon: SlidersHorizontal },
+  { id: 'import', label: 'Import review', icon: Database },
   { id: 'codes', label: 'Owner codes', icon: Tag },
   { id: 'users', label: 'Users & access', icon: UsersRound },
-  { id: 'reminders', label: 'Reminders', icon: Bell },
-  { id: 'activity', label: 'Activity log', icon: Activity }
-];
+  { id: 'diagnostics', label: 'Diagnostics', icon: Activity },
+  { id: 'danger', label: 'Danger zone', icon: ShieldAlert }
+] as const;
 
-function daysSince(date: Date) {
+function daysSince(value: string) {
   const oneDay = 24 * 60 * 60 * 1000;
-  return Math.max(1, Math.ceil((Date.now() - date.getTime()) / oneDay));
+  return Math.max(1, Math.ceil((Date.now() - new Date(value).getTime()) / oneDay));
 }
 
 function shortTimezone(timezone: string) {
@@ -26,24 +52,28 @@ function shortTimezone(timezone: string) {
   return labels[timezone] ?? timezone;
 }
 
-function formatRelative(date: Date) {
-  const days = Math.max(0, Math.floor((Date.now() - date.getTime()) / (24 * 60 * 60 * 1000)));
+function formatRelative(value: string) {
+  const days = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / (24 * 60 * 60 * 1000)));
   if (days === 0) return 'Today';
   if (days === 1) return '1 day ago';
   return `${days} days ago`;
 }
 
-function badgeFor(sectionId: string, customer: CustomerDetail) {
-  if (sectionId === 'overview') return `${customer.gates.filter((gate) => gate.done).length} of ${customer.gates.length}`;
-  if (sectionId === 'workbook') return String(customer.itemCount);
+function badgeFor(sectionId: string, customer: CustomerNavData) {
+  if (sectionId === 'overview') return `${customer.gates.filter((gate) => gate.done).length}/${customer.gates.length}`;
+  if (sectionId === 'setup') return customer.gates.find((gate) => gate.current)?.label.split(' ')[0] ?? 'Ready';
+  if (sectionId === 'import') return String(customer.itemCount);
   if (sectionId === 'codes') return String(customer.ownerCodeCount);
   if (sectionId === 'users') return String(customer.userCount);
+  if (sectionId === 'diagnostics') return String(customer.pendingInvitationCount);
   return null;
 }
 
-export function CustomerNav({ customer }: { customer: CustomerDetail }) {
+export function CustomerNav({ customer }: { customer: CustomerNavData }) {
+  const pathname = usePathname();
+
   return (
-    <aside className="cd-nav" aria-label="Customer sections">
+    <aside className="cd-nav" aria-label="FF Admin customer portal">
       <Link href="/admin" className="back">
         <ChevronLeft aria-hidden="true" /> All customers
       </Link>
@@ -55,28 +85,24 @@ export function CustomerNav({ customer }: { customer: CustomerDetail }) {
         </div>
       </div>
       <nav className="sections">
-        <div className="group">This customer</div>
+        <div className="group">Customer cockpit</div>
         {sections.map((section) => {
           const Icon = section.icon;
           const badge = badgeFor(section.id, customer);
-          const active = section.id === 'users';
+          const href = `/admin/customers/${customer.id}/${section.id}`;
+          const active = pathname === href || (section.id === 'overview' && pathname === `/admin/customers/${customer.id}`);
 
           return (
-            <Link
-              className={active ? 'active' : ''}
-              href={active ? `/admin/customers/${customer.id}/users` : `/admin/customers/${customer.id}/${section.id}`}
-              key={section.id}
-            >
+            <Link className={active ? 'active' : ''} href={href} key={section.id}>
               <Icon aria-hidden="true" />
               <span>{section.label}</span>
               {badge ? <span className={`badge${section.id === 'overview' ? ' warn' : ''}`}>{badge}</span> : <span />}
             </Link>
           );
         })}
-        <div className="group">Admin</div>
-        <Link href={`/?as=${customer.id}`}><Eye aria-hidden="true" /><span>View as customer</span><span /></Link>
-        <Link href={`/admin/companies/${customer.id}`}><Settings aria-hidden="true" /><span>Workspace settings</span><span /></Link>
-        <Link href={`/admin/companies/${customer.id}#danger`}><ShieldAlert aria-hidden="true" /><span>Danger zone</span><span /></Link>
+        <div className="group">Read-only support</div>
+        <Link href={`/admin/customers/${customer.id}/diagnostics#queue-visibility`}><Eye aria-hidden="true" /><span>Queue diagnostics</span><span /></Link>
+        <Link href={`/admin/customers/${customer.id}/users`}><UserPlus aria-hidden="true" /><span>Stage users</span><span>{customer.pendingInvitationCount}</span></Link>
       </nav>
       <div className="nav-foot">
         <div className="row"><span>Created</span><strong>{formatRelative(customer.createdAt)}</strong></div>
