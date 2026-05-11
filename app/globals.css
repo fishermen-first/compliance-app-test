@@ -3114,8 +3114,8 @@ svg {
 .settings-setup-page .access-rows-head,
 .settings-setup-page .access-row {
   display: grid;
-  grid-template-columns: minmax(160px, 1.2fr) minmax(180px, 1.6fr) min-content min-content;
-  gap: 18px;
+  grid-template-columns: minmax(180px, 1.3fr) minmax(220px, 1.6fr) 140px 160px;
+  gap: 24px;
   align-items: center;
   padding: 12px 28px;
 }
@@ -3127,6 +3127,10 @@ svg {
   font-weight: 900;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.settings-setup-page .access-rows-head span {
+  white-space: nowrap;
 }
 
 .settings-setup-page .access-row {
