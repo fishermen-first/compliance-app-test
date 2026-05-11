@@ -3,9 +3,10 @@ import { UsersTable } from '../_components/users-table';
 
 type CustomerUsersPageProps = {
   params: { customerId: string };
+  searchParams?: { message?: string };
 };
 
-export default async function CustomerUsersPage({ params }: CustomerUsersPageProps) {
+export default async function CustomerUsersPage({ params, searchParams }: CustomerUsersPageProps) {
   const [customer, users] = await Promise.all([
     getCustomerDetail(params.customerId),
     getCustomerUsers(params.customerId)
@@ -22,6 +23,8 @@ export default async function CustomerUsersPage({ params }: CustomerUsersPagePro
           </p>
         </div>
       </header>
+
+      {searchParams?.message ? <div className="cd-inline-message" role="status">{searchParams.message}</div> : null}
 
       <section className="cd-body">
         <UsersTable customerId={customer.id} ownerCodes={customer.ownerCodes} users={users} />

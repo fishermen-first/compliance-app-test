@@ -28,13 +28,17 @@ function profileEmail(row: any) {
   return relation(row.profiles)?.email ?? 'Profile pending';
 }
 
+function customerConsoleHref(companyId: string) {
+  return `/admin/customers/${companyId}/users`;
+}
+
 function setupStage(company: CompanySetup) {
   if (company.totalItems === 0 && company.vessels === 0) {
     return {
       label: 'Import workbook',
       detail: 'Workspace exists. Import the customer workbook next.',
-      action: 'Import workbook',
-      href: `/admin/companies/${company.id}#import`,
+      action: 'Open customer',
+      href: customerConsoleHref(company.id),
       tone: 'active'
     };
   }
@@ -43,8 +47,8 @@ function setupStage(company: CompanySetup) {
     return {
       label: 'Review import',
       detail: 'Imported data needs review before users are added.',
-      action: 'Review import',
-      href: `/admin/companies/${company.id}#import`,
+      action: 'Open customer',
+      href: customerConsoleHref(company.id),
       tone: 'active'
     };
   }
@@ -53,8 +57,8 @@ function setupStage(company: CompanySetup) {
     return {
       label: 'Map owners',
       detail: `${company.ownerCodes - company.mappedOwnerCodes} owner codes still need people.`,
-      action: 'Map owners',
-      href: `/admin/companies/${company.id}#mapping`,
+      action: 'Open customer',
+      href: customerConsoleHref(company.id),
       tone: 'active'
     };
   }
@@ -63,8 +67,8 @@ function setupStage(company: CompanySetup) {
     return {
       label: 'Add users',
       detail: 'Owner mapping is ready. Add customer users to the workspace.',
-      action: 'Add users',
-      href: `/admin/companies/${company.id}#access`,
+      action: 'Open customer',
+      href: customerConsoleHref(company.id),
       tone: 'ready'
     };
   }
@@ -72,8 +76,8 @@ function setupStage(company: CompanySetup) {
   return {
     label: 'Verify access',
     detail: `${company.users} active users · ${company.pendingInvites} pending login.`,
-    action: 'View workspace',
-    href: `/admin/companies/${company.id}`,
+    action: 'Open customer',
+    href: customerConsoleHref(company.id),
     tone: 'ready'
   };
 }
@@ -152,21 +156,21 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       description: hasWorkspaces ? 'Open a workspace and upload the customer sheet.' : 'Available after a workspace exists.',
       state: hasWorkspaces && activeStage?.label === 'Import workbook' ? 'active' : hasWorkspaces ? 'ready' : 'locked',
       icon: Upload,
-      href: activeCompany ? `/admin/companies/${activeCompany.id}#import` : '#create-workspace'
+      href: activeCompany ? customerConsoleHref(activeCompany.id) : '#create-workspace'
     },
     {
       label: 'Map owners',
       description: hasWorkspaces ? 'Connect detected owner codes to customer emails.' : 'Owner codes appear after import.',
       state: hasWorkspaces && activeStage?.label === 'Map owners' ? 'active' : hasWorkspaces ? 'ready' : 'locked',
       icon: Users,
-      href: activeCompany ? `/admin/companies/${activeCompany.id}#mapping` : '#create-workspace'
+      href: activeCompany ? customerConsoleHref(activeCompany.id) : '#create-workspace'
     },
     {
       label: 'Add users',
       description: hasWorkspaces ? 'Add users after owner mapping is ready.' : 'Users are added after mapping.',
       state: hasWorkspaces && activeStage?.label === 'Add users' ? 'active' : hasWorkspaces ? 'ready' : 'locked',
       icon: UserPlus,
-      href: activeCompany ? `/admin/companies/${activeCompany.id}#access` : '#create-workspace'
+      href: activeCompany ? customerConsoleHref(activeCompany.id) : '#create-workspace'
     }
   ];
 

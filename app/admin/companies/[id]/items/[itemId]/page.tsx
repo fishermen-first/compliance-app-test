@@ -56,9 +56,9 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
   return (
     <main className="admin-console admin-detail-console">
       <aside className="admin-rail">
-        <Link className="admin-back-link" href={`/admin/companies/${companyId}`}>
+        <Link className="admin-back-link" href={`/admin/customers/${companyId}/users`}>
           <ArrowLeft aria-hidden="true" />
-          Customer setup
+          Customer users
         </Link>
         <div className="admin-rail-footer">
           <span>Workspace</span>
@@ -84,8 +84,8 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
           reminderRules={reminderRules ?? []}
           recipients={recipients ?? []}
           canManageItem
-          backHref={`/admin/companies/${companyId}`}
-          backLabel="Back to customer setup"
+          backHref={`/admin/customers/${companyId}/users`}
+          backLabel="Back to customer users"
           itemPathPrefix={`/admin/companies/${companyId}/items`}
         />
       </section>

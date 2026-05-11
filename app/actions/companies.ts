@@ -5,6 +5,11 @@ import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
+function customerConsolePath(companyId: string, message?: string) {
+  const query = message ? `?message=${encodeURIComponent(message)}` : '';
+  return `/admin/customers/${companyId}/users${query}`;
+}
+
 function requiredString(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? '').trim();
 
@@ -44,7 +49,7 @@ export async function createCompany(formData: FormData) {
   }
 
   if (existing) {
-    redirect(`/admin/companies/${existing.id}?message=${encodeURIComponent(`${existing.name} already exists.`)}`);
+    redirect(customerConsolePath(existing.id, `${existing.name} already exists.`));
   }
 
   const { data: company, error } = await admin
@@ -58,5 +63,5 @@ export async function createCompany(formData: FormData) {
   }
 
   revalidatePath('/admin');
-  redirect(`/admin/companies/${company.id}?message=${encodeURIComponent('Workspace created. Import the compliance workbook next.')}#import`);
+  redirect(customerConsolePath(company.id, 'Workspace created. Import the compliance workbook next.'));
 }
