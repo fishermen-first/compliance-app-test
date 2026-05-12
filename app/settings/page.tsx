@@ -1,18 +1,12 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AppSidebar } from '@/components/app-sidebar';
+import { AccessDrawer } from '@/components/access-drawer';
 import { NoAccessScreen } from '@/components/no-access-screen';
+import { OwnerDrawer } from '@/components/owner-drawer';
 import { WorkspaceBlockedScreen } from '@/components/workspace-blocked-screen';
 import { type Database } from '@/lib/database.types';
 import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
-import {
-  cancelPendingInvite,
-  removeMemberAccess,
-  updateMemberRole,
-  updateOwnerCodeAssignment,
-  updatePendingInviteRole
-} from './actions';
 
 type AppRole = Database['public']['Enums']['app_role'];
 
@@ -71,13 +65,6 @@ type RowStatus = {
   className: string;
   nextAction?: string;
 };
-
-const roleOptions: Array<{ value: AppRole; label: string }> = [
-  { value: 'owner', label: 'owner' },
-  { value: 'office_admin', label: 'office_admin' },
-  { value: 'office_user', label: 'office_user' },
-  { value: 'vessel_user', label: 'vessel_user' }
-];
 
 function relation<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -143,106 +130,13 @@ function statusForOwner(owner: OwnerCodeRow, target: AccessRow | null, assignmen
   return { label: 'Unmapped', className: 'unmapped' };
 }
 
-function roleChip(role: AppRole) {
-  return <span className="chip role-chip">{role}</span>;
-}
+function resolveNameFromOwnerCodes(row: AccessRow, allOwners: OwnerCodeRow[]) {
+  const linked = ownerCodesFor(row)
+    .map((code) => allOwners.find((owner) => owner.code === code))
+    .filter(Boolean);
+  const named = linked.find((owner) => owner?.display_name);
 
-function hiddenTargetFields({ companyId, row }: { companyId: string; row: AccessRow }) {
-  return (
-    <>
-      <input type="hidden" name="companyId" value={companyId} />
-      <input type="hidden" name="targetId" value={row.target_id} />
-    </>
-  );
-}
-
-function RoleEditor({ companyId, row, actorRole }: { companyId: string; row: AccessRow; actorRole: AppRole }) {
-  if (!row.can_update_role) return roleChip(row.role);
-
-  const action = row.target_kind === 'membership' ? updateMemberRole : updatePendingInviteRole;
-  const options = actorRole === 'office_admin'
-    ? roleOptions.filter((option) => option.value === 'office_user' || option.value === 'vessel_user')
-    : roleOptions;
-
-  return (
-    <form action={action} className="settings-inline-form">
-      {hiddenTargetFields({ companyId, row })}
-      <select name="role" defaultValue={row.role} aria-label={`Role for ${row.email ?? row.target_id}`}>
-        {options.map((option) => (
-          <option value={option.value} key={option.value}>{option.label}</option>
-        ))}
-      </select>
-      <button type="submit">Save role</button>
-    </form>
-  );
-}
-
-function AccessActions({ companyId, row }: { companyId: string; row: AccessRow }) {
-  if (row.target_kind === 'membership' && row.can_remove) {
-    return (
-      <form action={removeMemberAccess} className="settings-inline-form">
-        {hiddenTargetFields({ companyId, row })}
-        <button type="submit" className="danger-action">Remove</button>
-      </form>
-    );
-  }
-
-  if (row.target_kind === 'invitation' && row.can_cancel) {
-    return (
-      <form action={cancelPendingInvite} className="settings-inline-form">
-        {hiddenTargetFields({ companyId, row })}
-        <button type="submit" className="danger-action">Cancel invite</button>
-      </form>
-    );
-  }
-
-  return <span className="read-only-note">No cleanup action</span>;
-}
-
-function OwnerCodeEditor({
-  companyId,
-  row,
-  ownerCodes
-}: {
-  companyId: string;
-  row: AccessRow;
-  ownerCodes: OwnerCodeRow[];
-}) {
-  const selected = new Set(ownerCodesFor(row));
-  const canUpdate = Boolean(row.can_update_owner_codes);
-  const canClear = Boolean(row.can_clear_owner_codes && selected.size > 0);
-
-  if (!canUpdate && !canClear) {
-    return <span className="read-only-note">Owner-code changes blocked</span>;
-  }
-
-  return (
-    <details className="owner-editor-details access-editor-details">
-      <summary className="edit-toggle">{canUpdate ? 'Edit owner codes' : 'Clear owner codes'}</summary>
-      <form action={updateOwnerCodeAssignment} className="editor">
-        {hiddenTargetFields({ companyId, row })}
-        <input type="hidden" name="targetKind" value={row.target_kind} />
-        <h3 className="editor-title">Editing owner codes for {row.email ?? row.display_name ?? row.target_id}</h3>
-        {row.app_admin_contamination ? (
-          <p className="editor-subtitle">FF Admin contamination can only be cleared, not assigned new owner codes.</p>
-        ) : (
-          <p className="editor-subtitle">Assignments must use existing active members or unaccepted pending invites.</p>
-        )}
-        {canUpdate ? (
-          <div className="settings-code-checks">
-            {ownerCodes.map((owner) => (
-              <label key={owner.code}>
-                <input type="checkbox" name="ownerCodes" value={owner.code} defaultChecked={selected.has(owner.code)} />
-                <span>{owner.code}</span>
-                <small>{owner.records ?? 0} records</small>
-              </label>
-            ))}
-          </div>
-        ) : null}
-        <button type="submit" className="save-btn">{canUpdate ? 'Save owner codes' : 'Clear owner codes'}</button>
-      </form>
-    </details>
-  );
+  return named?.display_name ?? null;
 }
 
 export default async function SettingsPage({ searchParams }: SettingsProps) {
@@ -297,13 +191,21 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
     );
   }
 
+  const startOfWeek = new Date();
+  startOfWeek.setHours(0, 0, 0, 0);
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(endOfWeek.getDate() + 7);
+  const startOfWeekDate = startOfWeek.toISOString().slice(0, 10);
+  const endOfWeekDate = endOfWeek.toISOString().slice(0, 10);
+
   const [
     accessRowsResult,
     ownerCodesResult,
     reminderRulesResult,
     recipientsResult,
     vesselsResult,
-    itemsResult
+    itemsResult,
+    itemsDueResult
   ] = await Promise.all([
     supabase.rpc('settings_get_access_rows', { target_company_id: companyId }),
     supabase.rpc('get_queue_owner_codes', { target_company_id: companyId }),
@@ -323,7 +225,15 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
     supabase
       .from('compliance_items')
       .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId),
+    supabase
+      .from('compliance_items')
+      .select('id', { count: 'exact', head: true })
       .eq('company_id', companyId)
+      .gte('expiration_date', startOfWeekDate)
+      .lt('expiration_date', endOfWeekDate)
+      .neq('status', 'complete')
+      .neq('status', 'discontinued')
   ]);
 
   const accessRows = accessRowsResult.error ? [] : ((accessRowsResult.data ?? []) as AccessRow[]);
@@ -338,7 +248,8 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
   const warnings = [
     accessRowsResult.error ? 'Customer access could not be loaded safely. Re-check users before changing owner mappings.' : null,
     ownerCodesResult.error ? 'Owner-code mapping could not be loaded safely.' : null,
-    itemsResult.error ? 'Imported record counts could not be verified.' : null
+    itemsResult.error ? 'Imported record counts could not be verified.' : null,
+    itemsDueResult.error ? 'Items due this week could not be verified.' : null
   ].filter(Boolean) as string[];
 
   const accessByOwnerCode = new Map<string, AccessRow>();
@@ -362,20 +273,49 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
   });
   const mappedOwnerCount = ownerRows.filter((row) => ['Mapped', 'Invite pending'].includes(row.status.label)).length;
   const coverageLabel =
-    ownerCodesResult.error || accessRowsResult.error || itemsResult.error
+    ownerCodesResult.error || accessRowsResult.error
       ? 'Needs verification'
       : `${mappedOwnerCount} of ${ownerRows.length} mapped`;
+  const itemsDueThisWeek = itemsDueResult.count ?? 0;
   const summaryCells = [
     { label: 'Workspace', value: company?.name ?? 'Workspace', small: true },
     { label: 'Timezone', value: formatTimezone(company?.timezone), small: true },
     { label: 'Active vessels', value: vesselsResult.error ? 'Needs verification' : String(vesselsResult.count ?? 0), needsVerification: Boolean(vesselsResult.error) },
     { label: 'Imported records', value: itemsResult.error ? 'Needs verification' : String(itemsResult.count ?? 0), needsVerification: Boolean(itemsResult.error) },
-    { label: 'Owner-code coverage', value: coverageLabel, needsVerification: coverageLabel === 'Needs verification' }
+    { label: 'Items due this week', value: itemsDueResult.error ? 'Needs verification' : String(itemsDueThisWeek), needsVerification: Boolean(itemsDueResult.error) }
   ];
   const appAdminContaminationRows = accessRows.filter((row) => row.app_admin_contamination);
   const missingEmailRows = accessRows.filter((row) => row.target_kind === 'membership' && !row.email);
   const normalAccessRows = sortAccessRows(accessRows.filter((row) => row.email));
   const showFfAdminNote = appAdminContaminationRows.length > 0;
+  const ownerDrawerRows = ownerRows.map(({ owner, target, status }) => ({
+    code: owner.code,
+    records: owner.records ?? 0,
+    ownerDisplayName: owner.display_name,
+    target: target ? {
+      target_kind: target.target_kind,
+      target_id: target.target_id,
+      email: target.email,
+      display_name: target.display_name,
+      role: target.role,
+      owner_codes: target.owner_codes ?? []
+    } : null,
+    status
+  }));
+  const accessDrawerRows = normalAccessRows.map((row) => ({
+    target_kind: row.target_kind,
+    target_id: row.target_id,
+    email: row.email,
+    display_name: row.display_name ?? resolveNameFromOwnerCodes(row, ownerCodes),
+    role: row.role,
+    owner_codes: row.owner_codes ?? [],
+    app_admin_contamination: row.app_admin_contamination,
+    can_update_role: row.can_update_role,
+    can_remove: row.can_remove,
+    can_cancel: row.can_cancel,
+    can_update_owner_codes: row.can_update_owner_codes,
+    can_clear_owner_codes: row.can_clear_owner_codes
+  }));
 
   return (
     <div className="app-shell">
@@ -395,7 +335,7 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
           {summaryCells.map((cell) => (
             <div className={`summary-cell${cell.needsVerification ? ' needs-verification' : ''}`} key={cell.label}>
               <dt>{cell.label}</dt>
-              <dd className={cell.small ? 'small-text' : undefined}>{cell.value}</dd>
+              <dd className={cell.small ? 'text' : undefined}>{cell.value}</dd>
             </div>
           ))}
         </dl>
@@ -414,6 +354,7 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
             <div className="stack-panel-head-text">
               <span className="label">Workbook owner codes</span>
               <h2 id="owner-code-heading">Owner-code assignments</h2>
+              <div className="meta">Click a row to review the mapped person and records.</div>
             </div>
             <span className="head-meta">{coverageLabel}</span>
           </div>
@@ -422,7 +363,7 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
             <p className="ff-admin-note">FF admins can inspect this workspace from the admin console. They are not customer workspace users.</p>
           ) : null}
           {canShowOwnerRows ? (
-            ownerRows.length === 0 ? (
+            ownerDrawerRows.length === 0 ? (
               <p className="panel-empty-copy">No owner initials found.</p>
             ) : (
               <div className="owner-rows" role="list">
@@ -431,39 +372,9 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
                   <span>Records</span>
                   <span>Mapped person · Login email</span>
                   <span>Status</span>
-                  <span>Actions</span>
+                  <span aria-hidden="true"></span>
                 </div>
-                {ownerRows.map(({ owner, target, status }) => (
-                  <article className="owner-row" role="listitem" key={owner.code}>
-                    <div>
-                      <span className="mobile-label">Owner code</span>
-                      <strong className="code">{owner.code}</strong>
-                    </div>
-                    <div className="records">
-                      <span className="mobile-label">Records</span>
-                      <strong>{owner.records ?? 0}</strong>
-                      <small>{owner.display_name ?? 'Workbook owner code'}</small>
-                    </div>
-                    <div className="identity">
-                      <span className="mobile-label">Mapped person · Login email</span>
-                      <span className={`name${target?.display_name || target?.email ? '' : ' empty'}`}>
-                        {target?.display_name ?? target?.email ?? 'No customer user'}
-                      </span>
-                      <span className={`addr${target?.email ? '' : ' empty'}`}>
-                        {target?.email ?? 'Not assigned'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="mobile-label">Status</span>
-                      <span className={`chip ${status.className}`}>{status.label}</span>
-                    </div>
-                    <div className="owner-actions">
-                      <span className="mobile-label">Actions</span>
-                      <Link className="view-records-link" href={`/?owner=${encodeURIComponent(owner.code)}`}>View records</Link>
-                      {status.nextAction ? <small className="editor-next-action">{status.nextAction}</small> : null}
-                    </div>
-                  </article>
-                ))}
+                {ownerDrawerRows.map((row) => <OwnerDrawer key={row.code} row={row} />)}
               </div>
             )
           ) : (
@@ -476,6 +387,7 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
             <div className="stack-panel-head-text">
               <span className="label">People with access</span>
               <h2 id="access-heading">Workspace access</h2>
+              <div className="meta">Click a person to manage their role, owner codes, or remove access.</div>
             </div>
             <button className="save-btn muted" type="button" disabled>Ask FF Admin to add a new user</button>
           </div>
@@ -505,34 +417,19 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
                 <div className="access-rows" role="list">
                   <div className="access-rows-head" aria-hidden="true">
                     <span>Person · Email</span>
-                    <span>Access status</span>
+                    <span>Status</span>
                     <span>Role</span>
                     <span>Owner codes</span>
-                    <span>Actions</span>
+                    <span aria-hidden="true"></span>
                   </div>
-                  {normalAccessRows.map((row) => (
-                    <article className="access-row" role="listitem" key={`${row.target_kind}-${row.target_id}`}>
-                      <div className="identity">
-                        <span className={`name${row.display_name ? '' : ' empty'}`}>
-                          {row.display_name ?? (row.target_kind === 'invitation' ? 'Pending invite' : 'No name')}
-                          {row.app_admin_contamination ? <small>FF Admin warning</small> : null}
-                        </span>
-                        <span className="addr">{row.email}</span>
-                      </div>
-                      <div><span className={`chip ${row.target_kind === 'membership' ? 'active' : 'invite-pending'}`}>{row.target_kind === 'membership' ? 'Active' : 'Invite pending'}</span></div>
-                      <div><RoleEditor companyId={companyId} row={row} actorRole={membership.role} /></div>
-                      <div>
-                        {ownerCodesFor(row).length > 0 ? (
-                          <div className="code-strip">
-                            {ownerCodesFor(row).map((code) => <span key={code} className="code-pill">{code}</span>)}
-                          </div>
-                        ) : (
-                          <span className="code-pill empty">No codes</span>
-                        )}
-                        <OwnerCodeEditor companyId={companyId} row={row} ownerCodes={ownerCodes} />
-                      </div>
-                      <div><AccessActions companyId={companyId} row={row} /></div>
-                    </article>
+                  {accessDrawerRows.map((row) => (
+                    <AccessDrawer
+                      key={`${row.target_kind}-${row.target_id}`}
+                      row={row}
+                      companyId={companyId}
+                      ownerCodes={ownerCodes}
+                      actorRole={membership.role}
+                    />
                   ))}
                 </div>
               )}

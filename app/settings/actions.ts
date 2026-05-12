@@ -38,6 +38,16 @@ function ownerCodes(formData: FormData) {
   ));
 }
 
+function targetKind(formData: FormData) {
+  const value = requiredString(formData, 'targetKind');
+
+  if (value !== 'membership' && value !== 'invitation') {
+    throw new Error('Choose a valid access row.');
+  }
+
+  return value;
+}
+
 function settingsRedirect(message: string) {
   const params = new URLSearchParams();
   params.set('message', message);
@@ -116,4 +126,41 @@ export async function updateOwnerCodeAssignment(formData: FormData) {
   });
 
   settingsRedirect('Owner-code assignments updated.');
+}
+
+export async function updateAccessDrawerSettings(formData: FormData) {
+  const target_company_id = requiredString(formData, 'companyId');
+  const target_kind = targetKind(formData);
+  const target_id = requiredString(formData, 'targetId');
+  const shouldUpdateRole = formData.get('updateRole') === 'true';
+  const shouldUpdateOwnerCodes = formData.get('updateOwnerCodes') === 'true';
+
+  if (shouldUpdateRole) {
+    const next_role = requiredRole(formData, 'role');
+
+    if (target_kind === 'membership') {
+      await callSettingsRpc('settings_update_member_access', {
+        target_company_id,
+        target_membership_id: target_id,
+        next_role
+      });
+    } else {
+      await callSettingsRpc('settings_update_pending_invite_access', {
+        target_company_id,
+        target_invitation_id: target_id,
+        next_role
+      });
+    }
+  }
+
+  if (shouldUpdateOwnerCodes) {
+    await callSettingsRpc('settings_update_owner_code_assignment', {
+      target_company_id,
+      target_kind,
+      target_id,
+      owner_codes: ownerCodes(formData)
+    });
+  }
+
+  settingsRedirect('Access settings updated.');
 }
