@@ -4931,7 +4931,7 @@ svg {
   }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 880px) {
   .settings-setup-page .owner-rows-head {
     display: none;
   }
@@ -7122,6 +7122,35 @@ svg {
 
 .drawer-field-note {
   margin-top: 6px;
+}
+
+.field-link {
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--teal-dark);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.field-link:hover {
+  text-decoration: underline;
+}
+
+.perm-note {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: #1f4775;
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.45;
 }
 
 .drawer-record-link {

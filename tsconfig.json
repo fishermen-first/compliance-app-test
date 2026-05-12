@@ -35,6 +35,9 @@
     ".next/types/**/*.ts"
   ],
   "exclude": [
+    "handoff",
+    "handoff-redesign",
+    "handoff-settings",
     "node_modules",
     "mockup"
   ]

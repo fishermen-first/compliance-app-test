@@ -1101,6 +1101,7 @@ export type Database = {
         Returns: {
           target_kind: string
           target_id: string
+          target_user_id: string | null
           email: string | null
           display_name: string | null
           role: Database["public"]["Enums"]["app_role"]
@@ -1112,6 +1113,9 @@ export type Database = {
           can_cancel: boolean
           can_update_owner_codes: boolean
           can_clear_owner_codes: boolean
+          invited_by_display_name: string | null
+          invited_at: string | null
+          joined_at: string | null
           created_at: string
         }[]
       }

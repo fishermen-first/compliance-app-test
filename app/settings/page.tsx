@@ -29,6 +29,7 @@ type MembershipContextRow = {
 type AccessRow = {
   target_kind: 'membership' | 'invitation';
   target_id: string;
+  target_user_id: string | null;
   email: string | null;
   display_name: string | null;
   role: AppRole;
@@ -40,6 +41,9 @@ type AccessRow = {
   can_cancel: boolean | null;
   can_update_owner_codes: boolean | null;
   can_clear_owner_codes: boolean | null;
+  invited_by_display_name: string | null;
+  invited_at: string | null;
+  joined_at: string | null;
   created_at: string;
 };
 
@@ -133,10 +137,13 @@ function statusForOwner(owner: OwnerCodeRow, target: AccessRow | null, assignmen
 function resolveNameFromOwnerCodes(row: AccessRow, allOwners: OwnerCodeRow[]) {
   const linked = ownerCodesFor(row)
     .map((code) => allOwners.find((owner) => owner.code === code))
-    .filter(Boolean);
+    .filter((owner): owner is OwnerCodeRow => Boolean(owner));
   const named = linked.find((owner) => owner?.display_name);
 
-  return named?.display_name ?? null;
+  return {
+    displayName: named?.display_name ?? null,
+    ownerCode: named?.code ?? null
+  };
 }
 
 export default async function SettingsPage({ searchParams }: SettingsProps) {
@@ -302,20 +309,29 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
     } : null,
     status
   }));
-  const accessDrawerRows = normalAccessRows.map((row) => ({
-    target_kind: row.target_kind,
-    target_id: row.target_id,
-    email: row.email,
-    display_name: row.display_name ?? resolveNameFromOwnerCodes(row, ownerCodes),
-    role: row.role,
-    owner_codes: row.owner_codes ?? [],
-    app_admin_contamination: row.app_admin_contamination,
-    can_update_role: row.can_update_role,
-    can_remove: row.can_remove,
-    can_cancel: row.can_cancel,
-    can_update_owner_codes: row.can_update_owner_codes,
-    can_clear_owner_codes: row.can_clear_owner_codes
-  }));
+  const accessDrawerRows = normalAccessRows.map((row) => {
+    const resolvedName = resolveNameFromOwnerCodes(row, ownerCodes);
+
+    return {
+      target_kind: row.target_kind,
+      target_id: row.target_id,
+      target_user_id: row.target_user_id,
+      email: row.email,
+      display_name: row.display_name ?? resolvedName.displayName,
+      display_name_source_owner_code: row.display_name ? null : resolvedName.ownerCode,
+      role: row.role,
+      owner_codes: row.owner_codes ?? [],
+      app_admin_contamination: row.app_admin_contamination,
+      can_update_role: row.can_update_role,
+      can_remove: row.can_remove,
+      can_cancel: row.can_cancel,
+      can_update_owner_codes: row.can_update_owner_codes,
+      can_clear_owner_codes: row.can_clear_owner_codes,
+      invited_by_display_name: row.invited_by_display_name,
+      invited_at: row.invited_at,
+      joined_at: row.joined_at
+    };
+  });
 
   return (
     <div className="app-shell">
@@ -429,6 +445,7 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
                       companyId={companyId}
                       ownerCodes={ownerCodes}
                       actorRole={membership.role}
+                      viewerId={userData.user.id}
                     />
                   ))}
                 </div>
