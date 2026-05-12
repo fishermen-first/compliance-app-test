@@ -94,11 +94,12 @@ export function AccessDrawer({
   const isSelf = row.target_kind === 'membership' && (row.target_user_id === viewerId || row.target_id === viewerId);
   const name = row.display_name ?? 'No name on file';
   const canUpdateRole = !isSelf && Boolean(row.can_update_role);
+  const canUpdateDisplayName = isSelf && row.target_kind === 'membership';
   const showOwnerCodes = !isSelf && row.role === 'office_user';
   const canUpdateOwnerCodes = showOwnerCodes && Boolean(row.can_update_owner_codes);
   const canClearOwnerCodes = showOwnerCodes && Boolean(row.can_clear_owner_codes);
   const canSubmitOwnerCodes = canUpdateOwnerCodes || canClearOwnerCodes;
-  const canSave = canUpdateRole || canSubmitOwnerCodes;
+  const canSave = canUpdateDisplayName || canUpdateRole || canSubmitOwnerCodes;
   const showDangerZone = !isSelf && Boolean(row.can_cancel || row.can_remove);
   const subline = isInvite
     ? `Pending invite - sent by ${row.invited_by_display_name ?? 'unknown sender'} on ${formatDrawerDate(row.invited_at)}`
@@ -183,6 +184,7 @@ export function AccessDrawer({
               <input type="hidden" name="companyId" value={companyId} />
               <input type="hidden" name="targetKind" value={row.target_kind} />
               <input type="hidden" name="targetId" value={row.target_id} />
+              <input type="hidden" name="updateDisplayName" value={canUpdateDisplayName ? 'true' : 'false'} />
               <input type="hidden" name="updateRole" value={canUpdateRole ? 'true' : 'false'} />
               <input type="hidden" name="updateOwnerCodes" value={canSubmitOwnerCodes ? 'true' : 'false'} />
 
@@ -286,7 +288,7 @@ export function AccessDrawer({
 
               <div className="drawer-foot">
                 <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Cancel</button>
-                {!isSelf ? <button type="submit" className="btn-primary" disabled={!canSave}>Save changes</button> : null}
+                <button type="submit" className="btn-primary" disabled={!canSave}>Save changes</button>
               </div>
             </form>
           </aside>

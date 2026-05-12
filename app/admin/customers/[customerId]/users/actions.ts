@@ -354,7 +354,7 @@ export async function updateUserAccess(input: {
   } else {
     const { data: invitation, error } = await admin
       .from('company_invitations')
-      .select('id, company_id, email, role, accepted_at')
+      .select('id, company_id, email, display_name, role, accepted_at')
       .eq('id', id)
       .maybeSingle();
 
@@ -364,12 +364,14 @@ export async function updateUserAccess(input: {
 
     const previousEmail = invitation.email;
     const nextEmail = input.email === undefined ? invitation.email : await assertCustomerEmail(input.email);
+    const nextName = input.name?.trim() || null;
     if (!nextEmail) throw new Error('Customer email is required.');
 
     await assertNoActiveMembershipInAnotherCompany(admin, input.customerId, nextEmail);
 
-    const update: { email?: string; role?: ReturnType<typeof toAppRole> } = {};
+    const update: { email?: string; display_name?: string | null; role?: ReturnType<typeof toAppRole> } = {};
     if (input.email !== undefined) update.email = nextEmail;
+    if (input.name !== undefined) update.display_name = nextName;
     if (input.role) update.role = toAppRole(input.role);
 
     if (Object.keys(update).length > 0) {

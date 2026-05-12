@@ -132,8 +132,16 @@ export async function updateAccessDrawerSettings(formData: FormData) {
   const target_company_id = requiredString(formData, 'companyId');
   const target_kind = targetKind(formData);
   const target_id = requiredString(formData, 'targetId');
+  const shouldUpdateDisplayName = formData.get('updateDisplayName') === 'true';
   const shouldUpdateRole = formData.get('updateRole') === 'true';
   const shouldUpdateOwnerCodes = formData.get('updateOwnerCodes') === 'true';
+
+  if (shouldUpdateDisplayName) {
+    await callSettingsRpc('settings_update_own_profile', {
+      target_company_id,
+      next_full_name: requiredString(formData, 'displayName')
+    });
+  }
 
   if (shouldUpdateRole) {
     const next_role = requiredRole(formData, 'role');

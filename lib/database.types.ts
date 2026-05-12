@@ -109,6 +109,7 @@ export type Database = {
           accepted_at: string | null
           company_id: string
           created_at: string
+          display_name: string | null
           email: string
           id: string
           invited_by: string | null
@@ -119,6 +120,7 @@ export type Database = {
           accepted_at?: string | null
           company_id: string
           created_at?: string
+          display_name?: string | null
           email: string
           id?: string
           invited_by?: string | null
@@ -129,6 +131,7 @@ export type Database = {
           accepted_at?: string | null
           company_id?: string
           created_at?: string
+          display_name?: string | null
           email?: string
           id?: string
           invited_by?: string | null
@@ -1138,6 +1141,10 @@ export type Database = {
           target_id: string
           owner_codes: string[]
         }
+        Returns: undefined
+      }
+      settings_update_own_profile: {
+        Args: { target_company_id: string; next_full_name: string }
         Returns: undefined
       }
       settings_update_pending_invite_access: {

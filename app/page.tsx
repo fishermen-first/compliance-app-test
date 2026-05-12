@@ -39,7 +39,7 @@ export default async function Home({ searchParams }: HomeProps) {
     .order('created_at', { ascending: true });
 
   if (!memberships || memberships.length === 0) {
-    const { data: acceptedCompanyId, error: acceptError } = await supabase.rpc('accept_company_invite', { full_name: userData.user.email?.split('@')[0] ?? 'User' });
+    const { data: acceptedCompanyId, error: acceptError } = await supabase.rpc('accept_company_invite', {});
 
     if (acceptError?.message.includes('MULTI_COMPANY_MEMBERSHIP_BLOCKED')) {
       return <WorkspaceBlockedScreen email={userData.user.email} />;

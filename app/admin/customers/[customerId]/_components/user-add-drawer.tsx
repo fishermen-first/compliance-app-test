@@ -39,6 +39,11 @@ export function UserAddDrawer({
                 <h3>Identity</h3>
               </div>
               <div className="field">
+                <label htmlFor="add-name">Full name</label>
+                <input id="add-name" name="fullName" type="text" placeholder="Customer user name" />
+                <span className="hint">Optional while staging, but saved for the pending invite if provided.</span>
+              </div>
+              <div className="field">
                 <label htmlFor="add-email">Login email</label>
                 <input id="add-email" name="email" type="email" placeholder="name@customer.com" required />
                 <span className="hint">FF admin emails are rejected for customer access and owner-code mapping.</span>

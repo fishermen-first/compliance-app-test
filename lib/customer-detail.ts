@@ -23,6 +23,7 @@ type MembershipRow = {
 type InvitationRow = {
   id: string;
   email: string | null;
+  display_name: string | null;
   role: AppRole;
   accepted_at: string | null;
   created_at: string;
@@ -246,7 +247,7 @@ export async function getCustomerDetail(customerId: string): Promise<CustomerDet
       .order('created_at', { ascending: true }),
     admin
       .from('company_invitations')
-      .select('id, email, role, accepted_at, created_at, invited_by')
+      .select('id, email, display_name, role, accepted_at, created_at, invited_by')
       .eq('company_id', customerId)
       .order('created_at', { ascending: false }),
     admin
@@ -351,7 +352,7 @@ export async function getCustomerUsers(customerId: string): Promise<CustomerUser
       .order('created_at', { ascending: true }),
     admin
       .from('company_invitations')
-      .select('id, email, role, accepted_at, created_at, invited_by')
+      .select('id, email, display_name, role, accepted_at, created_at, invited_by')
       .eq('company_id', customerId)
       .order('created_at', { ascending: false }),
     admin
@@ -432,7 +433,7 @@ export async function getCustomerUsers(customerId: string): Promise<CustomerUser
         {
           id: `invitation:${invite.id}`,
           kind: 'invitation' as const,
-          name: null,
+          name: invite.display_name ?? null,
           email: invite.email,
           role: toCustomerRole(invite.role),
           codes,

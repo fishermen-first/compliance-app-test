@@ -21,6 +21,11 @@ function requiredString(formData: FormData, name: string) {
   return value;
 }
 
+function optionalString(formData: FormData, name: string) {
+  const value = String(formData.get(name) ?? '').trim();
+  return value || null;
+}
+
 function isExistingAuthUserError(message: string) {
   const normalized = message.toLowerCase();
 
@@ -169,6 +174,7 @@ async function assertNoActiveMembershipInAnotherCompany(
 export async function createInvitation(formData: FormData) {
   const companyId = String(formData.get('companyId') ?? '').trim();
   const email = requiredString(formData, 'email').toLowerCase();
+  const displayName = optionalString(formData, 'fullName') ?? optionalString(formData, 'displayName');
   const role = requiredString(formData, 'role');
   const ownerCodes = parseOwnerCodes(formData);
   const redirectTo = safeRedirectPath(formData.get('redirectTo'));
@@ -235,18 +241,28 @@ export async function createInvitation(formData: FormData) {
     throw error;
   }
 
+  const invitationPayload: {
+    company_id: string;
+    email: string;
+    display_name?: string;
+    role: (typeof companyRoles)[number];
+    invited_by: string;
+    accepted_at: null;
+  } = {
+    company_id: companyId,
+    email,
+    role: role as (typeof companyRoles)[number],
+    invited_by: userData.user.id,
+    accepted_at: null
+  };
+
+  if (displayName) {
+    invitationPayload.display_name = displayName;
+  }
+
   const { error } = await supabaseAdmin
     .from('company_invitations')
-    .upsert(
-      {
-        company_id: companyId,
-        email,
-        role: role as (typeof companyRoles)[number],
-        invited_by: userData.user.id,
-        accepted_at: null
-      },
-      { onConflict: 'company_id,email' }
-    );
+    .upsert(invitationPayload, { onConflict: 'company_id,email' });
 
   if (error) {
     throw new Error(error.message);
