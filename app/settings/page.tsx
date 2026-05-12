@@ -429,8 +429,7 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
                 <div className="owner-rows-head" aria-hidden="true">
                   <span>Owner code</span>
                   <span>Records</span>
-                  <span>Mapped person</span>
-                  <span>Login email</span>
+                  <span>Mapped person · Login email</span>
                   <span>Status</span>
                   <span>Actions</span>
                 </div>
@@ -445,13 +444,14 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
                       <strong>{owner.records ?? 0}</strong>
                       <small>{owner.display_name ?? 'Workbook owner code'}</small>
                     </div>
-                    <div className={`person${target?.display_name || target?.email ? '' : ' empty'}`}>
-                      <span className="mobile-label">Mapped person</span>
-                      {target?.display_name ?? target?.email ?? 'No customer user'}
-                    </div>
-                    <div className={`login${target?.email ? '' : ' empty'}`}>
-                      <span className="mobile-label">Login email</span>
-                      {target?.email ?? 'Not assigned'}
+                    <div className="identity">
+                      <span className="mobile-label">Mapped person · Login email</span>
+                      <span className={`name${target?.display_name || target?.email ? '' : ' empty'}`}>
+                        {target?.display_name ?? target?.email ?? 'No customer user'}
+                      </span>
+                      <span className={`addr${target?.email ? '' : ' empty'}`}>
+                        {target?.email ?? 'Not assigned'}
+                      </span>
                     </div>
                     <div>
                       <span className="mobile-label">Status</span>
@@ -504,8 +504,7 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
               ) : (
                 <div className="access-rows" role="list">
                   <div className="access-rows-head" aria-hidden="true">
-                    <span>Person</span>
-                    <span>Email</span>
+                    <span>Person · Email</span>
                     <span>Access status</span>
                     <span>Role</span>
                     <span>Owner codes</span>
@@ -513,17 +512,23 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
                   </div>
                   {normalAccessRows.map((row) => (
                     <article className="access-row" role="listitem" key={`${row.target_kind}-${row.target_id}`}>
-                      <div className={`person${row.display_name ? '' : ' empty'}`}>
-                        <strong>{row.display_name ?? (row.target_kind === 'invitation' ? 'Pending invite' : 'No name')}</strong>
-                        {row.app_admin_contamination ? <small>FF Admin warning</small> : null}
+                      <div className="identity">
+                        <span className={`name${row.display_name ? '' : ' empty'}`}>
+                          {row.display_name ?? (row.target_kind === 'invitation' ? 'Pending invite' : 'No name')}
+                          {row.app_admin_contamination ? <small>FF Admin warning</small> : null}
+                        </span>
+                        <span className="addr">{row.email}</span>
                       </div>
-                      <div className="email">{row.email}</div>
                       <div><span className={`chip ${row.target_kind === 'membership' ? 'active' : 'invite-pending'}`}>{row.target_kind === 'membership' ? 'Active' : 'Invite pending'}</span></div>
                       <div><RoleEditor companyId={companyId} row={row} actorRole={membership.role} /></div>
                       <div>
-                        <span className={`chip ${ownerCodesFor(row).length > 0 ? 'mapped' : 'unmapped'}`}>
-                          {ownerCodesFor(row).length > 0 ? ownerCodesFor(row).join(', ') : 'No codes'}
-                        </span>
+                        {ownerCodesFor(row).length > 0 ? (
+                          <div className="code-strip">
+                            {ownerCodesFor(row).map((code) => <span key={code} className="code-pill">{code}</span>)}
+                          </div>
+                        ) : (
+                          <span className="code-pill empty">No codes</span>
+                        )}
                         <OwnerCodeEditor companyId={companyId} row={row} ownerCodes={ownerCodes} />
                       </div>
                       <div><AccessActions companyId={companyId} row={row} /></div>

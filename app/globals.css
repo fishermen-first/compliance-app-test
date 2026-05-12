@@ -2799,8 +2799,13 @@ svg {
 .settings-setup-page .owner-rows-head,
 .settings-setup-page .owner-row {
   display: grid;
-  grid-template-columns: minmax(72px, 0.55fr) minmax(62px, 0.4fr) minmax(112px, 1fr) minmax(152px, 1.35fr) minmax(138px, 0.9fr) minmax(170px, auto);
-  gap: 10px;
+  grid-template-columns:
+    minmax(78px, 0.5fr)
+    minmax(70px, 0.35fr)
+    minmax(220px, 1.6fr)
+    minmax(140px, 0.8fr)
+    minmax(180px, auto);
+  gap: 16px;
   align-items: center;
 }
 
@@ -2849,38 +2854,12 @@ svg {
   font-weight: 750;
 }
 
-.settings-setup-page .owner-row .person,
-.settings-setup-page .owner-row .login {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-setup-page .owner-row .person {
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.settings-setup-page .owner-row .login {
-  color: var(--muted);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-
-.settings-setup-page .owner-row .person.empty,
-.settings-setup-page .owner-row .login.empty {
-  color: var(--muted);
-  font-style: italic;
-  font-weight: 650;
-}
-
 .settings-setup-page .owner-actions {
   display: contents;
 }
 
 .settings-setup-page .view-records-link {
-  grid-column: 6;
+  grid-column: 5;
   justify-self: start;
   padding: 6px 10px;
   border-radius: 8px;
@@ -2901,7 +2880,7 @@ svg {
 
 .settings-setup-page .edit-toggle {
   display: inline-flex;
-  grid-column: 6;
+  grid-column: 5;
   justify-self: end;
   align-items: center;
   min-height: 34px;
@@ -2926,7 +2905,7 @@ svg {
 }
 
 .settings-setup-page .read-only-note {
-  grid-column: 6;
+  grid-column: 5;
   justify-self: end;
   color: var(--muted);
   font-size: 12px;
@@ -3121,10 +3100,15 @@ svg {
 .settings-setup-page .access-rows-head,
 .settings-setup-page .access-row {
   display: grid;
-  grid-template-columns: minmax(150px, 1.1fr) minmax(190px, 1.25fr) minmax(118px, max-content) minmax(170px, 1.05fr) minmax(180px, 1.1fr) minmax(132px, max-content);
+  grid-template-columns:
+    minmax(260px, 1.8fr)
+    minmax(118px, max-content)
+    minmax(180px, 1fr)
+    minmax(200px, 1.15fr)
+    minmax(132px, max-content);
   gap: 18px;
   align-items: center;
-  padding: 12px 28px;
+  padding: 14px 28px;
 }
 
 .settings-setup-page .access-rows-head {
@@ -3147,32 +3131,6 @@ svg {
 
 .settings-setup-page .access-row:last-child {
   border-bottom: 0;
-}
-
-.settings-setup-page .access-row .person,
-.settings-setup-page .access-row .email {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-setup-page .access-row .person {
-  font-weight: 900;
-}
-
-.settings-setup-page .access-row .person small {
-  display: block;
-  margin-top: 3px;
-  color: #842a1a;
-  font-size: 11px;
-  font-weight: 850;
-}
-
-.settings-setup-page .access-row .email {
-  color: var(--muted);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
 }
 
 .settings-setup-page .settings-inline-form {
@@ -3312,6 +3270,75 @@ svg {
   color: var(--muted);
   font-weight: 750;
   line-height: 1.5;
+}
+
+.settings-setup-page .identity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-setup-page .identity .name {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.settings-setup-page .identity .name.empty {
+  color: var(--muted);
+  font-style: italic;
+  font-weight: 700;
+}
+
+.settings-setup-page .identity .name small {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--danger-soft);
+  color: #842a1a;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.settings-setup-page .identity .addr {
+  color: var(--muted);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.settings-setup-page .identity .addr.empty {
+  font-style: italic;
+}
+
+.settings-setup-page .code-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.settings-setup-page .code-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--green-soft);
+  color: #0f5547;
+  font-size: 11.5px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.settings-setup-page .code-pill.empty {
+  background: var(--stone-soft);
+  color: #5b554a;
+  font-style: italic;
+  font-weight: 700;
 }
 
 .admin-console {
@@ -4954,17 +4981,22 @@ svg {
     text-transform: uppercase;
   }
 
+  .settings-setup-page .owner-row > .identity {
+    align-items: start;
+  }
+
+  .settings-setup-page .owner-row .identity .mobile-label {
+    grid-row: 1 / span 2;
+  }
+
+  .settings-setup-page .owner-row .identity .name,
+  .settings-setup-page .owner-row .identity .addr {
+    grid-column: 2;
+  }
+
   .settings-setup-page .owner-row .records small {
     display: inline;
     margin-left: 6px;
-  }
-
-  .settings-setup-page .owner-row .person,
-  .settings-setup-page .owner-row .login {
-    overflow: visible;
-    overflow-wrap: anywhere;
-    text-overflow: clip;
-    white-space: normal;
   }
 
   .settings-setup-page .owner-row .chip {
@@ -5134,6 +5166,10 @@ svg {
     text-transform: uppercase;
   }
 
+  .settings-setup-page .owner-actions .mobile-label {
+    display: none;
+  }
+
   .settings-setup-page .owner-row .code {
     font-size: 24px;
   }
@@ -5141,11 +5177,6 @@ svg {
   .settings-setup-page .owner-row .records small {
     display: inline;
     margin-left: 6px;
-  }
-
-  .settings-setup-page .owner-row .person,
-  .settings-setup-page .owner-row .login {
-    white-space: normal;
   }
 
   .settings-setup-page .editor-fields {
@@ -5164,11 +5195,6 @@ svg {
     grid-template-columns: 1fr;
     gap: 6px;
     padding: 16px 20px;
-  }
-
-  .settings-setup-page .access-row .person,
-  .settings-setup-page .access-row .email {
-    white-space: normal;
   }
 
   .settings-setup-page .reminder-metrics > div {
