@@ -178,9 +178,9 @@ async function updateOwnerCodeAssignments(
 
   for (const owner of ownerCodes) {
     const assignedToTarget =
-      owner.user_id === target.userId ||
-      (previousEmail && normalizedEmail(owner.pending_email) === previousEmail) ||
-      (nextEmail && normalizedEmail(owner.pending_email) === nextEmail);
+      Boolean(target.userId && owner.user_id === target.userId) ||
+      Boolean(previousEmail && normalizedEmail(owner.pending_email) === previousEmail) ||
+      Boolean(nextEmail && normalizedEmail(owner.pending_email) === nextEmail);
     const shouldAssign = desiredCodes.has(owner.code);
 
     if (!assignedToTarget && !shouldAssign) continue;
