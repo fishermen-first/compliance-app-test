@@ -4038,7 +4038,27 @@ svg {
 }
 
 .admin-workspace-list-compact article {
-  grid-template-columns: minmax(220px, 0.9fr) minmax(360px, 1.3fr) auto;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-areas:
+    "primary action"
+    "checks action";
+  gap: 12px 18px;
+}
+
+.admin-workspace-list-compact .admin-workspace-primary {
+  grid-area: primary;
+}
+
+.admin-workspace-list-compact .admin-workspace-checks {
+  grid-area: checks;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+}
+
+.admin-workspace-list-compact article > a {
+  grid-area: action;
+  justify-self: end;
 }
 
 .admin-setup-hero {
@@ -4859,6 +4879,17 @@ svg {
 
   .admin-workspace-list article {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-workspace-list-compact article {
+    grid-template-areas:
+      "primary"
+      "checks"
+      "action";
+  }
+
+  .admin-workspace-list-compact article > a {
+    justify-self: start;
   }
 
   .admin-workspace-checks {
