@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { type ReactNode } from 'react';
 import { ArrowRight, CheckCircle2, ShieldAlert, UploadCloud } from 'lucide-react';
-import { importComplianceWorkbook } from '@/app/actions/imports';
+import { applyComplianceWorkbookImport, importComplianceWorkbook } from '@/app/actions/imports';
 import { saveOwnerCodeMapping } from '@/app/actions/owner-codes';
 import { queueCompanyReminders } from '@/app/actions/reminders';
 import { getAdminCustomerWorkspace, type AdminCustomerWorkspace } from '@/lib/admin-customer-workspace';
@@ -191,28 +191,40 @@ function Setup({ workspace }: { workspace: AdminCustomerWorkspace }) {
 function ImportReview({ workspace }: { workspace: AdminCustomerWorkspace }) {
   const { customer, importReview } = workspace;
   const latest = importReview.latestRun;
+  const safeRows = importReview.metrics.safeCreateCount + importReview.metrics.safeUpdateCount;
+  const canApplySafeRows = latest?.mode === 'dry_run' && !latest.applied_run_id && safeRows > 0;
 
   return (
     <>
       <SectionHeader
         eyebrow="Import review"
         title="Make workbook risk visible before anyone logs in"
-        description="Review records, warnings, vessel matching, owner codes, and re-import behavior from the persisted import run."
+        description="Dry run first, review structured issues, then apply only rows that v2 classified as safe."
         action={
-          <form action={importComplianceWorkbook} className="cd-inline-upload">
-            <input type="hidden" name="companyId" value={customer.id} />
-            <label className="cd-file-button">
-              <UploadCloud aria-hidden="true" /> Re-import workbook
-              <input name="workbook" type="file" accept=".xlsx,.xls" required />
-            </label>
-            <button className="cd-button primary" type="submit">Import</button>
-          </form>
+          <div className="cd-import-actions">
+            <form action={importComplianceWorkbook} className="cd-inline-upload">
+              <input type="hidden" name="companyId" value={customer.id} />
+              <label className="cd-file-button">
+                <UploadCloud aria-hidden="true" /> Upload workbook
+                <input name="workbook" type="file" accept=".xlsx,.xls" required />
+              </label>
+              <button className="cd-button primary" type="submit">Dry run</button>
+            </form>
+            {latest?.mode === 'dry_run' ? (
+              <form action={applyComplianceWorkbookImport} className="cd-inline-apply">
+                <input type="hidden" name="companyId" value={customer.id} />
+                <input type="hidden" name="importRunId" value={latest.id} />
+                <button className="cd-button" type="submit" disabled={!canApplySafeRows}>Apply safe rows</button>
+              </form>
+            ) : null}
+          </div>
         }
       />
       <section className="cd-body">
         <div className="cd-metric-grid">
-          <Metric label="Rows imported" value={importReview.metrics.importedRecords} detail={latest ? `From ${latest.sheet_name}` : 'No persisted import run yet'} />
-          <Metric label="Warnings" value={importReview.metrics.warningCount} detail={latest ? 'Persisted from latest import' : 'Re-import to capture warnings'} />
+          <Metric label={latest?.mode === 'dry_run' ? 'Rows parsed' : 'Rows imported'} value={importReview.metrics.importedRecords} detail={latest ? `From ${latest.sheet_name}` : 'No persisted import run yet'} />
+          <Metric label="Safe rows" value={safeRows} detail={`${importReview.metrics.safeCreateCount} create · ${importReview.metrics.safeUpdateCount} update`} />
+          <Metric label="Issues" value={importReview.metrics.issueCount || importReview.issues.length} detail={latest ? `${importReview.metrics.skippedCount} rows held for review` : 'Dry run to classify issues'} />
           <Metric label="Company-wide" value={importReview.metrics.companyWideCount} detail="Items without a vessel assignment" />
           <Metric label="Vessels found" value={importReview.metrics.vesselCount} detail="Active vessels in workspace" />
         </div>
@@ -221,27 +233,34 @@ function ImportReview({ workspace }: { workspace: AdminCustomerWorkspace }) {
           <section className="cd-panel">
             <div className="cd-panel-head">
               <h2>Latest import</h2>
-              <span className={`cd-chip ${latest ? 'ready' : 'attention'}`}>{latest ? formatDate(latest.created_at) : 'No run'}</span>
+              <span className={`cd-chip ${latest ? 'ready' : 'attention'}`}>{latest ? `${latest.mode} · ${latest.status}` : 'No run'}</span>
             </div>
             {latest ? (
               <div className="cd-audit-timeline">
                 <div className="cd-audit-item"><strong>{latest.workbook_name ?? 'Workbook file'}</strong><span>{latest.record_count} records · {latest.owner_code_count} owner codes · {latest.warning_count} warnings</span></div>
-                <div className="cd-audit-item"><strong>Re-import behavior</strong><span>Rows update by company, source sheet, and source row number.</span></div>
+                <div className="cd-audit-item"><strong>Run created</strong><span>{formatDate(latest.created_at)} · {latest.detected_format ?? 'legacy format'} · {latest.parser_version ?? 'legacy parser'}</span></div>
+                <div className="cd-audit-item"><strong>Re-import behavior</strong><span>v2 matches by template key, prior source fingerprint, or conservative natural key. Row number is weak evidence only.</span></div>
               </div>
             ) : (
-              <p className="muted">This workspace has imported data from before import-run persistence. Re-import when ready to capture durable warning history.</p>
+              <p className="muted">This workspace has imported data from before import v2. Upload a workbook to create a dry-run review before any apply.</p>
             )}
           </section>
 
           <section className="cd-panel">
             <div className="cd-panel-head">
-              <h2>Warnings</h2>
-              <span className="cd-chip attention">{importReview.warnings.length}</span>
+              <h2>Structured issues</h2>
+              <span className="cd-chip attention">{importReview.issues.length || importReview.warnings.length}</span>
             </div>
             <div className="cd-list">
-              <div className="cd-row head warning-row"><span>Warning</span><span>Row</span><span>Severity</span></div>
-              {importReview.warnings.length === 0 ? (
-                <div className="cd-row warning-row"><strong>No persisted warnings</strong><span>-</span><span className="cd-chip ready">Clear</span></div>
+              <div className="cd-row head warning-row"><span>Issue</span><span>Row</span><span>Severity</span></div>
+              {importReview.issues.length > 0 ? importReview.issues.map((issue) => (
+                <div className="cd-row warning-row" key={issue.id}>
+                  <strong>{issue.message}</strong>
+                  <span>{issue.source_row_number ?? '-'}</span>
+                  <span className={`cd-chip ${statusChip(issue.severity)}`}>{issue.issue_type}</span>
+                </div>
+              )) : importReview.warnings.length === 0 ? (
+                <div className="cd-row warning-row"><strong>No persisted issues</strong><span>-</span><span className="cd-chip ready">Clear</span></div>
               ) : importReview.warnings.map((warning) => (
                 <div className="cd-row warning-row" key={warning.id}>
                   <strong>{warning.issue}</strong>

@@ -6475,6 +6475,20 @@ svg {
   flex-wrap: wrap;
 }
 
+.cd-import-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cd-inline-apply {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 .cd-file-button {
   position: relative;
   overflow: hidden;
@@ -6614,7 +6628,9 @@ svg {
     grid-template-columns: 1fr;
   }
 
+  .cd-import-actions,
   .cd-inline-upload,
+  .cd-inline-apply,
   .cd-panel-head {
     align-items: flex-start;
     justify-content: flex-start;

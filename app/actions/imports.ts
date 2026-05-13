@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
-import { isCompanyWideVessel, parseComplianceWorkbook } from '@/lib/workbook-import';
+import { parseComplianceWorkbook, WorkbookImportError } from '@/lib/workbook-import';
 
 function requiredString(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? '').trim();
@@ -14,17 +14,6 @@ function requiredString(formData: FormData, name: string) {
 
 function customerImportPath(companyId: string, message: string) {
   return `/admin/customers/${companyId}/import?message=${encodeURIComponent(message)}`;
-}
-
-function customerCodesPath(companyId: string, message: string) {
-  return `/admin/customers/${companyId}/codes?message=${encodeURIComponent(message)}`;
-}
-
-function warningSeverity(issue: string) {
-  const normalized = issue.toLowerCase();
-  if (normalized.includes('skipped')) return 'fix';
-  if (normalized.includes('outlier')) return 'fix';
-  return 'review';
 }
 
 type ImporterUser = {
@@ -85,7 +74,18 @@ export async function importComplianceWorkbook(formData: FormData) {
   }
 
   const buffer = await workbook.arrayBuffer();
-  const { sheetName, records, summary } = await parseComplianceWorkbook(buffer);
+  let parsed: Awaited<ReturnType<typeof parseComplianceWorkbook>>;
+
+  try {
+    parsed = await parseComplianceWorkbook(buffer);
+  } catch (error) {
+    if (error instanceof WorkbookImportError) {
+      redirect(customerImportPath(companyId, error.message));
+    }
+    throw error;
+  }
+
+  const { sheetName, detectedFormat, templateVersion, parserVersion, records, summary } = parsed;
 
   if (records.length === 0) {
     redirect(customerImportPath(companyId, 'No compliance rows were found in the workbook.'));
@@ -103,36 +103,17 @@ export async function importComplianceWorkbook(formData: FormData) {
 
   await ensureImporterProfile(admin, user);
 
-  const vesselNames = Array.from(new Set(records.map((record) => record.vessel).filter((vessel) => !isCompanyWideVessel(vessel)) as string[])).sort();
-  if (vesselNames.length > 0) {
-    const { error } = await admin.from('vessels').upsert(
-      vesselNames.map((name) => ({ company_id: companyId, name, active: true, updated_at: new Date().toISOString() })),
-      { onConflict: 'company_id,name' }
-    );
-    if (error) throw new Error(error.message);
-  }
-
-  const { data: vessels, error: vesselError } = await admin
-    .from('vessels')
-    .select('id, name')
-    .eq('company_id', companyId);
-
-  if (vesselError) throw new Error(vesselError.message);
-
-  const vesselIdByName = new Map((vessels ?? []).map((vessel) => [vessel.name, vessel.id]));
-  const ownerCodes = summary.ownerCodes.map((owner) => owner.code);
-  if (ownerCodes.length > 0) {
-    const { error } = await admin.from('company_owner_codes').upsert(
-      ownerCodes.map((code) => ({ company_id: companyId, code, updated_at: new Date().toISOString() })),
-      { onConflict: 'company_id,code' }
-    );
-    if (error) throw new Error(error.message);
-  }
-
   const importPayload = records.map((record) => ({
-    vesselId: record.vessel && !isCompanyWideVessel(record.vessel) ? vesselIdByName.get(record.vessel) ?? null : null,
+    sourceRowNumber: record.sourceRowNumber,
+    sourceRowJson: record.sourceRowJson,
+    sourceRowHash: record.sourceRowHash,
+    sourceFingerprint: record.sourceFingerprint,
+    templateItemKey: record.templateItemKey,
+    matchCandidate: record.matchCandidate,
     ownerRaw: record.ownerRaw,
     ownerCurrent: record.ownerCurrent,
+    vessel: record.vessel,
+    vesselOrScope: record.vesselOrScope,
     itemName: record.itemName,
     itemNumber: record.itemNumber,
     agencyType: record.agencyType,
@@ -144,81 +125,30 @@ export async function importComplianceWorkbook(formData: FormData) {
     expirationDate: record.expirationDate,
     status: record.status,
     statusNotes: record.statusNotes,
-    instructions: record.instructions,
-    sourceRowNumber: record.sourceRowNumber
+    instructions: record.instructions
   }));
 
-  const { error: importError } = await admin.rpc('import_compliance_workbook_records', {
+  const { data: importRunId, error: importError } = await admin.rpc('dry_run_compliance_workbook_import', {
     target_company_id: companyId,
     target_sheet: sheetName,
-    records: importPayload
+    workbook_name: workbook.name || null,
+    detected_format: detectedFormat,
+    template_version: templateVersion,
+    parser_version: parserVersion,
+    records: importPayload,
+    parse_summary: summary,
+    imported_by: user.id
   });
 
   if (importError) throw new Error(importError.message);
 
-  const { data: importedItems, error: importedItemsError } = await admin
-    .from('compliance_items')
-    .select('id, company_id')
-    .eq('company_id', companyId)
-    .eq('source_sheet', sheetName)
-    .not('source_row_number', 'is', null);
-
-  if (importedItemsError) throw new Error(importedItemsError.message);
-
-  const reminderRows = (importedItems ?? []).flatMap((item) => [
-    {
-      item_id: item.id,
-      company_id: companyId,
-      label: 'Start working reminder',
-      trigger_type: 'on_start_date'
-    },
-    {
-      item_id: item.id,
-      company_id: companyId,
-      label: '14 days before expiration',
-      trigger_type: 'days_before_expiration',
-      days_before: 14
-    }
-  ]);
-
-  for (let index = 0; index < reminderRows.length; index += 100) {
-    const { error } = await admin
-      .from('compliance_item_reminder_rules')
-      .upsert(reminderRows.slice(index, index + 100), { onConflict: 'item_id,label,trigger_type' });
-    if (error) throw new Error(error.message);
-  }
-
   const { data: importRun, error: importRunError } = await admin
     .from('company_import_runs')
-    .insert({
-      company_id: companyId,
-      sheet_name: sheetName,
-      workbook_name: workbook.name || null,
-      record_count: summary.recordCount,
-      vessel_count: summary.vesselCount,
-      owner_code_count: summary.ownerCodes.length,
-      warning_count: summary.warnings.length,
-      imported_by: user.id
-    })
-    .select('id')
+    .select('id, record_count, issue_count, safe_create_count, safe_update_count, skipped_count')
+    .eq('id', importRunId)
     .single();
 
   if (importRunError) throw new Error(importRunError.message);
-
-  if (summary.warnings.length > 0) {
-    const { error: warningsError } = await admin.from('company_import_warnings').insert(
-      summary.warnings.map((warning) => ({
-        import_run_id: importRun.id,
-        company_id: companyId,
-        row_number: warning.row,
-        issue: warning.issue,
-        value: warning.value ?? null,
-        severity: warningSeverity(warning.issue)
-      }))
-    );
-
-    if (warningsError) throw new Error(warningsError.message);
-  }
 
   revalidatePath('/admin');
   revalidatePath(`/admin/companies/${companyId}`);
@@ -227,6 +157,43 @@ export async function importComplianceWorkbook(formData: FormData) {
   revalidatePath(`/admin/customers/${companyId}/import`);
   revalidatePath(`/admin/customers/${companyId}/codes`);
 
-  const warningCopy = summary.warnings.length > 0 ? ` ${summary.warnings.length} import warnings need review.` : '';
-  redirect(customerCodesPath(companyId, `Imported ${summary.recordCount} items, ${summary.vesselCount} vessels, and ${summary.ownerCodes.length} owner codes.${warningCopy}`));
+  const safeCount = importRun.safe_create_count + importRun.safe_update_count;
+  const issueCopy = importRun.issue_count > 0 ? ` ${importRun.issue_count} issues need review.` : '';
+  redirect(customerImportPath(companyId, `Dry run complete: ${importRun.record_count} rows parsed, ${safeCount} safe to apply.${issueCopy}`));
+}
+
+export async function applyComplianceWorkbookImport(formData: FormData) {
+  const companyId = requiredString(formData, 'companyId');
+  const importRunId = requiredString(formData, 'importRunId');
+  const user = await requireAppAdmin();
+  const admin = createAdminClient();
+
+  await ensureImporterProfile(admin, user);
+
+  const { data: applyRunId, error: applyError } = await admin.rpc('apply_compliance_workbook_import', {
+    target_import_run_id: importRunId,
+    approved_issue_ids: [],
+    applied_by: user.id
+  });
+
+  if (applyError) throw new Error(applyError.message);
+
+  const { data: applyRun, error: applyRunError } = await admin
+    .from('company_import_runs')
+    .select('safe_create_count, safe_update_count, skipped_count')
+    .eq('id', applyRunId)
+    .eq('company_id', companyId)
+    .single();
+
+  if (applyRunError) throw new Error(applyRunError.message);
+
+  revalidatePath('/admin');
+  revalidatePath(`/admin/companies/${companyId}`);
+  revalidatePath(`/admin/customers/${companyId}`);
+  revalidatePath(`/admin/customers/${companyId}/overview`);
+  revalidatePath(`/admin/customers/${companyId}/import`);
+  revalidatePath(`/admin/customers/${companyId}/codes`);
+
+  const skippedCopy = applyRun.skipped_count > 0 ? ` ${applyRun.skipped_count} rows were left unchanged for review.` : '';
+  redirect(customerImportPath(companyId, `Applied ${applyRun.safe_create_count} new rows and ${applyRun.safe_update_count} source updates.${skippedCopy}`));
 }

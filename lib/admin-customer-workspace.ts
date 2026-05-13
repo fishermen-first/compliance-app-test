@@ -56,6 +56,18 @@ type ImportRunRow = {
   vessel_count: number;
   owner_code_count: number;
   warning_count: number;
+  issue_count: number;
+  safe_create_count: number;
+  safe_update_count: number;
+  skipped_count: number;
+  mode: string;
+  status: string;
+  detected_format: string | null;
+  template_version: string | null;
+  parser_version: string | null;
+  applied_from_run_id: string | null;
+  applied_run_id: string | null;
+  applied_at: string | null;
   imported_by: string | null;
   created_at: string;
 };
@@ -66,6 +78,15 @@ type ImportWarningRow = {
   issue: string;
   value: string | null;
   severity: string;
+};
+
+type ImportIssueRow = {
+  id: string;
+  source_row_number: number | null;
+  issue_type: string;
+  severity: string;
+  message: string;
+  status: string;
 };
 
 type ReminderLogRow = {
@@ -142,9 +163,14 @@ export type AdminCustomerWorkspace = {
   importReview: {
     latestRun: ImportRunRow | null;
     warnings: ImportWarningRow[];
+    issues: ImportIssueRow[];
     metrics: {
       importedRecords: number;
       warningCount: number;
+      issueCount: number;
+      safeCreateCount: number;
+      safeUpdateCount: number;
+      skippedCount: number;
       companyWideCount: number;
       vesselCount: number;
       manualRecurrenceCount: number;
@@ -422,7 +448,7 @@ export async function getAdminCustomerWorkspace(customerId: string): Promise<Adm
       .order('code'),
     admin
       .from('company_import_runs')
-      .select('id, sheet_name, workbook_name, record_count, vessel_count, owner_code_count, warning_count, imported_by, created_at')
+      .select('id, sheet_name, workbook_name, record_count, vessel_count, owner_code_count, warning_count, issue_count, safe_create_count, safe_update_count, skipped_count, mode, status, detected_format, template_version, parser_version, applied_from_run_id, applied_run_id, applied_at, imported_by, created_at')
       .eq('company_id', customerId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -472,6 +498,9 @@ export async function getAdminCustomerWorkspace(customerId: string): Promise<Adm
   const items = (itemsResult.data ?? []) as ItemRow[];
   const ownerCodes = (ownerCodesResult.data ?? []) as unknown as OwnerCodeRow[];
   const latestRun = (latestImportResult.data ?? null) as ImportRunRow | null;
+  const issueRunId = latestRun?.mode === 'apply'
+    ? latestRun.applied_from_run_id ?? latestRun.id
+    : latestRun?.id ?? null;
   const warningsResult = latestRun
     ? await admin
         .from('company_import_warnings')
@@ -480,8 +509,17 @@ export async function getAdminCustomerWorkspace(customerId: string): Promise<Adm
         .order('row_number', { ascending: true, nullsFirst: false })
         .limit(50)
     : { data: [], error: null };
+  const issuesResult = issueRunId
+    ? await admin
+        .from('compliance_import_issues')
+        .select('id, source_row_number, issue_type, severity, message, status')
+        .eq('import_run_id', issueRunId)
+        .order('source_row_number', { ascending: true, nullsFirst: false })
+        .limit(75)
+    : { data: [], error: null };
 
   if (warningsResult.error) throw new Error(warningsResult.error.message);
+  if (issuesResult.error) throw new Error(issuesResult.error.message);
 
   const ownerCounts = itemCountsByOwner(items);
   const appAdminEmails = classification.appAdminEmails;
@@ -563,9 +601,14 @@ export async function getAdminCustomerWorkspace(customerId: string): Promise<Adm
     importReview: {
       latestRun,
       warnings: (warningsResult.data ?? []) as ImportWarningRow[],
+      issues: (issuesResult.data ?? []) as ImportIssueRow[],
       metrics: {
         importedRecords: latestRun?.record_count ?? customer.itemCount,
         warningCount: latestRun?.warning_count ?? 0,
+        issueCount: latestRun?.issue_count ?? 0,
+        safeCreateCount: latestRun?.safe_create_count ?? 0,
+        safeUpdateCount: latestRun?.safe_update_count ?? 0,
+        skippedCount: latestRun?.skipped_count ?? 0,
         companyWideCount: items.filter((item) => !item.vessel_id).length,
         vesselCount: customer.vesselCount,
         manualRecurrenceCount: items.filter((item) => item.recurrence_unit === 'manual' || item.recurrence_unit === 'none').length,

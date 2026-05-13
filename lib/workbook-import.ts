@@ -1,14 +1,28 @@
+import { createHash } from 'crypto';
 import readXlsxFile from 'read-excel-file/node';
 import type { Database } from '@/lib/database.types';
 
 type ComplianceItemStatus = Database['public']['Enums']['compliance_item_status'];
 type RecurrenceUnit = Database['public']['Enums']['recurrence_unit'];
+type DetectedWorkbookFormat = 'legacy_due_dates' | 'ff_template_v1';
 
 export type ImportedComplianceRecord = {
   sourceRowNumber: number;
+  sourceRowJson: Record<string, string | null>;
+  sourceRowHash: string;
+  sourceFingerprint: string;
+  templateItemKey: string | null;
+  matchCandidate: {
+    itemName: string | null;
+    vesselOrScope: string | null;
+    ownerCode: string | null;
+    itemNumber: string | null;
+    agencyType: string | null;
+  };
   ownerRaw: string | null;
   ownerCurrent: string | null;
   vessel: string | null;
+  vesselOrScope: string | null;
   itemName: string;
   itemNumber: string | null;
   agencyType: string | null;
@@ -25,13 +39,25 @@ export type ImportedComplianceRecord = {
 
 export type WorkbookImportSummary = {
   sheet: string;
+  detectedFormat: DetectedWorkbookFormat;
+  templateVersion: string | null;
+  parserVersion: string;
   recordCount: number;
   vesselCount: number;
   ownerCodes: Array<{ code: string; count: number }>;
   warnings: Array<{ row: number; issue: string; value?: string | null }>;
 };
 
-const headers = [
+export class WorkbookImportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'WorkbookImportError';
+  }
+}
+
+const parserVersion = 'import-v2-phase1-2026-05-13';
+
+const legacyHeaders = [
   'ownerRaw',
   'vessel',
   'itemName',
@@ -43,6 +69,35 @@ const headers = [
   'statusRaw',
   'statusNotes',
   'instructions'
+] as const;
+
+const legacyHeaderLabels = [
+  'Owner',
+  'Vessel',
+  'Item',
+  'Item Number',
+  'Agency/Type',
+  'Frequency Due',
+  'Current Expiration',
+  'Start Working On',
+  'Status',
+  'Status Notes',
+  'Information'
+] as const;
+
+const templateRequiredColumns = [
+  'template_item_key',
+  'owner_code',
+  'vessel_or_scope',
+  'item_name',
+  'item_number',
+  'regulatory_party',
+  'compliance_domain',
+  'obligation_type',
+  'applicability_scope',
+  'frequency',
+  'start_working_on',
+  'due_or_expiration_date'
 ] as const;
 
 const companyWideNames = new Set(['asmg', 'ashco', 'company', 'office', '']);
@@ -61,6 +116,74 @@ function clean(value: unknown) {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   const text = String(value).trim();
   return text || null;
+}
+
+function normalizeHeaderLabel(value: unknown) {
+  return (clean(value) ?? '')
+    .toLowerCase()
+    .replace(/[\s/-]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+function normalizeMatchValue(value: string | null) {
+  const normalized = (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return normalized || null;
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((entry) => stableStringify(entry)).join(',')}]`;
+  return `{${Object.entries(value as Record<string, unknown>)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
+    .join(',')}}`;
+}
+
+function sha256(value: unknown) {
+  return createHash('sha256').update(stableStringify(value)).digest('hex');
+}
+
+function templateColumnMap(row: unknown[]) {
+  const entries = row.map((cell, index) => [normalizeHeaderLabel(cell), index] as const).filter(([label]) => Boolean(label));
+  return new Map(entries);
+}
+
+function isTemplateHeader(row: unknown[]) {
+  const columns = templateColumnMap(row);
+  return templateRequiredColumns.every((column) => columns.has(column));
+}
+
+function isLegacyHeader(row: unknown[]) {
+  const normalized = row.map(normalizeHeaderLabel);
+  return normalized.includes('vessel') && normalized.includes('item');
+}
+
+function assertLegacyHeaderOrder(row: unknown[]) {
+  const actual = row.slice(0, legacyHeaderLabels.length).map(normalizeHeaderLabel);
+  const expected = legacyHeaderLabels.map(normalizeHeaderLabel);
+  const mismatchIndex = expected.findIndex((label, index) => actual[index] !== label);
+
+  if (mismatchIndex !== -1) {
+    throw new WorkbookImportError(
+      `Legacy workbook columns are reordered near "${legacyHeaderLabels[mismatchIndex]}". Use the original Due Dates column order or the FF template before importing.`
+    );
+  }
+}
+
+function rowJsonFromKeys(keys: readonly string[], values: unknown[]) {
+  return Object.fromEntries(keys.map((key, index) => [key, clean(values[index] ?? null)]));
+}
+
+function sourceFingerprint(candidate: ImportedComplianceRecord['matchCandidate']) {
+  return sha256({
+    itemName: candidate.itemName,
+    vesselOrScope: candidate.vesselOrScope,
+    ownerCode: candidate.ownerCode,
+    itemNumber: candidate.itemNumber,
+    agencyType: candidate.agencyType
+  });
 }
 
 function excelDateToIso(value: unknown) {
@@ -141,6 +264,9 @@ export function isCompanyWideVessel(value: string | null) {
 
 export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
   sheetName: string;
+  detectedFormat: DetectedWorkbookFormat;
+  templateVersion: string | null;
+  parserVersion: string;
   records: ImportedComplianceRecord[];
   summary: WorkbookImportSummary;
 }> {
@@ -157,13 +283,86 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
   const rows = sheet?.data ?? [];
   const warnings: WorkbookImportSummary['warnings'] = [];
   const records: ImportedComplianceRecord[] = [];
+  const templateHeaderIndex = rows.findIndex((row) => isTemplateHeader(row));
+  const legacyHeaderIndex = rows.findIndex((row) => isLegacyHeader(row));
+  const detectedFormat: DetectedWorkbookFormat = templateHeaderIndex !== -1 ? 'ff_template_v1' : 'legacy_due_dates';
+  const templateVersion = detectedFormat === 'ff_template_v1' ? 'FF Compliance Import Template v1' : null;
 
-  rows.slice(1).forEach((row, index) => {
-    const rowNumber = index + 2;
-    const values = headers.map((_, valueIndex) => row[valueIndex] ?? null);
+  if (detectedFormat === 'legacy_due_dates') {
+    if (legacyHeaderIndex === -1) {
+      throw new WorkbookImportError('No recognizable Due Dates header row was found.');
+    }
+    assertLegacyHeaderOrder(rows[legacyHeaderIndex]);
+  }
+
+  if (detectedFormat === 'ff_template_v1') {
+    const headerRow = rows[templateHeaderIndex];
+    const columns = templateColumnMap(headerRow);
+
+    rows.slice(templateHeaderIndex + 1).forEach((row, index) => {
+      const rowNumber = templateHeaderIndex + index + 2;
+      const valueFor = (column: string) => row[columns.get(column) ?? -1] ?? null;
+      const sourceRowJson = Object.fromEntries(
+        Array.from(columns.entries())
+          .filter(([column]) => column.length > 0)
+          .map(([column, columnIndex]) => [column, clean(row[columnIndex] ?? null)])
+      ) as Record<string, string | null>;
+
+      if (!Object.values(sourceRowJson).some(Boolean)) return;
+
+      const itemName = clean(valueFor('item_name'));
+      if (!itemName) {
+        warnings.push({ row: rowNumber, issue: 'Skipped row with no item name' });
+        return;
+      }
+
+      const ownerRaw = clean(valueFor('owner_code'));
+      const vesselOrScope = clean(valueFor('vessel_or_scope'));
+      const agencyType = clean(valueFor('regulatory_party'));
+      const frequencyLabel = clean(valueFor('frequency'));
+      const recurrence = inferRecurrence(frequencyLabel);
+      const itemNumber = clean(valueFor('item_number'));
+      const matchCandidate = {
+        itemName: normalizeMatchValue(itemName),
+        vesselOrScope: normalizeMatchValue(vesselOrScope),
+        ownerCode: normalizeMatchValue(ownerRaw),
+        itemNumber: normalizeMatchValue(itemNumber),
+        agencyType: normalizeMatchValue(agencyType)
+      };
+
+      records.push({
+        sourceRowNumber: rowNumber,
+        sourceRowJson,
+        sourceRowHash: sha256(sourceRowJson),
+        sourceFingerprint: sourceFingerprint(matchCandidate),
+        templateItemKey: clean(valueFor('template_item_key')),
+        matchCandidate,
+        ownerRaw,
+        ownerCurrent: parseOwnerCurrent(ownerRaw),
+        vessel: vesselOrScope,
+        vesselOrScope,
+        itemName,
+        itemNumber,
+        agencyType,
+        complianceArea: clean(valueFor('compliance_domain')) ?? inferArea(agencyType, itemName),
+        frequencyLabel,
+        recurrenceUnit: recurrence.unit,
+        recurrenceInterval: recurrence.interval,
+        expirationDate: importDate(valueFor('due_or_expiration_date'), rowNumber, 'due or expiration date', warnings),
+        startWorkingOn: importDate(valueFor('start_working_on'), rowNumber, 'start working date', warnings),
+        status: 'not_started',
+        statusNotes: clean(valueFor('status_notes')),
+        instructions: clean(valueFor('instructions'))
+      });
+    });
+  } else {
+    rows.slice(legacyHeaderIndex + 1).forEach((row, index) => {
+    const rowNumber = legacyHeaderIndex + index + 2;
+    const values = legacyHeaders.map((_, valueIndex) => row[valueIndex] ?? null);
     if (!values.some((value) => clean(value))) return;
 
-    const raw = Object.fromEntries(headers.map((header, headerIndex) => [header, values[headerIndex]]));
+    const raw = Object.fromEntries(legacyHeaders.map((header, headerIndex) => [header, values[headerIndex]]));
+    const sourceRowJson = rowJsonFromKeys(legacyHeaders, values);
     const itemName = clean(raw.itemName);
     if (!itemName) {
       warnings.push({ row: rowNumber, issue: 'Skipped row with no item name' });
@@ -174,14 +373,29 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
     const recurrence = inferRecurrence(frequencyLabel);
     const ownerRaw = clean(raw.ownerRaw);
     const agencyType = clean(raw.agencyType);
+    const vessel = clean(raw.vessel);
+    const itemNumber = clean(raw.itemNumber);
+    const matchCandidate = {
+      itemName: normalizeMatchValue(itemName),
+      vesselOrScope: normalizeMatchValue(vessel),
+      ownerCode: normalizeMatchValue(ownerRaw),
+      itemNumber: normalizeMatchValue(itemNumber),
+      agencyType: normalizeMatchValue(agencyType)
+    };
 
     records.push({
       sourceRowNumber: rowNumber,
+      sourceRowJson,
+      sourceRowHash: sha256(sourceRowJson),
+      sourceFingerprint: sourceFingerprint(matchCandidate),
+      templateItemKey: null,
+      matchCandidate,
       ownerRaw,
       ownerCurrent: parseOwnerCurrent(ownerRaw),
-      vessel: clean(raw.vessel),
+      vessel,
+      vesselOrScope: vessel,
       itemName,
-      itemNumber: clean(raw.itemNumber),
+      itemNumber,
       agencyType,
       complianceArea: inferArea(agencyType, itemName),
       frequencyLabel,
@@ -194,6 +408,7 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
       instructions: clean(raw.instructions)
     });
   });
+  }
 
   const vesselNames = new Set(records.map((record) => record.vessel).filter((vessel) => !isCompanyWideVessel(vessel)));
   const ownerCounts = new Map<string, number>();
@@ -204,9 +419,15 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
 
   return {
     sheetName,
+    detectedFormat,
+    templateVersion,
+    parserVersion,
     records,
     summary: {
       sheet: sheetName,
+      detectedFormat,
+      templateVersion,
+      parserVersion,
       recordCount: records.length,
       vesselCount: vesselNames.size,
       ownerCodes: Array.from(ownerCounts.entries())
