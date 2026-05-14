@@ -14,7 +14,7 @@ export default async function VesselSetupPage() {
     .from('company_memberships')
     .select('role')
     .eq('user_id', userData.user.id)
-    .in('role', ['owner', 'office_admin'])
+    .eq('role', 'owner')
     .limit(1)
     .maybeSingle();
 

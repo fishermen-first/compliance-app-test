@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 
 type AppRole = Database['public']['Enums']['app_role'];
 
-const roleValues = new Set<AppRole>(['owner', 'office_admin', 'office_user', 'vessel_user']);
+const roleValues = new Set<AppRole>(['owner', 'office_user']);
 
 function requiredString(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? '').trim();

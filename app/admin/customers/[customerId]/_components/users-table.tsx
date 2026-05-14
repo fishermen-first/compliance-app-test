@@ -17,9 +17,9 @@ const statusLabel: Record<CustomerUser['status'], string> = {
 
 const roleLabel: Record<CustomerRole, string> = {
   owner: 'Owner',
-  office_admin: 'Customer Admin',
+  office_admin: 'Legacy Admin',
   office_user: 'Office User',
-  vessel_user: 'Vessel User'
+  vessel_user: 'Legacy User'
 };
 
 type SortKey = 'name' | 'email' | 'role' | 'status' | 'lastLoginAt';

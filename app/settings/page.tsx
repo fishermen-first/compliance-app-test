@@ -5,7 +5,7 @@ import { NoAccessScreen } from '@/components/no-access-screen';
 import { OwnerDrawer } from '@/components/owner-drawer';
 import { WorkspaceBlockedScreen } from '@/components/workspace-blocked-screen';
 import { type Database } from '@/lib/database.types';
-import { accessRoleLabel } from '@/lib/roles';
+import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
 type AppRole = Database['public']['Enums']['app_role'];
@@ -180,7 +180,7 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
   const company = relation(membership.companies);
   const companyId = membership.company_id;
 
-  if (!['owner', 'office_admin'].includes(membership.role)) {
+  if (!isCustomerOwnerRole(membership.role)) {
     return (
       <div className="app-shell">
         <AppSidebar
@@ -190,7 +190,7 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
         />
         <main className="settings-setup-page">
           <section className="degraded-block">
-            <strong>Customer admin access required.</strong>
+            <strong>Workspace owner access required.</strong>
             <p>Ask a workspace owner or FF Admin to review access settings.</p>
           </section>
         </main>
@@ -444,7 +444,6 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
                       row={row}
                       companyId={companyId}
                       ownerCodes={ownerCodes}
-                      actorRole={membership.role}
                       viewerId={userData.user.id}
                     />
                   ))}

@@ -30,7 +30,7 @@ export default async function NewItemPage() {
     .limit(1)
     .maybeSingle();
 
-  if (!membership || !['owner', 'office_admin', 'office_user'].includes(membership.role)) redirect('/');
+  if (!membership || membership.role !== 'owner') redirect('/');
 
   const { data: vessels } = await supabase
     .from('vessels')

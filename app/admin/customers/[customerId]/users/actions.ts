@@ -39,6 +39,14 @@ function assertValidEmail(email: string) {
   return normalized;
 }
 
+function assertActiveCustomerRole(role: CustomerRole) {
+  if (role !== 'owner' && role !== 'office_user') {
+    throw new Error('Choose an active customer role.');
+  }
+
+  return role;
+}
+
 type AuthUser = {
   id: string;
   email?: string | null;
@@ -306,7 +314,7 @@ export async function updateUserAccess(input: {
     if (input.role) {
       const { error: roleError } = await admin
         .from('company_memberships')
-        .update({ role: toAppRole(input.role) })
+        .update({ role: toAppRole(assertActiveCustomerRole(input.role)) })
         .eq('id', membership.id);
 
       if (roleError) throw new Error(roleError.message);
@@ -372,7 +380,7 @@ export async function updateUserAccess(input: {
     const update: { email?: string; display_name?: string | null; role?: ReturnType<typeof toAppRole> } = {};
     if (input.email !== undefined) update.email = nextEmail;
     if (input.name !== undefined) update.display_name = nextName;
-    if (input.role) update.role = toAppRole(input.role);
+    if (input.role) update.role = toAppRole(assertActiveCustomerRole(input.role));
 
     if (Object.keys(update).length > 0) {
       const { error: updateError } = await admin.from('company_invitations').update(update).eq('id', invitation.id);

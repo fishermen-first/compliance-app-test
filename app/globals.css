@@ -1860,7 +1860,7 @@ svg {
 }
 
 .all-items-table .work-table-row {
-  grid-template-columns: 62px minmax(118px, 145px) minmax(250px, 1.4fr) minmax(80px, 0.45fr) minmax(130px, 0.75fr) minmax(105px, 0.6fr) minmax(112px, 0.65fr) minmax(112px, 0.65fr) minmax(112px, 0.65fr);
+  grid-template-columns: var(--item-grid-template, 62px minmax(118px, 145px) minmax(250px, 1.4fr) minmax(80px, 0.45fr) minmax(130px, 0.75fr) minmax(105px, 0.6fr) minmax(112px, 0.65fr) minmax(112px, 0.65fr) minmax(112px, 0.65fr));
 }
 
 .reminder-table .work-table-row {
@@ -1890,6 +1890,10 @@ svg {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.item-cell {
+  display: block;
 }
 
 .queue-table-row strong {
@@ -4665,6 +4669,24 @@ svg {
   gap: 14px;
 }
 
+.item-core-editor {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 24px;
+}
+
+.item-core-editor > div,
+.item-core-editor .wide-field,
+.item-core-editor button {
+  grid-column: 1 / -1;
+}
+
+.form-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .status-form label {
   display: grid;
   gap: 8px;
@@ -4811,6 +4833,7 @@ svg {
   .detail-grid,
   .detail-two-col,
   .workflow-steps,
+  .item-core-editor,
   .reminder-rule-grid,
   .recipient-editor-row,
   .customer-summary-grid,

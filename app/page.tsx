@@ -4,7 +4,7 @@ import { Dashboard, type DashboardFilters } from '@/components/dashboard';
 import { NoAccessScreen } from '@/components/no-access-screen';
 import { WorkspaceBlockedScreen } from '@/components/workspace-blocked-screen';
 import { getCompanyOwnerCodes, getCustomerItems } from '@/lib/customer-data';
-import { accessRoleLabel } from '@/lib/roles';
+import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
 type HomeProps = {
@@ -72,7 +72,7 @@ export default async function Home({ searchParams }: HomeProps) {
   const currentUserName = profile?.full_name ?? userData.user.email ?? 'User';
   const requestedOwner = searchParams?.owner;
   const mappedOwnerCodes = ownerCodes.filter((owner) => owner.is_assigned_to_current_user).map((owner) => owner.code);
-  const isCustomerAdmin = ['owner', 'office_admin'].includes(membership.role);
+  const isCustomerOwner = isCustomerOwnerRole(membership.role);
   const requestedOwnerCode = requestedOwner && requestedOwner !== 'all' ? decodeURIComponent(requestedOwner) : null;
   const validOwnerCodes = new Set([
     ...ownerCodes.map((owner) => owner.code),
@@ -81,21 +81,21 @@ export default async function Home({ searchParams }: HomeProps) {
   const requestedOwnerAllowed = Boolean(
     requestedOwnerCode
     && validOwnerCodes.has(requestedOwnerCode)
-    && (isCustomerAdmin || mappedOwnerCodes.includes(requestedOwnerCode))
+    && (isCustomerOwner || mappedOwnerCodes.includes(requestedOwnerCode))
   );
-  const showAllOwners = isCustomerAdmin && (requestedOwner === 'all' || (!requestedOwner && mappedOwnerCodes.length === 0));
+  const showAllOwners = isCustomerOwner && (requestedOwner === 'all' || (!requestedOwner && mappedOwnerCodes.length === 0));
   const selectedOwnerCodes = requestedOwnerAllowed && requestedOwnerCode
     ? [requestedOwnerCode]
     : showAllOwners
       ? []
       : mappedOwnerCodes;
-  const canCreateItems = isCustomerAdmin || mappedOwnerCodes.length > 0;
-  const validOwnerFilter = requestedOwner === 'all' && isCustomerAdmin
+  const canCreateItems = isCustomerOwner;
+  const validOwnerFilter = requestedOwner === 'all' && isCustomerOwner
     ? 'all'
     : requestedOwnerAllowed && requestedOwnerCode
       ? requestedOwnerCode
       : undefined;
-  const ownerFilterCodes = isCustomerAdmin
+  const ownerFilterCodes = isCustomerOwner
     ? Array.from(validOwnerCodes).sort((a, b) => a.localeCompare(b))
     : mappedOwnerCodes;
   const filters: DashboardFilters = {

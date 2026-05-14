@@ -58,9 +58,7 @@ export function UserAddDrawer({
                 <label htmlFor="add-role">Workspace role</label>
                 <select id="add-role" name="role" defaultValue="office_user">
                   <option value="owner">owner - workspace owner</option>
-                  <option value="office_admin">office_admin - customer admin</option>
                   <option value="office_user">office_user - edit assigned work</option>
-                  <option value="vessel_user">vessel_user - view assigned work</option>
                 </select>
               </div>
             </div>

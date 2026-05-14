@@ -23,21 +23,25 @@ export default async function RemindersPage() {
 
   if (!membership) redirect('/');
 
+  const canManageReminders = membership.role === 'owner';
   const [{ data: company }, { data: logs }, { data: rules }, { data: isAppAdmin }] = await Promise.all([
     supabase.from('companies').select('name').eq('id', membership.company_id).single(),
-    supabase
-      .from('reminder_send_log')
-      .select('recipient_email, subject, status, scheduled_for, sent_at, failure_reason')
-      .eq('company_id', membership.company_id)
-      .order('scheduled_for', { ascending: false })
-      .limit(50),
-    supabase
-      .from('compliance_item_reminder_rules')
-      .select('id')
-      .eq('company_id', membership.company_id),
+    canManageReminders
+      ? supabase
+          .from('reminder_send_log')
+          .select('recipient_email, subject, status, scheduled_for, sent_at, failure_reason')
+          .eq('company_id', membership.company_id)
+          .order('scheduled_for', { ascending: false })
+          .limit(50)
+      : Promise.resolve({ data: [] }),
+    canManageReminders
+      ? supabase
+          .from('compliance_item_reminder_rules')
+          .select('id')
+          .eq('company_id', membership.company_id)
+      : Promise.resolve({ data: [] }),
     supabase.rpc('is_app_admin')
   ]);
-  const canManageReminders = ['owner', 'office_admin'].includes(membership.role);
 
   return (
     <div className="app-shell">
@@ -64,7 +68,7 @@ export default async function RemindersPage() {
         {!canManageReminders ? (
           <section className="owner-notice-panel setup-warning-panel">
             <strong>Read only</strong>
-            <span>Customer Admins manage reminder scheduling for this workspace.</span>
+            <span>Workspace owners manage reminder scheduling for this workspace.</span>
           </section>
         ) : null}
 

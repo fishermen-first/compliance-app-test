@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { AppSidebar } from '@/components/app-sidebar';
 import { daysUntil, displayState, formatDate, stateClassName, type ComplianceItem } from '@/lib/compliance';
 import { getCompanyOwnerCodes, getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer-data';
-import { accessRoleLabel } from '@/lib/roles';
+import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
 
 type CalendarPageProps = {
   searchParams?: { owner?: string; scope?: string };
@@ -139,7 +139,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     ...openItems.map((item) => item.owner_current).filter(Boolean) as string[]
   ])).sort();
   const mappedOwnerCodes = ownerCodes.filter((owner) => owner.is_assigned_to_current_user).map((owner) => owner.code);
-  const canViewAllOwners = ['owner', 'office_admin'].includes(membership.role);
+  const canViewAllOwners = isCustomerOwnerRole(membership.role);
   const requestedOwner = searchParams?.owner && searchParams.owner !== 'all' ? decodeURIComponent(searchParams.owner) : null;
   const hasValidRequestedOwner = requestedOwner ? ownerCodeRows.includes(requestedOwner) : false;
   const showAllOwners = canViewAllOwners && (
@@ -218,7 +218,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
         {selectedOwnerCodes.length === 0 && !showAllOwners ? (
           <section className="owner-notice-panel setup-warning-panel">
             <strong>Owner setup needed</strong>
-            <span>Your planning list will appear after a Customer Admin maps your login to owner initials from the workbook.</span>
+            <span>Your planning list will appear after a workspace owner maps your login to owner initials from the workbook.</span>
           </section>
         ) : null}
 

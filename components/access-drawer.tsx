@@ -35,18 +35,16 @@ type OwnerCode = {
   display_name: string | null;
 };
 
-const roleOptions: Array<{ value: AppRole; label: string }> = [
+const roleOptions: Array<{ value: AppRole; label: string; disabled?: boolean }> = [
   { value: 'owner', label: 'owner' },
-  { value: 'office_admin', label: 'office_admin' },
-  { value: 'office_user', label: 'office_user' },
-  { value: 'vessel_user', label: 'vessel_user' }
+  { value: 'office_user', label: 'office_user' }
 ];
 
 const permissionCopy: Record<AppRole, string> = {
-  owner: 'Owners can edit all records, invite users, manage owner-codes, and change workspace settings.',
-  office_admin: 'Office admins can edit all compliance records, invite office_users and vessel_users, and manage owner-code assignments.',
-  office_user: 'Office users only see records assigned to their owner codes.',
-  vessel_user: 'Vessel users can update compliance items for their assigned vessels.'
+  owner: 'Owners can edit records, manage reminders, invite users, manage owner codes, and change workspace settings.',
+  office_admin: 'Legacy role. This role no longer grants admin permissions.',
+  office_user: 'Office users only see and update records assigned to their owner codes.',
+  vessel_user: 'Legacy role. This role no longer grants item permissions.'
 };
 
 const dateFormatter = new Intl.DateTimeFormat('en', {
@@ -55,14 +53,10 @@ const dateFormatter = new Intl.DateTimeFormat('en', {
   year: 'numeric'
 });
 
-function roleChoices(actorRole: AppRole, currentRole: AppRole) {
-  const choices = actorRole === 'office_admin'
-    ? roleOptions.filter((option) => option.value === 'office_user' || option.value === 'vessel_user')
-    : roleOptions;
+function roleChoices(currentRole: AppRole) {
+  if (roleOptions.some((option) => option.value === currentRole)) return roleOptions;
 
-  if (choices.some((option) => option.value === currentRole)) return choices;
-
-  return [{ value: currentRole, label: currentRole }, ...choices];
+  return [{ value: currentRole, label: `${currentRole} (legacy)`, disabled: true }, ...roleOptions];
 }
 
 function formatDrawerDate(value: string | null) {
@@ -78,13 +72,11 @@ export function AccessDrawer({
   row,
   companyId,
   ownerCodes,
-  actorRole,
   viewerId
 }: {
   row: Row;
   companyId: string;
   ownerCodes: OwnerCode[];
-  actorRole: AppRole;
   viewerId: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -228,8 +220,8 @@ export function AccessDrawer({
                   <>
                     <label htmlFor={`role-${row.target_id}`}>Role</label>
                     <select id={`role-${row.target_id}`} name="role" defaultValue={row.role}>
-                      {roleChoices(actorRole, row.role).map((option) => (
-                        <option value={option.value} key={option.value}>{option.label}</option>
+                      {roleChoices(row.role).map((option) => (
+                        <option value={option.value} key={option.value} disabled={option.disabled}>{option.label}</option>
                       ))}
                     </select>
                   </>

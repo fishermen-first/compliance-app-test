@@ -131,9 +131,9 @@ export async function importComplianceWorkbook(formData: FormData) {
   const { data: importRunId, error: importError } = await admin.rpc('dry_run_compliance_workbook_import', {
     target_company_id: companyId,
     target_sheet: sheetName,
-    workbook_name: workbook.name || null,
+    workbook_name: workbook.name || undefined,
     detected_format: detectedFormat,
-    template_version: templateVersion,
+    template_version: templateVersion ?? undefined,
     parser_version: parserVersion,
     records: importPayload,
     parse_summary: summary,

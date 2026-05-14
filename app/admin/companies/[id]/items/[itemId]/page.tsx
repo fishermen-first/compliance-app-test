@@ -23,7 +23,7 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
   const companyId = params.id;
   const itemId = params.itemId;
 
-  const [{ data: company }, { data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }] = await Promise.all([
+  const [{ data: company }, { data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }, { data: reminderLogs }, { data: vessels }] = await Promise.all([
     supabase.from('companies').select('id, name, timezone').eq('id', companyId).maybeSingle(),
     supabase
       .from('compliance_items')
@@ -48,7 +48,20 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
       .select('recipient_name, recipient_email, recipient_type')
       .eq('company_id', companyId)
       .eq('item_id', itemId)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('reminder_send_log')
+      .select('recipient_email, status, scheduled_for, sent_at, failure_reason')
+      .eq('company_id', companyId)
+      .eq('item_id', itemId)
+      .order('scheduled_for', { ascending: false })
+      .limit(5),
+    supabase
+      .from('vessels')
+      .select('id, name')
+      .eq('company_id', companyId)
+      .eq('active', true)
+      .order('name')
   ]);
 
   if (!company || !rawItem) notFound();
@@ -83,7 +96,12 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
           history={(history ?? []) as any}
           reminderRules={reminderRules ?? []}
           recipients={recipients ?? []}
-          canManageItem
+          reminderLogs={reminderLogs ?? []}
+          vessels={vessels ?? []}
+          canUpdateStatus
+          canCompleteItem
+          canEditCore
+          canManageReminders
           backHref={`/admin/customers/${companyId}/users`}
           backLabel="Back to customer users"
           itemPathPrefix={`/admin/companies/${companyId}/items`}

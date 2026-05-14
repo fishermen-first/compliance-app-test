@@ -3,7 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { inferRecurrence, parseOwnerCurrent } from '@/lib/compliance';
+import { type Database } from '@/lib/database.types';
 import { createClient } from '@/lib/supabase/server';
+
+type RecurrenceUnit = Database['public']['Enums']['recurrence_unit'];
+
+const recurrenceUnits = new Set<RecurrenceUnit>(['years', 'months', 'manual', 'none']);
 
 function optionalString(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? '').trim();
@@ -27,6 +32,14 @@ function optionalInteger(formData: FormData, name: string) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed)) throw new Error(`${name} must be a whole number`);
   return parsed;
+}
+
+function requiredRecurrenceUnit(formData: FormData, name: string) {
+  const value = requiredString(formData, name);
+  if (!recurrenceUnits.has(value as RecurrenceUnit)) {
+    throw new Error(`${name} is invalid`);
+  }
+  return value as RecurrenceUnit;
 }
 
 function requireEmail(value: string) {
@@ -109,7 +122,7 @@ async function requireMembership(options: { allowAppAdmin?: boolean } = {}) {
     .limit(1)
     .maybeSingle();
 
-  if (!membership || !['owner', 'office_admin', 'office_user'].includes(membership.role)) {
+  if (!membership || !['owner', 'office_user'].includes(membership.role)) {
     redirect('/');
   }
 
@@ -117,14 +130,18 @@ async function requireMembership(options: { allowAppAdmin?: boolean } = {}) {
 }
 
 export async function createComplianceItem(formData: FormData) {
-  const { supabase, membership } = await requireMembership();
-  if (!membership) redirect('/');
+  const { supabase, membership } = await requireMembership({ allowAppAdmin: true });
+  const targetCompanyId = membership?.company_id ?? optionalString(formData, 'companyId');
+
+  if (membership && membership.role !== 'owner') redirect('/');
+  if (!targetCompanyId) redirect('/');
+
   const ownerRaw = optionalString(formData, 'ownerRaw');
   const frequencyLabel = optionalString(formData, 'frequencyLabel');
   const recurrence = inferRecurrence(frequencyLabel);
 
   const { data: itemId, error } = await supabase.rpc('create_compliance_item', {
-    target_company_id: membership.company_id,
+    target_company_id: targetCompanyId,
     target_vessel_id: optionalString(formData, 'vesselId'),
     item_owner_raw: ownerRaw,
     item_owner_current: optionalString(formData, 'ownerCurrent') ?? parseOwnerCurrent(ownerRaw),
@@ -146,7 +163,39 @@ export async function createComplianceItem(formData: FormData) {
 
   revalidatePath('/');
   revalidatePath('/items');
-  redirect(`/items/${itemId}`);
+  redirect(itemDetailPath(formData, itemId));
+}
+
+export async function updateComplianceItemCore(formData: FormData) {
+  const itemId = requiredString(formData, 'itemId');
+  const { supabase } = await requireMembership({ allowAppAdmin: true });
+
+  const { error } = await supabase.rpc('update_compliance_item_core', {
+    target_item_id: itemId,
+    next_vessel_id: optionalString(formData, 'vesselId'),
+    next_owner_raw: optionalString(formData, 'ownerRaw'),
+    next_owner_current: optionalString(formData, 'ownerCurrent') ?? parseOwnerCurrent(optionalString(formData, 'ownerRaw')),
+    next_item_name: requiredString(formData, 'itemName'),
+    next_item_number: optionalString(formData, 'itemNumber'),
+    next_agency_type: optionalString(formData, 'agencyType'),
+    next_compliance_area: requiredString(formData, 'complianceArea'),
+    next_frequency_label: optionalString(formData, 'frequencyLabel'),
+    next_recurrence_unit: requiredRecurrenceUnit(formData, 'recurrenceUnit'),
+    next_recurrence_interval: optionalInteger(formData, 'recurrenceInterval'),
+    next_start_working_on: optionalString(formData, 'startWorkingOn'),
+    next_expiration_date: optionalString(formData, 'expirationDate'),
+    next_status_notes: optionalString(formData, 'statusNotes'),
+    next_instructions: optionalString(formData, 'instructions'),
+    next_sharepoint_url: optionalString(formData, 'sharepointUrl')
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath('/');
+  revalidatePath('/items');
+  revalidatePath(`/items/${itemId}`);
+  revalidatePath(itemDetailPath(formData, itemId));
+  redirect(itemDetailPath(formData, itemId));
 }
 
 export async function updateComplianceItemStatus(formData: FormData) {

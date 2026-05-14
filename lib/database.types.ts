@@ -104,64 +104,6 @@ export type Database = {
         }
         Relationships: []
       }
-      company_invitations: {
-        Row: {
-          accepted_at: string | null
-          company_id: string
-          created_at: string
-          display_name: string | null
-          email: string
-          id: string
-          invited_by: string | null
-          role: Database["public"]["Enums"]["app_role"]
-          vessel_id: string | null
-        }
-        Insert: {
-          accepted_at?: string | null
-          company_id: string
-          created_at?: string
-          display_name?: string | null
-          email: string
-          id?: string
-          invited_by?: string | null
-          role?: Database["public"]["Enums"]["app_role"]
-          vessel_id?: string | null
-        }
-        Update: {
-          accepted_at?: string | null
-          company_id?: string
-          created_at?: string
-          display_name?: string | null
-          email?: string
-          id?: string
-          invited_by?: string | null
-          role?: Database["public"]["Enums"]["app_role"]
-          vessel_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "company_invitations_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "company_invitations_invited_by_fkey"
-            columns: ["invited_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "company_invitations_vessel_id_fkey"
-            columns: ["vessel_id"]
-            isOneToOne: false
-            referencedRelation: "vessels"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       company_import_runs: {
         Row: {
           applied_at: string | null
@@ -243,6 +185,27 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "company_import_runs_applied_by_fkey"
+            columns: ["applied_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_import_runs_applied_from_run_id_fkey"
+            columns: ["applied_from_run_id"]
+            isOneToOne: false
+            referencedRelation: "company_import_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_import_runs_applied_run_id_fkey"
+            columns: ["applied_run_id"]
+            isOneToOne: false
+            referencedRelation: "company_import_runs"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "company_import_runs_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -306,6 +269,64 @@ export type Database = {
           },
         ]
       }
+      company_invitations: {
+        Row: {
+          accepted_at: string | null
+          company_id: string
+          created_at: string
+          display_name: string | null
+          email: string
+          id: string
+          invited_by: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          vessel_id: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          company_id: string
+          created_at?: string
+          display_name?: string | null
+          email: string
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          vessel_id?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          company_id?: string
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_invitations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_invitations_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       company_memberships: {
         Row: {
           company_id: string
@@ -344,162 +365,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      compliance_import_issues: {
-        Row: {
-          company_id: string
-          created_at: string
-          decided_at: string | null
-          decided_by: string | null
-          decision: string | null
-          details: Json
-          id: string
-          import_run_id: string
-          import_run_row_id: string | null
-          issue_type: string
-          matched_item_id: string | null
-          message: string
-          severity: string
-          source_row_number: number | null
-          status: string
-        }
-        Insert: {
-          company_id: string
-          created_at?: string
-          decided_at?: string | null
-          decided_by?: string | null
-          decision?: string | null
-          details?: Json
-          id?: string
-          import_run_id: string
-          import_run_row_id?: string | null
-          issue_type: string
-          matched_item_id?: string | null
-          message: string
-          severity?: string
-          source_row_number?: number | null
-          status?: string
-        }
-        Update: {
-          company_id?: string
-          created_at?: string
-          decided_at?: string | null
-          decided_by?: string | null
-          decision?: string | null
-          details?: Json
-          id?: string
-          import_run_id?: string
-          import_run_row_id?: string | null
-          issue_type?: string
-          matched_item_id?: string | null
-          message?: string
-          severity?: string
-          source_row_number?: number | null
-          status?: string
-        }
-        Relationships: []
-      }
-      compliance_import_run_rows: {
-        Row: {
-          company_id: string
-          created_at: string
-          id: string
-          import_run_id: string
-          is_safe_to_apply: boolean
-          match_strategy: string | null
-          matched_item_id: string | null
-          normalized_agency_type: string | null
-          normalized_item_name: string | null
-          normalized_item_number: string | null
-          normalized_owner_code: string | null
-          normalized_vessel_or_scope: string | null
-          parsed_record: Json
-          proposed_action: string
-          source_agency_type: string | null
-          source_compliance_area: string | null
-          source_expiration_date: string | null
-          source_fingerprint: string
-          source_frequency_label: string | null
-          source_item_name: string | null
-          source_item_number: string | null
-          source_owner_code: string | null
-          source_recurrence_interval: number | null
-          source_recurrence_unit: Database["public"]["Enums"]["recurrence_unit"] | null
-          source_row_hash: string | null
-          source_row_json: Json
-          source_row_number: number | null
-          source_sheet: string | null
-          source_start_working_on: string | null
-          source_vessel_or_scope: string | null
-          template_item_key: string | null
-        }
-        Insert: {
-          company_id: string
-          created_at?: string
-          id?: string
-          import_run_id: string
-          is_safe_to_apply?: boolean
-          match_strategy?: string | null
-          matched_item_id?: string | null
-          normalized_agency_type?: string | null
-          normalized_item_name?: string | null
-          normalized_item_number?: string | null
-          normalized_owner_code?: string | null
-          normalized_vessel_or_scope?: string | null
-          parsed_record?: Json
-          proposed_action?: string
-          source_agency_type?: string | null
-          source_compliance_area?: string | null
-          source_expiration_date?: string | null
-          source_fingerprint: string
-          source_frequency_label?: string | null
-          source_item_name?: string | null
-          source_item_number?: string | null
-          source_owner_code?: string | null
-          source_recurrence_interval?: number | null
-          source_recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"] | null
-          source_row_hash?: string | null
-          source_row_json?: Json
-          source_row_number?: number | null
-          source_sheet?: string | null
-          source_start_working_on?: string | null
-          source_vessel_or_scope?: string | null
-          template_item_key?: string | null
-        }
-        Update: {
-          company_id?: string
-          created_at?: string
-          id?: string
-          import_run_id?: string
-          is_safe_to_apply?: boolean
-          match_strategy?: string | null
-          matched_item_id?: string | null
-          normalized_agency_type?: string | null
-          normalized_item_name?: string | null
-          normalized_item_number?: string | null
-          normalized_owner_code?: string | null
-          normalized_vessel_or_scope?: string | null
-          parsed_record?: Json
-          proposed_action?: string
-          source_agency_type?: string | null
-          source_compliance_area?: string | null
-          source_expiration_date?: string | null
-          source_fingerprint?: string
-          source_frequency_label?: string | null
-          source_item_name?: string | null
-          source_item_number?: string | null
-          source_owner_code?: string | null
-          source_recurrence_interval?: number | null
-          source_recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"] | null
-          source_row_hash?: string | null
-          source_row_json?: Json
-          source_row_number?: number | null
-          source_sheet?: string | null
-          source_start_working_on?: string | null
-          source_vessel_or_scope?: string | null
-          template_item_key?: string | null
-        }
-        Relationships: []
       }
       company_owner_codes: {
         Row: {
@@ -567,72 +432,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      compliance_item_import_sources: {
-        Row: {
-          active: boolean
-          company_id: string
-          compliance_item_id: string
-          first_import_run_id: string | null
-          first_seen_at: string
-          id: string
-          last_import_run_id: string | null
-          last_seen_at: string
-          normalized_agency_type: string | null
-          normalized_item_name: string | null
-          normalized_item_number: string | null
-          normalized_owner_code: string | null
-          normalized_vessel_or_scope: string | null
-          source_fingerprint: string
-          source_row_hash: string | null
-          source_row_json: Json
-          source_row_number: number | null
-          source_sheet: string | null
-          template_item_key: string | null
-        }
-        Insert: {
-          active?: boolean
-          company_id: string
-          compliance_item_id: string
-          first_import_run_id?: string | null
-          first_seen_at?: string
-          id?: string
-          last_import_run_id?: string | null
-          last_seen_at?: string
-          normalized_agency_type?: string | null
-          normalized_item_name?: string | null
-          normalized_item_number?: string | null
-          normalized_owner_code?: string | null
-          normalized_vessel_or_scope?: string | null
-          source_fingerprint: string
-          source_row_hash?: string | null
-          source_row_json?: Json
-          source_row_number?: number | null
-          source_sheet?: string | null
-          template_item_key?: string | null
-        }
-        Update: {
-          active?: boolean
-          company_id?: string
-          compliance_item_id?: string
-          first_import_run_id?: string | null
-          first_seen_at?: string
-          id?: string
-          last_import_run_id?: string | null
-          last_seen_at?: string
-          normalized_agency_type?: string | null
-          normalized_item_name?: string | null
-          normalized_item_number?: string | null
-          normalized_owner_code?: string | null
-          normalized_vessel_or_scope?: string | null
-          source_fingerprint?: string
-          source_row_hash?: string | null
-          source_row_json?: Json
-          source_row_number?: number | null
-          source_sheet?: string | null
-          template_item_key?: string | null
-        }
-        Relationships: []
       }
       compliance_events: {
         Row: {
@@ -710,6 +509,321 @@ export type Database = {
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_import_issues: {
+        Row: {
+          company_id: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision: string | null
+          details: Json
+          id: string
+          import_run_id: string
+          import_run_row_id: string | null
+          issue_type: string
+          matched_item_id: string | null
+          message: string
+          severity: string
+          source_row_number: number | null
+          status: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string | null
+          details?: Json
+          id?: string
+          import_run_id: string
+          import_run_row_id?: string | null
+          issue_type: string
+          matched_item_id?: string | null
+          message: string
+          severity?: string
+          source_row_number?: number | null
+          status?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string | null
+          details?: Json
+          id?: string
+          import_run_id?: string
+          import_run_row_id?: string | null
+          issue_type?: string
+          matched_item_id?: string | null
+          message?: string
+          severity?: string
+          source_row_number?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_import_issues_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_import_issues_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_import_issues_import_run_id_fkey"
+            columns: ["import_run_id"]
+            isOneToOne: false
+            referencedRelation: "company_import_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_import_issues_import_run_row_id_fkey"
+            columns: ["import_run_row_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_import_run_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_import_issues_matched_item_id_fkey"
+            columns: ["matched_item_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_import_run_rows: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          import_run_id: string
+          is_safe_to_apply: boolean
+          match_strategy: string | null
+          matched_item_id: string | null
+          normalized_agency_type: string | null
+          normalized_item_name: string | null
+          normalized_item_number: string | null
+          normalized_owner_code: string | null
+          normalized_vessel_or_scope: string | null
+          parsed_record: Json
+          proposed_action: string
+          source_agency_type: string | null
+          source_compliance_area: string | null
+          source_expiration_date: string | null
+          source_fingerprint: string
+          source_frequency_label: string | null
+          source_item_name: string | null
+          source_item_number: string | null
+          source_owner_code: string | null
+          source_recurrence_interval: number | null
+          source_recurrence_unit:
+            | Database["public"]["Enums"]["recurrence_unit"]
+            | null
+          source_row_hash: string | null
+          source_row_json: Json
+          source_row_number: number | null
+          source_sheet: string | null
+          source_start_working_on: string | null
+          source_vessel_or_scope: string | null
+          template_item_key: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          import_run_id: string
+          is_safe_to_apply?: boolean
+          match_strategy?: string | null
+          matched_item_id?: string | null
+          normalized_agency_type?: string | null
+          normalized_item_name?: string | null
+          normalized_item_number?: string | null
+          normalized_owner_code?: string | null
+          normalized_vessel_or_scope?: string | null
+          parsed_record?: Json
+          proposed_action?: string
+          source_agency_type?: string | null
+          source_compliance_area?: string | null
+          source_expiration_date?: string | null
+          source_fingerprint: string
+          source_frequency_label?: string | null
+          source_item_name?: string | null
+          source_item_number?: string | null
+          source_owner_code?: string | null
+          source_recurrence_interval?: number | null
+          source_recurrence_unit?:
+            | Database["public"]["Enums"]["recurrence_unit"]
+            | null
+          source_row_hash?: string | null
+          source_row_json?: Json
+          source_row_number?: number | null
+          source_sheet?: string | null
+          source_start_working_on?: string | null
+          source_vessel_or_scope?: string | null
+          template_item_key?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          import_run_id?: string
+          is_safe_to_apply?: boolean
+          match_strategy?: string | null
+          matched_item_id?: string | null
+          normalized_agency_type?: string | null
+          normalized_item_name?: string | null
+          normalized_item_number?: string | null
+          normalized_owner_code?: string | null
+          normalized_vessel_or_scope?: string | null
+          parsed_record?: Json
+          proposed_action?: string
+          source_agency_type?: string | null
+          source_compliance_area?: string | null
+          source_expiration_date?: string | null
+          source_fingerprint?: string
+          source_frequency_label?: string | null
+          source_item_name?: string | null
+          source_item_number?: string | null
+          source_owner_code?: string | null
+          source_recurrence_interval?: number | null
+          source_recurrence_unit?:
+            | Database["public"]["Enums"]["recurrence_unit"]
+            | null
+          source_row_hash?: string | null
+          source_row_json?: Json
+          source_row_number?: number | null
+          source_sheet?: string | null
+          source_start_working_on?: string | null
+          source_vessel_or_scope?: string | null
+          template_item_key?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_import_run_rows_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_import_run_rows_import_run_id_fkey"
+            columns: ["import_run_id"]
+            isOneToOne: false
+            referencedRelation: "company_import_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_import_run_rows_matched_item_id_fkey"
+            columns: ["matched_item_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_item_import_sources: {
+        Row: {
+          active: boolean
+          company_id: string
+          compliance_item_id: string
+          first_import_run_id: string | null
+          first_seen_at: string
+          id: string
+          last_import_run_id: string | null
+          last_seen_at: string
+          normalized_agency_type: string | null
+          normalized_item_name: string | null
+          normalized_item_number: string | null
+          normalized_owner_code: string | null
+          normalized_vessel_or_scope: string | null
+          source_fingerprint: string
+          source_row_hash: string | null
+          source_row_json: Json
+          source_row_number: number | null
+          source_sheet: string | null
+          template_item_key: string | null
+        }
+        Insert: {
+          active?: boolean
+          company_id: string
+          compliance_item_id: string
+          first_import_run_id?: string | null
+          first_seen_at?: string
+          id?: string
+          last_import_run_id?: string | null
+          last_seen_at?: string
+          normalized_agency_type?: string | null
+          normalized_item_name?: string | null
+          normalized_item_number?: string | null
+          normalized_owner_code?: string | null
+          normalized_vessel_or_scope?: string | null
+          source_fingerprint: string
+          source_row_hash?: string | null
+          source_row_json?: Json
+          source_row_number?: number | null
+          source_sheet?: string | null
+          template_item_key?: string | null
+        }
+        Update: {
+          active?: boolean
+          company_id?: string
+          compliance_item_id?: string
+          first_import_run_id?: string | null
+          first_seen_at?: string
+          id?: string
+          last_import_run_id?: string | null
+          last_seen_at?: string
+          normalized_agency_type?: string | null
+          normalized_item_name?: string | null
+          normalized_item_number?: string | null
+          normalized_owner_code?: string | null
+          normalized_vessel_or_scope?: string | null
+          source_fingerprint?: string
+          source_row_hash?: string | null
+          source_row_json?: Json
+          source_row_number?: number | null
+          source_sheet?: string | null
+          template_item_key?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_item_import_sources_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_item_import_sources_compliance_item_id_fkey"
+            columns: ["compliance_item_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_item_import_sources_first_import_run_id_fkey"
+            columns: ["first_import_run_id"]
+            isOneToOne: false
+            referencedRelation: "company_import_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_item_import_sources_last_import_run_id_fkey"
+            columns: ["last_import_run_id"]
+            isOneToOne: false
+            referencedRelation: "company_import_runs"
             referencedColumns: ["id"]
           },
         ]
@@ -896,7 +1010,6 @@ export type Database = {
           recurrence_interval: number | null
           recurrence_unit: Database["public"]["Enums"]["recurrence_unit"]
           sharepoint_url: string | null
-          source_row_number: number | null
           source_agency_type: string | null
           source_compliance_area: string | null
           source_expiration_date: string | null
@@ -905,9 +1018,12 @@ export type Database = {
           source_item_number: string | null
           source_owner_code: string | null
           source_recurrence_interval: number | null
-          source_recurrence_unit: Database["public"]["Enums"]["recurrence_unit"] | null
+          source_recurrence_unit:
+            | Database["public"]["Enums"]["recurrence_unit"]
+            | null
           source_row_hash: string | null
           source_row_json: Json | null
+          source_row_number: number | null
           source_sheet: string | null
           source_start_working_on: string | null
           source_vessel_or_scope: string | null
@@ -942,7 +1058,6 @@ export type Database = {
           recurrence_interval?: number | null
           recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"]
           sharepoint_url?: string | null
-          source_row_number?: number | null
           source_agency_type?: string | null
           source_compliance_area?: string | null
           source_expiration_date?: string | null
@@ -951,9 +1066,12 @@ export type Database = {
           source_item_number?: string | null
           source_owner_code?: string | null
           source_recurrence_interval?: number | null
-          source_recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"] | null
+          source_recurrence_unit?:
+            | Database["public"]["Enums"]["recurrence_unit"]
+            | null
           source_row_hash?: string | null
           source_row_json?: Json | null
+          source_row_number?: number | null
           source_sheet?: string | null
           source_start_working_on?: string | null
           source_vessel_or_scope?: string | null
@@ -988,7 +1106,6 @@ export type Database = {
           recurrence_interval?: number | null
           recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"]
           sharepoint_url?: string | null
-          source_row_number?: number | null
           source_agency_type?: string | null
           source_compliance_area?: string | null
           source_expiration_date?: string | null
@@ -997,9 +1114,12 @@ export type Database = {
           source_item_number?: string | null
           source_owner_code?: string | null
           source_recurrence_interval?: number | null
-          source_recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"] | null
+          source_recurrence_unit?:
+            | Database["public"]["Enums"]["recurrence_unit"]
+            | null
           source_row_hash?: string | null
           source_row_json?: Json | null
+          source_row_number?: number | null
           source_sheet?: string | null
           source_start_working_on?: string | null
           source_vessel_or_scope?: string | null
@@ -1023,6 +1143,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_items_last_import_run_id_fkey"
+            columns: ["last_import_run_id"]
+            isOneToOne: false
+            referencedRelation: "company_import_runs"
             referencedColumns: ["id"]
           },
           {
@@ -1157,6 +1284,7 @@ export type Database = {
       reminder_send_log: {
         Row: {
           body: string
+          claimed_at: string | null
           company_id: string
           created_at: string
           failure_reason: string | null
@@ -1166,12 +1294,14 @@ export type Database = {
           recipient_email: string
           reminder_rule_id: string | null
           scheduled_for: string
+          send_attempts: number
           sent_at: string | null
           status: Database["public"]["Enums"]["reminder_status"]
           subject: string
         }
         Insert: {
           body: string
+          claimed_at?: string | null
           company_id: string
           created_at?: string
           failure_reason?: string | null
@@ -1181,12 +1311,14 @@ export type Database = {
           recipient_email: string
           reminder_rule_id?: string | null
           scheduled_for: string
+          send_attempts?: number
           sent_at?: string | null
           status?: Database["public"]["Enums"]["reminder_status"]
           subject: string
         }
         Update: {
           body?: string
+          claimed_at?: string | null
           company_id?: string
           created_at?: string
           failure_reason?: string | null
@@ -1196,6 +1328,7 @@ export type Database = {
           recipient_email?: string
           reminder_rule_id?: string | null
           scheduled_for?: string
+          send_attempts?: number
           sent_at?: string | null
           status?: Database["public"]["Enums"]["reminder_status"]
           subject?: string
@@ -1303,10 +1436,56 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      accept_company_invite: { Args: { full_name?: string }; Returns: string | null }
+      _customer_settings_actor_role: {
+        Args: { require_admin: boolean; target_company_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      _settings_can_manage_role: {
+        Args: {
+          actor_role: Database["public"]["Enums"]["app_role"]
+          next_role: Database["public"]["Enums"]["app_role"]
+          target_role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
+      _settings_email_is_app_admin: {
+        Args: { target_email: string }
+        Returns: boolean
+      }
+      accept_company_invite: { Args: { full_name?: string }; Returns: string }
+      apply_compliance_workbook_import: {
+        Args: {
+          applied_by?: string
+          approved_issue_ids?: string[]
+          target_import_run_id: string
+        }
+        Returns: string
+      }
+      can_edit_compliance_item_core: {
+        Args: { target_item_id: string }
+        Returns: boolean
+      }
       can_manage_compliance_item: {
         Args: { target_item_id: string }
         Returns: boolean
+      }
+      claim_due_reminders: {
+        Args: { claim_limit?: number; target_company_id?: string }
+        Returns: {
+          company_id: string
+          expiration_date: string
+          id: string
+          instructions: string
+          item_id: string
+          item_name: string
+          owner_current: string
+          recipient_email: string
+          reminder_rule_id: string
+          scheduled_for: string
+          start_working_on: string
+          status: Database["public"]["Enums"]["compliance_item_status"]
+          vessel_name: string
+        }[]
       }
       complete_compliance_item: {
         Args: {
@@ -1318,6 +1497,10 @@ export type Database = {
           target_item_id: string
         }
         Returns: string
+      }
+      compliance_item_has_customer_activity: {
+        Args: { target_item_id: string }
+        Returns: boolean
       }
       create_company_workspace: {
         Args: { company_name: string; full_name: string }
@@ -1362,29 +1545,17 @@ export type Database = {
         Returns: undefined
       }
       current_user_email: { Args: never; Returns: string }
-      apply_compliance_workbook_import: {
-        Args: {
-          target_import_run_id: string
-          approved_issue_ids?: string[]
-          applied_by?: string
-        }
-        Returns: string
-      }
-      compliance_item_has_customer_activity: {
-        Args: { target_item_id: string }
-        Returns: boolean
-      }
       dry_run_compliance_workbook_import: {
         Args: {
+          detected_format?: string
+          imported_by?: string
+          parse_summary?: Json
+          parser_version?: string
+          records?: Json
           target_company_id: string
           target_sheet: string
-          workbook_name?: string | null
-          detected_format?: string | null
-          template_version?: string | null
-          parser_version?: string | null
-          records?: Json
-          parse_summary?: Json
-          imported_by?: string | null
+          template_version?: string
+          workbook_name?: string
         }
         Returns: string
       }
@@ -1392,10 +1563,10 @@ export type Database = {
         Args: { target_company_id: string }
         Returns: {
           code: string
-          display_name: string | null
-          records: number
+          display_name: string
           is_assigned_to_current_user: boolean
           is_visible_to_current_user: boolean
+          records: number
         }[]
       }
       has_company_role: {
@@ -1405,37 +1576,46 @@ export type Database = {
         }
         Returns: boolean
       }
+      import_compliance_workbook_records: {
+        Args: { records: Json; target_company_id: string; target_sheet: string }
+        Returns: number
+      }
+      import_v2_is_company_wide_scope: {
+        Args: { value: string }
+        Returns: boolean
+      }
+      import_v2_normalize: { Args: { value: string }; Returns: string }
       is_app_admin: { Args: never; Returns: boolean }
       is_company_member: {
         Args: { target_company_id: string }
         Returns: boolean
-      }
-      import_compliance_workbook_records: {
-        Args: {
-          records: Json
-          target_company_id: string
-          target_sheet: string
-        }
-        Returns: number
-      }
-      save_initial_vessels: {
-        Args: { vessel_names: string[] }
-        Returns: undefined
       }
       save_compliance_item_reminders: {
         Args: {
           additional_recipients: Json
           expiration_days_before: number
           expiration_rule_active: boolean
-          item_instructions: string | null
-          repeat_every_days: number | null
+          item_instructions: string
+          repeat_every_days: number
           repeat_rule_active: boolean
           start_rule_active: boolean
           target_item_id: string
         }
         Returns: undefined
       }
+      save_initial_vessels: {
+        Args: { vessel_names: string[] }
+        Returns: undefined
+      }
       schedule_due_reminders: {
+        Args: { target_company_id: string; target_run_date?: string }
+        Returns: number
+      }
+      schedule_due_reminders_all_companies: {
+        Args: { target_run_date?: string }
+        Returns: number
+      }
+      schedule_due_reminders_for_company: {
         Args: { target_company_id: string; target_run_date?: string }
         Returns: number
       }
@@ -1446,24 +1626,24 @@ export type Database = {
       settings_get_access_rows: {
         Args: { target_company_id: string }
         Returns: {
-          target_kind: string
-          target_id: string
-          target_user_id: string | null
-          email: string | null
-          display_name: string | null
+          app_admin_contamination: boolean
+          can_cancel: boolean
+          can_clear_owner_codes: boolean
+          can_remove: boolean
+          can_update_owner_codes: boolean
+          can_update_role: boolean
+          created_at: string
+          display_name: string
+          email: string
+          invited_at: string
+          invited_by_display_name: string
+          joined_at: string
+          owner_codes: string[]
           role: Database["public"]["Enums"]["app_role"]
           status: string
-          owner_codes: string[]
-          app_admin_contamination: boolean
-          can_update_role: boolean
-          can_remove: boolean
-          can_cancel: boolean
-          can_update_owner_codes: boolean
-          can_clear_owner_codes: boolean
-          invited_by_display_name: string | null
-          invited_at: string | null
-          joined_at: string | null
-          created_at: string
+          target_id: string
+          target_kind: string
+          target_user_id: string
         }[]
       }
       settings_remove_member_access: {
@@ -1472,30 +1652,51 @@ export type Database = {
       }
       settings_update_member_access: {
         Args: {
+          next_role: Database["public"]["Enums"]["app_role"]
           target_company_id: string
           target_membership_id: string
-          next_role: Database["public"]["Enums"]["app_role"]
-        }
-        Returns: undefined
-      }
-      settings_update_owner_code_assignment: {
-        Args: {
-          target_company_id: string
-          target_kind: string
-          target_id: string
-          owner_codes: string[]
         }
         Returns: undefined
       }
       settings_update_own_profile: {
-        Args: { target_company_id: string; next_full_name: string }
+        Args: { next_full_name: string; target_company_id: string }
+        Returns: undefined
+      }
+      settings_update_owner_code_assignment: {
+        Args: {
+          owner_codes: string[]
+          target_company_id: string
+          target_id: string
+          target_kind: string
+        }
         Returns: undefined
       }
       settings_update_pending_invite_access: {
         Args: {
+          next_role: Database["public"]["Enums"]["app_role"]
           target_company_id: string
           target_invitation_id: string
-          next_role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: undefined
+      }
+      update_compliance_item_core: {
+        Args: {
+          next_agency_type?: string
+          next_compliance_area?: string
+          next_expiration_date?: string
+          next_frequency_label?: string
+          next_instructions?: string
+          next_item_name?: string
+          next_item_number?: string
+          next_owner_current?: string
+          next_owner_raw?: string
+          next_recurrence_interval?: number
+          next_recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"]
+          next_sharepoint_url?: string
+          next_start_working_on?: string
+          next_status_notes?: string
+          next_vessel_id?: string
+          target_item_id: string
         }
         Returns: undefined
       }

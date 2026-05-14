@@ -61,7 +61,7 @@ async function readOnlyPreflight() {
     multiMemberships,
     pendingInvites,
     pendingOwnerCodes,
-    customerAdmins,
+    workspaceOwners,
     appAdminOwnerCodes,
     companies
   ] = await Promise.all([
@@ -79,7 +79,7 @@ async function readOnlyPreflight() {
     service
       .from('company_memberships')
       .select('company_id, role')
-      .in('role', ['owner', 'office_admin']),
+      .eq('role', 'owner'),
     service
       .from('company_owner_codes')
       .select('company_id, code, pending_email, profiles!company_owner_codes_user_id_fkey(email)'),
@@ -88,7 +88,7 @@ async function readOnlyPreflight() {
       .select('id')
   ]);
 
-  for (const result of [multiMemberships, pendingInvites, pendingOwnerCodes, customerAdmins, appAdminOwnerCodes, companies]) {
+  for (const result of [multiMemberships, pendingInvites, pendingOwnerCodes, workspaceOwners, appAdminOwnerCodes, companies]) {
     if (result.error) throw new Error(result.error.message);
   }
 
@@ -111,10 +111,10 @@ async function readOnlyPreflight() {
   const crossCompanyInviteEmails = Array.from(inviteCompaniesByEmail.values()).filter((companies) => companies.size > 1).length;
 
   const adminsByCompany = new Map();
-  for (const row of customerAdmins.data ?? []) {
+  for (const row of workspaceOwners.data ?? []) {
     adminsByCompany.set(row.company_id, (adminsByCompany.get(row.company_id) ?? 0) + 1);
   }
-  const zeroAdminCompanies = (companies.data ?? []).filter((company) => (adminsByCompany.get(company.id) ?? 0) === 0).length;
+  const zeroOwnerCompanies = (companies.data ?? []).filter((company) => (adminsByCompany.get(company.id) ?? 0) === 0).length;
 
   console.log(JSON.stringify({
     mode: 'read-only',
@@ -122,9 +122,9 @@ async function readOnlyPreflight() {
     crossCompanyInviteEmails,
     pendingInviteRows: pendingInvites.data?.length ?? 0,
     pendingEmailOwnerCodeRows: pendingOwnerCodes.data?.length ?? 0,
-    customerAdminCompanies: adminsByCompany.size,
+    ownerManagedCompanies: adminsByCompany.size,
     companies: companies.data?.length ?? 0,
-    zeroAdminCompanies
+    zeroOwnerCompanies
   }, null, 2));
 }
 
@@ -143,7 +143,7 @@ async function fixtureVerification() {
 
   const companyId = required('VERIFY_SETTINGS_COMPANY_ID', process.env.VERIFY_SETTINGS_COMPANY_ID);
   const owner = await signInFixture('OWNER');
-  const officeAdmin = await signInFixture('OFFICE_ADMIN');
+  const legacyAdmin = await signInFixture('OFFICE_ADMIN');
   const officeUser = await signInFixture('OFFICE_USER');
   const vesselUser = await signInFixture('VESSEL_USER');
   const nonMember = await signInFixture('NON_MEMBER');
@@ -152,9 +152,7 @@ async function fixtureVerification() {
   const ownerRows = await owner.client.rpc('settings_get_access_rows', { target_company_id: companyId });
   if (ownerRows.error) throw new Error(`owner settings_get_access_rows failed: ${ownerRows.error.message}`);
 
-  const officeAdminRows = await officeAdmin.client.rpc('settings_get_access_rows', { target_company_id: companyId });
-  if (officeAdminRows.error) throw new Error(`office_admin settings_get_access_rows failed: ${officeAdminRows.error.message}`);
-
+  await expectRpcFailure(legacyAdmin.client, 'settings_get_access_rows', { target_company_id: companyId }, 'legacy office_admin settings_get_access_rows');
   await expectRpcFailure(officeUser.client, 'settings_get_access_rows', { target_company_id: companyId }, 'office_user settings_get_access_rows');
   await expectRpcFailure(vesselUser.client, 'settings_get_access_rows', { target_company_id: companyId }, 'vessel_user settings_get_access_rows');
   await expectRpcFailure(nonMember.client, 'settings_get_access_rows', { target_company_id: companyId }, 'non_member settings_get_access_rows');
@@ -169,7 +167,6 @@ async function fixtureVerification() {
   console.log(JSON.stringify({
     mode: 'fixture',
     ownerRows: ownerRows.data?.length ?? 0,
-    officeAdminRows: officeAdminRows.data?.length ?? 0,
     queueOwnerCodes: queueCodes.data?.length ?? 0
   }, null, 2));
 }

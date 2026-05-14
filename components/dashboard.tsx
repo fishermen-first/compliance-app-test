@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { CalendarDays, CheckCircle2, Plus } from 'lucide-react';
-import { accessRoleLabel } from '@/lib/roles';
+import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
 import {
   type ComplianceItem,
   displayState,
@@ -94,8 +94,8 @@ export function Dashboard({
   canCreateItems: boolean;
   filters: DashboardFilters;
 }) {
-  const isCustomerAdmin = ['owner', 'office_admin'].includes(currentUserRole);
-  const isUnmappedRegularUser = !isCustomerAdmin && !hasOwnerMapping;
+  const isCustomerOwner = isCustomerOwnerRole(currentUserRole);
+  const isUnmappedRegularUser = !isCustomerOwner && !hasOwnerMapping;
   const openItems = items.filter((item) => !['complete', 'discontinued'].includes(item.status));
   const scopedItems = showAllOwners
     ? openItems
@@ -135,7 +135,7 @@ export function Dashboard({
     : selectedOwnerCodes.length
       ? `Owner ${selectedOwnerCodes.join(', ')}`
       : 'Setup needed';
-  const defaultOwnerLabel = isCustomerAdmin ? 'Admin default' : 'My owners';
+  const defaultOwnerLabel = isCustomerOwner ? 'Owner default' : 'My owners';
   const queueHeading = hasColumnFilters ? 'Filtered work queue' : showAllOwners ? 'Current work queue' : 'My work queue';
 
   return (
@@ -166,7 +166,7 @@ export function Dashboard({
         </div>
       </header>
 
-      {!hasOwnerMapping && isCustomerAdmin ? (
+      {!hasOwnerMapping && isCustomerOwner ? (
         <div className="admin-notice">
           <span className="pill">Admin view</span>
           <span>No owner code is mapped to your login - this workspace opens to <strong>all company work</strong>. Map an owner code for a personal queue.</span>
@@ -177,11 +177,11 @@ export function Dashboard({
       {isUnmappedRegularUser ? (
         <section className="owner-notice-panel setup-warning-panel">
           <strong>Owner setup needed</strong>
-          <span>Ask a Customer Admin to map your login to the owner initials from the workbook. Item edits stay locked until that mapping exists.</span>
+          <span>Ask a workspace owner to map your login to the owner initials from the workbook. Item edits stay locked until that mapping exists.</span>
         </section>
       ) : null}
 
-      <section className={`snapshot${isCustomerAdmin ? '' : ' single-card'}`} aria-label="Queue snapshot">
+      <section className={`snapshot${isCustomerOwner ? '' : ' single-card'}`} aria-label="Queue snapshot">
         <article className="card due">
           <div className="label-block">
             <div className="label-row">
@@ -196,7 +196,7 @@ export function Dashboard({
           </Link>
         </article>
 
-        {isCustomerAdmin ? (
+        {isCustomerOwner ? (
           <article className="card risk">
             <p className="label">Company risk</p>
             <div className="risk-rows">
@@ -257,7 +257,7 @@ export function Dashboard({
           <div className="queue-filter-row">
             <span>Owner</span>
             <Link className={!filters.owner ? 'active' : ''} href={dashboardHref(filters, { owner: undefined })} scroll={false}>{defaultOwnerLabel}</Link>
-            {isCustomerAdmin ? <Link className={filters.owner === 'all' ? 'active' : ''} href={dashboardHref(filters, { owner: 'all' })} scroll={false}>All owners</Link> : null}
+            {isCustomerOwner ? <Link className={filters.owner === 'all' ? 'active' : ''} href={dashboardHref(filters, { owner: 'all' })} scroll={false}>All owners</Link> : null}
             {ownerFilterCodes.map((owner) => (
               <Link className={filters.owner === owner ? 'active' : ''} href={dashboardHref(filters, { owner })} key={owner} scroll={false}>{owner}</Link>
             ))}
@@ -309,7 +309,7 @@ export function Dashboard({
             <div className="empty-state">
               <CheckCircle2 aria-hidden="true" />
               <h3>{isUnmappedRegularUser ? 'No owner queue yet' : hasColumnFilters ? 'No items match these filters' : 'No actionable items right now'}</h3>
-              <p>{isUnmappedRegularUser ? 'Your queue will appear after a Customer Admin maps your login to an owner code.' : hasColumnFilters ? 'Clear or adjust the filters to bring more compliance work back into view.' : 'Items will appear here when their start-working date arrives, or when they are in progress, submitted, or overdue.'}</p>
+              <p>{isUnmappedRegularUser ? 'Your queue will appear after a workspace owner maps your login to an owner code.' : hasColumnFilters ? 'Clear or adjust the filters to bring more compliance work back into view.' : 'Items will appear here when their start-working date arrives, or when they are in progress, submitted, or overdue.'}</p>
             </div>
           ) : queueItems.slice(0, 12).map((item) => (
             <Link className="queue-item-row" href={`/items/${item.id}`} key={item.id}>

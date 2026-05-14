@@ -9,7 +9,7 @@ type ItemDetailPageProps = { params: { id: string } };
 export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
   const { supabase, membership, company } = await getCustomerContext();
 
-  const [{ data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }, ownerCodes] = await Promise.all([
+  const [{ data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }, { data: reminderLogs }, { data: vessels }, ownerCodes] = await Promise.all([
     supabase
       .from('compliance_items')
       .select('*, vessels(name)')
@@ -34,19 +34,31 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
       .eq('company_id', membership.company_id)
       .eq('item_id', params.id)
       .order('created_at', { ascending: true }),
+    supabase
+      .from('reminder_send_log')
+      .select('recipient_email, status, scheduled_for, sent_at, failure_reason')
+      .eq('company_id', membership.company_id)
+      .eq('item_id', params.id)
+      .order('scheduled_for', { ascending: false })
+      .limit(5),
+    supabase
+      .from('vessels')
+      .select('id, name')
+      .eq('company_id', membership.company_id)
+      .eq('active', true)
+      .order('name'),
     getCompanyOwnerCodes(membership.company_id)
   ]);
 
   if (!rawItem) notFound();
 
   const item = mapComplianceItem(rawItem);
-  const canManageItem =
-    ['owner', 'office_admin'].includes(membership.role)
-    || (
-      membership.role === 'office_user'
-      && Boolean(item.owner_current)
-      && ownerCodes.some((owner) => owner.code === item.owner_current && owner.is_assigned_to_current_user)
-    );
+  const isOwner = membership.role === 'owner';
+  const isAssignedOfficeUser = (
+    membership.role === 'office_user'
+    && Boolean(item.owner_current)
+    && ownerCodes.some((owner) => owner.code === item.owner_current && owner.is_assigned_to_current_user)
+  );
 
   return (
     <div className="app-shell">
@@ -57,7 +69,12 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
           history={(history ?? []) as any}
           reminderRules={reminderRules ?? []}
           recipients={recipients ?? []}
-          canManageItem={canManageItem}
+          reminderLogs={reminderLogs ?? []}
+          vessels={vessels ?? []}
+          canUpdateStatus={isOwner || isAssignedOfficeUser}
+          canCompleteItem={isOwner || isAssignedOfficeUser}
+          canEditCore={isOwner}
+          canManageReminders={isOwner}
           backHref="/"
           backLabel="Back to work queue"
           itemPathPrefix="/items"

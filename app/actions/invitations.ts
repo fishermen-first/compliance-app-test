@@ -6,7 +6,7 @@ import { assertOwnerEmailMappable, isOwnerCodeEmailRejectedError } from '@/lib/a
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
-const companyRoles = ['owner', 'office_admin', 'office_user', 'vessel_user'] as const;
+const companyRoles = ['owner', 'office_user'] as const;
 const allowedRoles = ['app_admin', ...companyRoles] as const;
 const ownerCodeRejectedMessage = 'This email cannot be used for a customer user.';
 const crossCompanyMessage = 'This email is already tied to another workspace. Ask FF Admin to review access.';

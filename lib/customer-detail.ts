@@ -118,9 +118,9 @@ export function toAppRole(role: CustomerRole): AppRole {
 function roleLabel(role: CustomerRole) {
   const labels: Record<CustomerRole, string> = {
     owner: 'Owner',
-    office_admin: 'Customer Admin',
+    office_admin: 'Legacy Admin',
     office_user: 'Office User',
-    vessel_user: 'Vessel User'
+    vessel_user: 'Legacy User'
   };
 
   return labels[role];

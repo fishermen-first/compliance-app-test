@@ -72,7 +72,7 @@ export async function getCustomerContext(options: { allowAppAdmin?: boolean; req
 
   const membership = memberships[0];
 
-  if (options.requireWritable && !['owner', 'office_admin', 'office_user'].includes(membership.role)) {
+  if (options.requireWritable && !['owner', 'office_user'].includes(membership.role)) {
     redirect('/');
   }
 
