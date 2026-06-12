@@ -29,6 +29,22 @@ type OwnerCodeRow = {
   handoff_exemption_reason: string | null;
 };
 
+function normalizeOwnerCode(value: string) {
+  const code = value.trim();
+
+  if (!code) return null;
+
+  if (code.length > 48) {
+    throw new Error('Owner codes must be 48 characters or fewer.');
+  }
+
+  if (/[\r\n\t]/.test(code)) {
+    throw new Error('Owner codes cannot include tabs or line breaks.');
+  }
+
+  return code;
+}
+
 function assertValidEmail(email: string) {
   const normalized = email.trim().toLowerCase();
 
@@ -160,7 +176,7 @@ async function updateOwnerCodeAssignments(
   target: OwnerCodeAssignmentTarget,
   codes: string[]
 ) {
-  const desiredCodes = new Set(codes.map((code) => code.trim()).filter(Boolean));
+  const desiredCodes = new Set(codes.map(normalizeOwnerCode).filter((code): code is string => Boolean(code)));
   const nextEmail = normalizedEmail(target.email);
   const previousEmail = normalizedEmail(target.previousEmail);
 
@@ -181,7 +197,21 @@ async function updateOwnerCodeAssignments(
   const unknownCodes = Array.from(desiredCodes).filter((code) => !existingCodes.has(code));
 
   if (unknownCodes.length > 0) {
-    throw new Error(`Unknown owner code: ${unknownCodes.join(', ')}`);
+    const { data: createdCodes, error: createError } = await admin
+      .from('company_owner_codes')
+      .upsert(
+        unknownCodes.map((code) => ({
+          company_id: customerId,
+          code,
+          updated_at: new Date().toISOString()
+        })),
+        { onConflict: 'company_id,code' }
+      )
+      .select('id, code, user_id, pending_email, handoff_exempt, handoff_exemption_reason');
+
+    if (createError) throw new Error(createError.message);
+
+    ownerCodes.push(...((createdCodes ?? []) as OwnerCodeRow[]));
   }
 
   for (const owner of ownerCodes) {

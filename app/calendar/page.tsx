@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { AppSidebar } from '@/components/app-sidebar';
-import { daysUntil, displayState, formatDate, stateClassName, type ComplianceItem } from '@/lib/compliance';
+import { StatusBadge } from '@/components/status-badge';
+import { daysUntil, displayState, formatDate, isWorkQueueItem, itemIsOverdue, type ComplianceItem } from '@/lib/compliance';
 import { getCompanyOwnerCodes, getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer-data';
 import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
 
@@ -43,11 +44,10 @@ function takeSection(items: ComplianceItem[], assignedIds: Set<string>, predicat
 
 function planningSections(items: ComplianceItem[]) {
   const assignedIds = new Set<string>();
-  const activeStates = new Set(['Ready', 'Overdue', 'In Progress', 'Submitted']);
   const needsWorkNow = takeSection(
     items,
     assignedIds,
-    (item) => activeStates.has(displayState(item)) || (daysUntil(item.start_working_on) ?? 1) <= 0,
+    (item) => isWorkQueueItem(item) || (daysUntil(item.start_working_on) ?? 1) <= 0,
     byDate('expiration_date')
   );
   const startingSoon = takeSection(
@@ -79,13 +79,13 @@ function planningSections(items: ComplianceItem[]) {
     },
     {
       title: 'Starting in the next 30 days',
-      description: 'Upcoming start-working dates that are not active yet.',
+      description: 'Start-working dates that are not active yet.',
       items: startingSoon,
       empty: 'No start dates in the next 30 days.'
     },
     {
       title: 'Expiring in the next 60 days',
-      description: 'Upcoming hard deadlines that are not already in the active work list.',
+      description: 'Hard deadlines that are not already in the active work list.',
       items: expiringSoon,
       empty: 'No additional expirations in the next 60 days.'
     },
@@ -99,8 +99,6 @@ function planningSections(items: ComplianceItem[]) {
 }
 
 function PlanningRow({ item }: { item: ComplianceItem }) {
-  const state = displayState(item);
-
   return (
     <Link className="planning-row" href={`/items/${item.id}`}>
       <span className="planning-owner-pill">{item.owner_current ?? 'Unassigned'}</span>
@@ -122,13 +120,13 @@ function PlanningRow({ item }: { item: ComplianceItem }) {
         <strong>{formatDate(item.expiration_date)}</strong>
         <small>{relativeDate(item.expiration_date)}</small>
       </div>
-      <span className={`status-chip state-${stateClassName(state)}`}>{state}</span>
+      <StatusBadge item={item} />
     </Link>
   );
 }
 
 export default async function CalendarPage({ searchParams }: CalendarPageProps) {
-  const { membership, company } = await getCustomerContext();
+  const { membership, company, profile, user } = await getCustomerContext();
   const [items, ownerCodes] = await Promise.all([
     getCustomerItems(membership.company_id),
     getCompanyOwnerCodes(membership.company_id)
@@ -166,15 +164,23 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     : selectedOwnerCodes.length
       ? `Owner ${selectedOwnerCodes.join(', ')}`
       : 'Owner setup needed';
+  const dueCount = items.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item) === 'Due' || itemIsOverdue(item))).length;
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} activePath="/calendar" />
+      <AppSidebar
+        companyName={company?.name ?? 'FF Compliance'}
+        userRole={accessRoleLabel(membership.role)}
+        userName={profile?.full_name ?? user.email}
+        userEmail={user.email}
+        dueCount={dueCount}
+        activePath="/calendar"
+      />
       <main className="workspace list-workspace">
         <header className="list-header">
           <div>
             <p className="eyebrow">Planning calendar · {scopeLabel}</p>
-            <h1>Upcoming compliance dates</h1>
+            <h1>Compliance planning dates</h1>
             <p>Use this list to plan around the two dates from the workbook: when to start work, and when the item expires or is due.</p>
           </div>
           <Link className="primary-action" href="/">Work queue</Link>

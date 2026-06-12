@@ -79,6 +79,13 @@ export function UserAddDrawer({
                   </label>
                 ))}
               </div>
+              <div className="code-add-row">
+                <label htmlFor="add-owner-code">Add owner code</label>
+                <div>
+                  <input id="add-owner-code" name="ownerCodes" type="text" maxLength={48} placeholder="SN or SN/BJ" />
+                </div>
+                <span className="hint">Use the exact workbook owner code if it is missing from the list.</span>
+              </div>
             </div>
           </div>
 

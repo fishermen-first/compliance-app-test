@@ -1,14 +1,19 @@
 import Link from 'next/link';
-import { CalendarDays, CheckCircle2, Plus } from 'lucide-react';
+import { type ReactNode } from 'react';
+import { CalendarDays, Columns3, Plus } from 'lucide-react';
 import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
 import {
   type ComplianceItem,
-  displayState,
   daysUntil,
-  shortDate,
-  stateClassName
+  displayState,
+  displayStateParam,
+  formatDate,
+  isWorkQueueItem,
+  itemIsOverdue,
+  shortDate
 } from '@/lib/compliance';
 import { itemVessel } from '@/lib/customer-data';
+import { StatusBadge } from '@/components/status-badge';
 
 export type DashboardFilters = {
   owner?: string;
@@ -16,7 +21,38 @@ export type DashboardFilters = {
   type?: string;
   vessel?: string;
   frequency?: string;
+  sort?: string;
+  dir?: string;
+  columns?: string;
 };
+
+type ColumnKey = 'item' | 'vessel' | 'owner' | 'agency' | 'start' | 'expiration' | 'status' | 'note' | 'frequency' | 'itemNumber';
+type SortKey = 'item' | 'vessel' | 'owner' | 'agency' | 'start' | 'expiration' | 'status';
+
+const columns: Array<{ key: ColumnKey; label: string }> = [
+  { key: 'item', label: 'Item' },
+  { key: 'vessel', label: 'Vessel' },
+  { key: 'owner', label: 'Owner' },
+  { key: 'agency', label: 'Agency' },
+  { key: 'start', label: 'Start' },
+  { key: 'expiration', label: 'Expires' },
+  { key: 'status', label: 'Status' },
+  { key: 'note', label: 'Latest note' },
+  { key: 'frequency', label: 'Frequency' },
+  { key: 'itemNumber', label: 'Item #' }
+];
+
+const defaultColumns: ColumnKey[] = ['item', 'vessel', 'owner', 'agency', 'start', 'expiration', 'status', 'note'];
+const sortKeys = new Set<SortKey>(['item', 'vessel', 'owner', 'agency', 'start', 'expiration', 'status']);
+const dashboardFilterKeys = ['owner', 'status', 'type', 'vessel', 'frequency', 'sort', 'dir', 'columns'] as const;
+
+const statusFilterOptions = [
+  { value: 'due', label: 'Due' },
+  { value: 'overdue', label: 'Overdue' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'submitted', label: 'Submitted' },
+  { value: 'not_due_yet', label: 'Not due yet' }
+];
 
 function initials(name: string) {
   return name
@@ -27,19 +63,9 @@ function initials(name: string) {
     .join('') || 'U';
 }
 
-function sortedByStart(items: ComplianceItem[]) {
-  return [...items].sort((a, b) => (a.start_working_on ?? '9999-12-31').localeCompare(b.start_working_on ?? '9999-12-31'));
-}
-
 function uniqueSorted(items: ComplianceItem[], getValue: (item: ComplianceItem) => string | null | undefined) {
   return Array.from(new Set(items.map(getValue).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b));
 }
-
-function displayStateParam(item: ComplianceItem) {
-  return displayState(item).toLowerCase().replaceAll(' ', '_');
-}
-
-const dashboardFilterKeys = ['owner', 'status', 'type', 'vessel', 'frequency'] as const;
 
 function dashboardHref(filters: DashboardFilters, updates: Partial<Record<keyof DashboardFilters, string | null | undefined>>) {
   const params = new URLSearchParams();
@@ -53,23 +79,125 @@ function dashboardHref(filters: DashboardFilters, updates: Partial<Record<keyof 
   return query ? `/?${query}` : '/';
 }
 
-function limitedOptions(options: string[], selected: string | undefined, limit = 10) {
-  const limited = options.slice(0, limit);
-
-  if (selected && options.includes(selected) && !limited.includes(selected)) {
-    return [...limited, selected];
-  }
-
-  return limited;
+function selectedColumns(value?: string) {
+  const requested = (value ?? '')
+    .split(',')
+    .map((column) => column.trim())
+    .filter((column): column is ColumnKey => columns.some((candidate) => candidate.key === column));
+  const unique = Array.from(new Set(requested));
+  return unique.length > 0 ? unique : defaultColumns;
 }
 
-const statusFilterOptions = [
-  { value: 'ready', label: 'Ready' },
-  { value: 'overdue', label: 'Overdue' },
-  { value: 'in_progress', label: 'In progress' },
-  { value: 'submitted', label: 'Submitted' },
-  { value: 'upcoming', label: 'Upcoming' }
-];
+function ownerSplit(items: ComplianceItem[]) {
+  const counts = new Map<string, number>();
+  items.forEach((item) => {
+    const owner = item.owner_current ?? 'Unassigned';
+    counts.set(owner, (counts.get(owner) ?? 0) + 1);
+  });
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 4)
+    .map(([owner, count]) => `${owner} ${count}`)
+    .join(' · ');
+}
+
+function sortValue(item: ComplianceItem, sort: SortKey) {
+  if (sort === 'item') return item.item_name;
+  if (sort === 'vessel') return itemVessel(item);
+  if (sort === 'owner') return item.owner_current ?? '';
+  if (sort === 'agency') return item.agency_type ?? '';
+  if (sort === 'start') return item.start_working_on ?? '9999-12-31';
+  if (sort === 'expiration') return item.expiration_date ?? '9999-12-31';
+  return displayState(item);
+}
+
+function sortItems(items: ComplianceItem[], sort: SortKey, dir: 'asc' | 'desc') {
+  const multiplier = dir === 'desc' ? -1 : 1;
+  return [...items].sort((a, b) => {
+    const compared = String(sortValue(a, sort)).localeCompare(String(sortValue(b, sort)));
+    return compared === 0 ? a.item_name.localeCompare(b.item_name) : compared * multiplier;
+  });
+}
+
+function FilterMenu({
+  label,
+  selectedLabel,
+  children
+}: {
+  label: string;
+  selectedLabel: string;
+  children: ReactNode;
+}) {
+  return (
+    <details className="filter-chip-menu">
+      <summary>{label}: {selectedLabel}</summary>
+      <div className="filter-pop">{children}</div>
+    </details>
+  );
+}
+
+function SortHeader({ column, filters, sort, dir }: { column: { key: ColumnKey; label: string }; filters: DashboardFilters; sort: SortKey; dir: 'asc' | 'desc' }) {
+  if (!sortKeys.has(column.key as SortKey)) return <span>{column.label}</span>;
+
+  const key = column.key as SortKey;
+  const active = sort === key;
+  const nextDir = active && dir === 'asc' ? 'desc' : 'asc';
+
+  return (
+    <Link className="th-sort" data-sorted={active ? 'true' : undefined} href={dashboardHref(filters, { sort: key, dir: nextDir })} scroll={false}>
+      <span>{column.label}</span>
+      <span className="arr">{active ? (dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+    </Link>
+  );
+}
+
+function ColumnChooser({ filters, visibleColumns }: { filters: DashboardFilters; visibleColumns: ColumnKey[] }) {
+  return (
+    <details className="column-menu">
+      <summary><Columns3 aria-hidden="true" /> Columns</summary>
+      <div className="colpop">
+        {columns.map((column) => {
+          const nextColumns = visibleColumns.includes(column.key)
+            ? visibleColumns.filter((key) => key !== column.key)
+            : [...visibleColumns, column.key];
+          const safeColumns = nextColumns.length > 0 ? nextColumns : visibleColumns;
+          const value = safeColumns.length === defaultColumns.length ? undefined : safeColumns.join(',');
+
+          return (
+            <Link className={visibleColumns.includes(column.key) ? 'active' : ''} href={dashboardHref(filters, { columns: value })} key={column.key} scroll={false}>
+              <span>{column.label}</span>
+              <span>{visibleColumns.includes(column.key) ? '✓' : ''}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
+function QueueCell({ item, column, isMine }: { item: ComplianceItem; column: ColumnKey; isMine: boolean }) {
+  if (column === 'item') {
+    return (
+      <td>
+        <Link className="item-link" href={`/items/${item.id}`}>
+          <span>{item.item_name}</span>
+          <small className="subline">{item.item_number ? `#${item.item_number} · ` : ''}{item.compliance_area ?? 'Other'}</small>
+        </Link>
+      </td>
+    );
+  }
+  if (column === 'vessel') {
+    return <td><span>{itemVessel(item)}</span><small className="subline">{item.vessel_id ? 'Vessel' : 'Office'}</small></td>;
+  }
+  if (column === 'owner') return <td><span className={`own-chip${isMine ? ' is-me' : ''}`}>{item.owner_current ?? '-'}</span></td>;
+  if (column === 'agency') return <td>{item.agency_type ?? '-'}</td>;
+  if (column === 'start') return <td>{shortDate(item.start_working_on)}</td>;
+  if (column === 'expiration') return <td>{shortDate(item.expiration_date)}</td>;
+  if (column === 'status') return <td><StatusBadge item={item} /></td>;
+  if (column === 'note') return <td><span className="cell-note">{item.status_notes || 'No note yet'}</span></td>;
+  if (column === 'frequency') return <td>{item.frequency_label ?? '-'}</td>;
+  return <td>{item.item_number ?? '-'}</td>;
+}
 
 export function Dashboard({
   companyName,
@@ -79,7 +207,6 @@ export function Dashboard({
   selectedOwnerCodes,
   showAllOwners,
   hasOwnerMapping,
-  ownerFilterCodes,
   canCreateItems,
   filters
 }: {
@@ -102,52 +229,68 @@ export function Dashboard({
     : selectedOwnerCodes.length > 0
       ? openItems.filter((item) => item.owner_current && selectedOwnerCodes.includes(item.owner_current))
       : [];
-  const overdueItems = openItems.filter((item) => displayState(item) === 'Overdue');
-  const readyItems = openItems.filter((item) => displayState(item) === 'Ready');
-  const submittedItems = openItems.filter((item) => item.status === 'submitted');
-  const scopedOverdueItems = scopedItems.filter((item) => displayState(item) === 'Overdue');
-  const scopedReadyItems = scopedItems.filter((item) => displayState(item) === 'Ready');
-  const scopedInProgressItems = scopedItems.filter((item) => item.status === 'in_progress');
-  const scopedSubmittedItems = scopedItems.filter((item) => item.status === 'submitted');
-  const scopedUpcomingItems = scopedItems.filter((item) => displayState(item) === 'Upcoming');
+  const sort = sortKeys.has(filters.sort as SortKey) ? filters.sort as SortKey : 'start';
+  const dir = filters.dir === 'desc' ? 'desc' : 'asc';
+  const visibleColumns = selectedColumns(filters.columns);
   const typeOptions = uniqueSorted(scopedItems, (item) => item.agency_type);
   const vesselOptions = uniqueSorted(scopedItems, itemVessel);
   const frequencyOptions = uniqueSorted(scopedItems, (item) => item.frequency_label);
   const filteredScopedItems = scopedItems.filter((item) => {
-    if (filters.status && item.status !== filters.status && displayStateParam(item) !== filters.status) return false;
+    if (filters.status === 'overdue' && !itemIsOverdue(item)) return false;
+    if (filters.status && filters.status !== 'overdue' && item.status !== filters.status && displayStateParam(item) !== filters.status) return false;
     if (filters.type && item.agency_type !== filters.type) return false;
     if (filters.vessel && itemVessel(item) !== filters.vessel) return false;
     if (filters.frequency && item.frequency_label !== filters.frequency) return false;
     return true;
   });
   const hasColumnFilters = Boolean(filters.status || filters.type || filters.vessel || filters.frequency);
-  const queueItems = sortedByStart(filteredScopedItems.filter((item) => {
+  const dueNowItems = scopedItems.filter((item) => displayState(item) === 'Due' && !itemIsOverdue(item));
+  const inProgressItems = scopedItems.filter((item) => item.status === 'in_progress');
+  const submittedItems = scopedItems.filter((item) => item.status === 'submitted');
+  const overdueItems = scopedItems.filter(itemIsOverdue);
+  const queueItems = sortItems(filteredScopedItems.filter((item) => {
     if (filters.status) return true;
-    const state = displayState(item);
-    return ['Ready', 'In Progress', 'Submitted', 'Overdue'].includes(state);
-  }));
-  const soonItems = filteredScopedItems.filter((item) => {
-    const expirationDays = daysUntil(item.expiration_date);
-    return expirationDays !== null && expirationDays >= 0 && expirationDays <= 30;
-  });
+    return isWorkQueueItem(item);
+  }), sort, dir);
+  const soonItems = sortItems(filteredScopedItems.filter((item) => {
+    if (isWorkQueueItem(item)) return false;
+    const startDays = daysUntil(item.start_working_on);
+    return startDays !== null && startDays > 0 && startDays <= 30;
+  }), 'start', 'asc');
   const queueScopeLabel = showAllOwners
-    ? 'All owners'
+    ? 'Everyone'
     : selectedOwnerCodes.length
-      ? `Owner ${selectedOwnerCodes.join(', ')}`
+      ? selectedOwnerCodes.join(', ')
       : 'Setup needed';
-  const defaultOwnerLabel = isCustomerOwner ? 'Owner default' : 'My owners';
   const queueHeading = hasColumnFilters ? 'Filtered work queue' : showAllOwners ? 'Current work queue' : 'My work queue';
+  const intro = showAllOwners
+    ? 'Items across the workspace whose start-working date has arrived, with each owner\'s latest progress note visible from the list.'
+    : 'Items you own whose start-working date has arrived, plus work already in progress, submitted, or overdue.';
+  const statusLabel = statusFilterOptions.find((option) => option.value === filters.status)?.label ?? 'All active';
+  const agencyLabel = filters.type ?? 'All';
+  const vesselLabel = filters.vessel ?? 'All';
+  const frequencyLabel = filters.frequency ?? 'All';
 
   return (
     <main className="workspace">
       <header className="page-header">
         <div>
           <p className="eyebrow">{companyName}</p>
-          <h1>Work queue</h1>
-          <p className="intro">Track active renewals, submissions, and upcoming compliance work from the imported due-date sheet.</p>
+          <h1>{queueHeading}</h1>
+          <p className="intro">{intro}</p>
         </div>
 
         <div className="header-actions">
+          <div className="scope-seg" aria-label="Queue scope">
+            <Link href={dashboardHref(filters, { owner: undefined })} aria-current={!showAllOwners ? 'true' : undefined} scroll={false}>
+              Mine - {selectedOwnerCodes.length ? selectedOwnerCodes.join(', ') : 'setup'}
+            </Link>
+            {isCustomerOwner ? (
+              <Link href={dashboardHref(filters, { owner: 'all' })} aria-current={showAllOwners ? 'true' : undefined} scroll={false}>
+                Everyone
+              </Link>
+            ) : null}
+          </div>
           <Link className="btn" href="/calendar">
             <CalendarDays aria-hidden="true" />
             <span>Calendar</span>
@@ -181,114 +324,60 @@ export function Dashboard({
         </section>
       ) : null}
 
-      <section className={`snapshot${isCustomerOwner ? '' : ' single-card'}`} aria-label="Queue snapshot">
-        <article className="card due">
-          <div className="label-block">
-            <div className="label-row">
-              <span className="num">{soonItems.length}</span>
-              <p className="label">Due in 30 days</p>
-            </div>
-            <p className="copy">Expirations approaching soon in the selected queue.</p>
-          </div>
-          <span />
-          <Link className="btn-link" href="/calendar">
-            <span>Open calendar</span>
-          </Link>
+      <section className="snapshot redesign-snapshot" aria-label="Queue snapshot">
+        <article className="stat-card">
+          <span>Due now</span>
+          <strong>{dueNowItems.length}</strong>
+          <p>{showAllOwners ? ownerSplit(dueNowItems) || 'No owner split yet' : 'Start-working date has arrived.'}</p>
         </article>
-
-        {isCustomerOwner ? (
-          <article className="card risk">
-            <p className="label">Company risk</p>
-            <div className="risk-rows">
-              <div>
-                <span className="num danger">{overdueItems.length}</span>
-                <span className="lbl">Overdue across all owners</span>
-              </div>
-              <div>
-                <span className="num ok">{readyItems.length}</span>
-                <span className="lbl">Ready across all owners</span>
-              </div>
-              <div>
-                <span className="num warn">{submittedItems.length}</span>
-                <span className="lbl">Submitted across all owners</span>
-              </div>
-            </div>
-          </article>
-        ) : null}
-      </section>
-
-      <section className="status-tabs" aria-label="Workflow summary">
-        <Link className={filters.status === 'ready' ? 'active' : ''} href={dashboardHref(filters, { status: 'ready' })} scroll={false}>
-          <span className="name">Ready</span>
-          <span className="num">{scopedReadyItems.length}</span>
-          <span className="desc">{showAllOwners ? 'All owners ready' : 'Selected scope ready'}</span>
-        </Link>
-        <Link className={filters.status === 'in_progress' ? 'active' : ''} href={dashboardHref(filters, { status: 'in_progress' })} scroll={false}>
-          <span className="name">In progress</span>
-          <span className="num">{scopedInProgressItems.length}</span>
-          <span className="desc">Being worked now</span>
-        </Link>
-        <Link className={filters.status === 'submitted' ? 'active' : ''} href={dashboardHref(filters, { status: 'submitted' })} scroll={false}>
-          <span className="name">Submitted</span>
-          <span className="num">{scopedSubmittedItems.length}</span>
-          <span className="desc">Waiting on response</span>
-        </Link>
-        <Link className={filters.status === 'upcoming' ? 'active' : ''} href={dashboardHref(filters, { status: 'upcoming' })} scroll={false}>
-          <span className="name">Upcoming</span>
-          <span className="num">{scopedUpcomingItems.length}</span>
-          <span className="desc">Not ready yet</span>
-        </Link>
-        <Link className={filters.status === 'overdue' ? 'active' : ''} href={dashboardHref(filters, { status: 'overdue' })} scroll={false}>
-          <span className="name">Overdue</span>
-          <span className="num">{scopedOverdueItems.length}</span>
-          <span className="desc">Past expiration</span>
-        </Link>
+        <article className="stat-card">
+          <span>In progress</span>
+          <strong>{inProgressItems.length}</strong>
+          <p>Renewals, filings, audits, or checks being worked now.</p>
+        </article>
+        <article className="stat-card">
+          <span>Submitted</span>
+          <strong>{submittedItems.length}</strong>
+          <p>Waiting on an agency, auditor, certifier, or confirmation.</p>
+        </article>
+        <article className="stat-card hot">
+          <span>Overdue</span>
+          <strong>{overdueItems.length}</strong>
+          <p>Past expiration while still open.</p>
+        </article>
       </section>
 
       <section className="panel queue-filter-panel" aria-label="Queue filters">
-        <div className="queue-filter-heading">
-          <div>
-            <span>Queue filters</span>
-            <h2>Refine work queue</h2>
+        <div className="queue-tools">
+          <div className="filter-chip-bar">
+            <FilterMenu label="Vessel" selectedLabel={vesselLabel}>
+              <Link className={!filters.vessel ? 'active' : ''} href={dashboardHref(filters, { vessel: undefined })} scroll={false}>All vessels</Link>
+              {vesselOptions.map((vessel) => (
+                <Link className={filters.vessel === vessel ? 'active' : ''} href={dashboardHref(filters, { vessel })} key={vessel} scroll={false}>{vessel}</Link>
+              ))}
+            </FilterMenu>
+            <FilterMenu label="Agency" selectedLabel={agencyLabel}>
+              <Link className={!filters.type ? 'active' : ''} href={dashboardHref(filters, { type: undefined })} scroll={false}>All agencies</Link>
+              {typeOptions.map((type) => (
+                <Link className={filters.type === type ? 'active' : ''} href={dashboardHref(filters, { type })} key={type} scroll={false}>{type}</Link>
+              ))}
+            </FilterMenu>
+            <FilterMenu label="Status" selectedLabel={statusLabel}>
+              <Link className={!filters.status ? 'active' : ''} href={dashboardHref(filters, { status: undefined })} scroll={false}>All active</Link>
+              {statusFilterOptions.map((option) => (
+                <Link className={filters.status === option.value ? 'active' : ''} href={dashboardHref(filters, { status: option.value })} key={option.value} scroll={false}>{option.label}</Link>
+              ))}
+            </FilterMenu>
+            <FilterMenu label="+ Filter" selectedLabel={frequencyLabel}>
+              <Link className={!filters.frequency ? 'active' : ''} href={dashboardHref(filters, { frequency: undefined })} scroll={false}>All frequencies</Link>
+              {frequencyOptions.map((frequency) => (
+                <Link className={filters.frequency === frequency ? 'active' : ''} href={dashboardHref(filters, { frequency })} key={frequency} scroll={false}>{frequency}</Link>
+              ))}
+            </FilterMenu>
           </div>
-          {(filters.owner || hasColumnFilters) ? <Link className="secondary-link" href="/" scroll={false}>Clear filters</Link> : null}
-        </div>
-        <div className="queue-filter-rows">
-          <div className="queue-filter-row">
-            <span>Owner</span>
-            <Link className={!filters.owner ? 'active' : ''} href={dashboardHref(filters, { owner: undefined })} scroll={false}>{defaultOwnerLabel}</Link>
-            {isCustomerOwner ? <Link className={filters.owner === 'all' ? 'active' : ''} href={dashboardHref(filters, { owner: 'all' })} scroll={false}>All owners</Link> : null}
-            {ownerFilterCodes.map((owner) => (
-              <Link className={filters.owner === owner ? 'active' : ''} href={dashboardHref(filters, { owner })} key={owner} scroll={false}>{owner}</Link>
-            ))}
-          </div>
-          <div className="queue-filter-row">
-            <span>Status</span>
-            <Link className={!filters.status ? 'active' : ''} href={dashboardHref(filters, { status: undefined })} scroll={false}>All active</Link>
-            {statusFilterOptions.map((option) => (
-              <Link className={filters.status === option.value ? 'active' : ''} href={dashboardHref(filters, { status: option.value })} key={option.value} scroll={false}>{option.label}</Link>
-            ))}
-          </div>
-          <div className="queue-filter-row">
-            <span>Agency/Type</span>
-            <Link className={!filters.type ? 'active' : ''} href={dashboardHref(filters, { type: undefined })} scroll={false}>All types</Link>
-            {limitedOptions(typeOptions, filters.type).map((type) => (
-              <Link className={filters.type === type ? 'active' : ''} href={dashboardHref(filters, { type })} key={type} scroll={false}>{type}</Link>
-            ))}
-          </div>
-          <div className="queue-filter-row">
-            <span>Vessel</span>
-            <Link className={!filters.vessel ? 'active' : ''} href={dashboardHref(filters, { vessel: undefined })} scroll={false}>All vessels</Link>
-            {limitedOptions(vesselOptions, filters.vessel).map((vessel) => (
-              <Link className={filters.vessel === vessel ? 'active' : ''} href={dashboardHref(filters, { vessel })} key={vessel} scroll={false}>{vessel}</Link>
-            ))}
-          </div>
-          <div className="queue-filter-row">
-            <span>Frequency</span>
-            <Link className={!filters.frequency ? 'active' : ''} href={dashboardHref(filters, { frequency: undefined })} scroll={false}>All frequencies</Link>
-            {limitedOptions(frequencyOptions, filters.frequency).map((frequency) => (
-              <Link className={filters.frequency === frequency ? 'active' : ''} href={dashboardHref(filters, { frequency })} key={frequency} scroll={false}>{frequency}</Link>
-            ))}
+          <div className="table-tools">
+            {(filters.owner || hasColumnFilters) ? <Link className="secondary-link" href="/" scroll={false}>Clear filters</Link> : null}
+            <ColumnChooser filters={filters} visibleColumns={visibleColumns} />
           </div>
         </div>
       </section>
@@ -296,48 +385,54 @@ export function Dashboard({
       <section className="panel priority-panel queue-panel">
         <div className="panel-heading">
           <div>
-            <span>{hasColumnFilters ? `${queueItems.length} matching items · ${queueScopeLabel}` : queueScopeLabel}</span>
+            <span>{hasColumnFilters ? `${queueItems.length} matching items · ${queueScopeLabel}` : `${queueItems.length} live items · ${queueScopeLabel}`}</span>
             <h2>{queueHeading}</h2>
           </div>
           <div className="queue-actions">
-            <Link className="secondary-link" href="/items">All records</Link>
+            <Link className="secondary-link" href="/items">All items</Link>
           </div>
         </div>
 
-        <div className="queue-list" aria-label="Actionable compliance items">
-          {queueItems.length === 0 ? (
-            <div className="empty-state">
-              <CheckCircle2 aria-hidden="true" />
-              <h3>{isUnmappedRegularUser ? 'No owner queue yet' : hasColumnFilters ? 'No items match these filters' : 'No actionable items right now'}</h3>
-              <p>{isUnmappedRegularUser ? 'Your queue will appear after a workspace owner maps your login to an owner code.' : hasColumnFilters ? 'Clear or adjust the filters to bring more compliance work back into view.' : 'Items will appear here when their start-working date arrives, or when they are in progress, submitted, or overdue.'}</p>
-            </div>
-          ) : queueItems.slice(0, 12).map((item) => (
-            <Link className="queue-item-row" href={`/items/${item.id}`} key={item.id}>
-              <div className="queue-item-main">
-                <div className="queue-item-kicker">
-                  <span>{item.owner_current ?? 'Unassigned'}</span>
-                  <span>{itemVessel(item)}</span>
-                  <span>{item.agency_type ?? 'No agency'} · {item.compliance_area ?? 'Other'}</span>
-                  <span>{item.frequency_label ?? 'No frequency'}</span>
-                </div>
-                <strong>{item.item_name}</strong>
-                <p>{item.status_notes || 'No notes'}</p>
-              </div>
-              <div className="queue-item-side">
-                <span className={`status-chip state-${stateClassName(displayState(item))}`}>{displayState(item)}</span>
-                <dl className="queue-item-dates">
-                  <div>
-                    <dt>Start</dt>
-                    <dd>{shortDate(item.start_working_on)}</dd>
-                  </div>
-                  <div>
-                    <dt>Expiration</dt>
-                    <dd>{shortDate(item.expiration_date)}</dd>
-                  </div>
-                </dl>
-              </div>
-            </Link>
-          ))}
+        <div className="redesign-table-wrap">
+          <table className="redesign-table" aria-label="Actionable compliance items">
+            <thead>
+              <tr>
+                {visibleColumns.map((column) => (
+                  <th key={column}><SortHeader column={columns.find((candidate) => candidate.key === column)!} filters={filters} sort={sort} dir={dir} /></th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {queueItems.length === 0 ? (
+                <tr>
+                  <td colSpan={visibleColumns.length}>
+                    <div className="empty-state">
+                      <h3>{isUnmappedRegularUser ? 'No owner queue yet' : hasColumnFilters ? 'No items match these filters' : 'No actionable items right now'}</h3>
+                      <p>{isUnmappedRegularUser ? 'Your queue will appear after a workspace owner maps your login to an owner code.' : hasColumnFilters ? 'Clear or adjust the filters to bring more compliance work back into view.' : 'Items will appear here when their start-working date arrives, or when they are in progress, submitted, or overdue.'}</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : queueItems.map((item) => (
+                <tr key={item.id}>
+                  {visibleColumns.map((column) => (
+                    <QueueCell column={column} isMine={Boolean(item.owner_current && selectedOwnerCodes.includes(item.owner_current))} item={item} key={column} />
+                  ))}
+                </tr>
+              ))}
+              {soonItems.length > 0 ? (
+                <>
+                  <tr className="row-group"><td colSpan={visibleColumns.length}>Starting soon - next 30 days</td></tr>
+                  {soonItems.map((item) => (
+                    <tr key={`soon-${item.id}`}>
+                      {visibleColumns.map((column) => (
+                        <QueueCell column={column} isMine={Boolean(item.owner_current && selectedOwnerCodes.includes(item.owner_current))} item={item} key={column} />
+                      ))}
+                    </tr>
+                  ))}
+                </>
+              ) : null}
+            </tbody>
+          </table>
         </div>
       </section>
     </main>

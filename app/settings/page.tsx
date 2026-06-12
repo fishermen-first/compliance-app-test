@@ -4,6 +4,7 @@ import { AccessDrawer } from '@/components/access-drawer';
 import { NoAccessScreen } from '@/components/no-access-screen';
 import { OwnerDrawer } from '@/components/owner-drawer';
 import { WorkspaceBlockedScreen } from '@/components/workspace-blocked-screen';
+import { createOwnerCode } from './actions';
 import { type Database } from '@/lib/database.types';
 import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
@@ -160,11 +161,14 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
     redirect('/admin');
   }
 
-  const membershipsResult = await supabase
-    .from('company_memberships')
-    .select('company_id, role, companies(id, name, timezone)')
-    .eq('user_id', userData.user.id)
-    .order('created_at', { ascending: true });
+  const [membershipsResult, profileResult] = await Promise.all([
+    supabase
+      .from('company_memberships')
+      .select('company_id, role, companies(id, name, timezone)')
+      .eq('user_id', userData.user.id)
+      .order('created_at', { ascending: true }),
+    supabase.from('profiles').select('full_name').eq('id', userData.user.id).maybeSingle()
+  ]);
 
   if (membershipsResult.error || !membershipsResult.data || membershipsResult.data.length === 0) {
     return <NoAccessScreen email={userData.user.email} />;
@@ -186,6 +190,8 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
         <AppSidebar
           companyName={company?.name ?? 'FF Compliance'}
           userRole={accessRoleLabel(membership.role)}
+          userName={profileResult.data?.full_name ?? userData.user.email}
+          userEmail={userData.user.email}
           activePath="/settings"
         />
         <main className="settings-setup-page">
@@ -338,6 +344,8 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
       <AppSidebar
         companyName={company?.name ?? 'FF Compliance'}
         userRole={accessRoleLabel(membership.role)}
+        userName={profileResult.data?.full_name ?? userData.user.email}
+        userEmail={userData.user.email}
         activePath="/settings"
       />
       <main className="settings-setup-page">
@@ -372,7 +380,15 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
               <h2 id="owner-code-heading">Owner-code assignments</h2>
               <div className="meta">Click a row to review the mapped person and records.</div>
             </div>
-            <span className="head-meta">{coverageLabel}</span>
+            <div className="owner-code-head-actions">
+              <span className="head-meta">{coverageLabel}</span>
+              <form action={createOwnerCode} className="owner-code-create-form">
+                <input type="hidden" name="companyId" value={companyId} />
+                <label htmlFor="settings-owner-code">Add owner code</label>
+                <input id="settings-owner-code" name="ownerCode" type="text" maxLength={48} placeholder="SN or SN/BJ" />
+                <button type="submit">Add</button>
+              </form>
+            </div>
           </div>
           {searchParams?.message ? <div className="inline-message" role="status">{searchParams.message}</div> : null}
           {showFfAdminNote ? (

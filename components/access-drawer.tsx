@@ -68,6 +68,10 @@ function formatDrawerDate(value: string | null) {
   return dateFormatter.format(new Date(timestamp));
 }
 
+function normalizeOwnerCode(value: string) {
+  return value.trim();
+}
+
 export function AccessDrawer({
   row,
   companyId,
@@ -81,13 +85,25 @@ export function AccessDrawer({
 }) {
   const [open, setOpen] = useState(false);
   const [selectedCodes, setSelectedCodes] = useState<string[]>(row.owner_codes);
+  const [ownerCodeDraft, setOwnerCodeDraft] = useState('');
   const initiallySelected = useMemo(() => new Set(row.owner_codes), [row.owner_codes]);
+  const visibleOwnerCodes = useMemo(() => {
+    const knownCodes = new Set(ownerCodes.map((ownerCode) => ownerCode.code));
+    const addedCodes = selectedCodes
+      .filter((code) => !knownCodes.has(code))
+      .map((code) => ({
+        code,
+        display_name: 'Added owner code'
+      }));
+
+    return [...ownerCodes, ...addedCodes];
+  }, [ownerCodes, selectedCodes]);
   const isInvite = row.target_kind === 'invitation';
   const isSelf = row.target_kind === 'membership' && (row.target_user_id === viewerId || row.target_id === viewerId);
   const name = row.display_name ?? 'No name on file';
   const canUpdateRole = !isSelf && Boolean(row.can_update_role);
   const canUpdateDisplayName = isSelf && row.target_kind === 'membership';
-  const showOwnerCodes = !isSelf && row.role === 'office_user';
+  const showOwnerCodes = row.role === 'owner' || row.role === 'office_user';
   const canUpdateOwnerCodes = showOwnerCodes && Boolean(row.can_update_owner_codes);
   const canClearOwnerCodes = showOwnerCodes && Boolean(row.can_clear_owner_codes);
   const canSubmitOwnerCodes = canUpdateOwnerCodes || canClearOwnerCodes;
@@ -101,6 +117,7 @@ export function AccessDrawer({
     if (!open) return;
 
     setSelectedCodes(row.owner_codes);
+    setOwnerCodeDraft('');
 
     const handler = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(false);
@@ -120,6 +137,19 @@ export function AccessDrawer({
         ? currentCodes.filter((selectedCode) => selectedCode !== code)
         : [...currentCodes, code]
     ));
+  }
+
+  function addOwnerCode() {
+    if (!canUpdateOwnerCodes) return;
+
+    const code = normalizeOwnerCode(ownerCodeDraft);
+    if (!code || selectedCodes.includes(code)) {
+      setOwnerCodeDraft('');
+      return;
+    }
+
+    setSelectedCodes((currentCodes) => [...currentCodes, code]);
+    setOwnerCodeDraft('');
   }
 
   return (
@@ -238,7 +268,7 @@ export function AccessDrawer({
                 <div className="field">
                   <span className="label-text">Owner codes</span>
                   <div className="field-pill-picker">
-                    {ownerCodes.map((ownerCode) => {
+                    {visibleOwnerCodes.map((ownerCode) => {
                       const selected = selectedCodes.includes(ownerCode.code);
                       const canToggle = canUpdateOwnerCodes || (canClearOwnerCodes && initiallySelected.has(ownerCode.code));
 
@@ -255,6 +285,28 @@ export function AccessDrawer({
                       );
                     })}
                   </div>
+                  {canUpdateOwnerCodes ? (
+                    <div className="drawer-code-add">
+                      <label htmlFor={`owner-code-${row.target_id}`}>Add owner code</label>
+                      <div>
+                        <input
+                          id={`owner-code-${row.target_id}`}
+                          type="text"
+                          value={ownerCodeDraft}
+                          maxLength={48}
+                          placeholder="SN or SN/BJ"
+                          onChange={(event) => setOwnerCodeDraft(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              addOwnerCode();
+                            }
+                          }}
+                        />
+                        <button type="button" className="btn-secondary" onClick={addOwnerCode}>Add</button>
+                      </div>
+                    </div>
+                  ) : null}
                   {canSubmitOwnerCodes ? selectedCodes.map((code) => (
                     <input key={code} type="hidden" name="ownerCodes" value={code} />
                   )) : null}

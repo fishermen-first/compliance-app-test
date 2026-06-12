@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { AppSidebar } from '@/components/app-sidebar';
-import { displayState, formatDate, type ComplianceItem } from '@/lib/compliance';
+import { displayState, formatDate, isWorkQueueItem, itemIsOverdue, type ComplianceItem } from '@/lib/compliance';
 import { getCustomerContext, getCustomerItems } from '@/lib/customer-data';
 import { accessRoleLabel } from '@/lib/roles';
 
@@ -17,7 +17,7 @@ function nextItem(items: ComplianceItem[]) {
 }
 
 export default async function VesselsPage() {
-  const { supabase, membership, company } = await getCustomerContext();
+  const { supabase, membership, company, profile, user } = await getCustomerContext();
   const [{ data: vessels }, items] = await Promise.all([
     supabase.from('vessels').select('id, name, active').eq('company_id', membership.company_id).order('name'),
     getCustomerItems(membership.company_id)
@@ -26,10 +26,18 @@ export default async function VesselsPage() {
   const vesselRows: VesselRow[] = vessels ?? [];
   const companyWideItems = items.filter((item) => !item.vessel_id);
   const totalOpen = items.filter((item) => !['complete', 'discontinued'].includes(item.status)).length;
+  const dueCount = items.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item) === 'Due' || itemIsOverdue(item))).length;
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} activePath="/vessels" />
+      <AppSidebar
+        companyName={company?.name ?? 'FF Compliance'}
+        userRole={accessRoleLabel(membership.role)}
+        userName={profile?.full_name ?? user.email}
+        userEmail={user.email}
+        dueCount={dueCount}
+        activePath="/vessels"
+      />
       <main className="workspace list-workspace">
         <header className="list-header">
           <div>
@@ -62,7 +70,7 @@ export default async function VesselsPage() {
           {vesselRows.map((vessel) => {
             const vesselItems = items.filter((item) => item.vessel_id === vessel.id);
             const openItems = vesselItems.filter((item) => !['complete', 'discontinued'].includes(item.status));
-            const readyItems = openItems.filter((item) => ['Ready', 'Overdue', 'In Progress', 'Submitted'].includes(displayState(item)));
+            const actionItems = openItems.filter(isWorkQueueItem);
             const upcoming = nextItem(vesselItems);
             return (
               <article className="panel vessel-summary-card" key={vessel.id}>
@@ -72,10 +80,10 @@ export default async function VesselsPage() {
                 </div>
                 <dl>
                   <div><dt>Open</dt><dd>{openItems.length}</dd></div>
-                  <div><dt>Needs action</dt><dd>{readyItems.length}</dd></div>
+                  <div><dt>Needs action</dt><dd>{actionItems.length}</dd></div>
                   <div><dt>Total records</dt><dd>{vesselItems.length}</dd></div>
                 </dl>
-                <p>{upcoming ? `Next: ${upcoming.item_name} on ${formatDate(upcoming.start_working_on ?? upcoming.expiration_date)}` : 'No upcoming work saved for this vessel.'}</p>
+                <p>{upcoming ? `Next: ${upcoming.item_name} on ${formatDate(upcoming.start_working_on ?? upcoming.expiration_date)}` : 'No scheduled work saved for this vessel.'}</p>
                 <Link className="secondary-link" href={`/items?vessel=${encodeURIComponent(vessel.name)}`}>View vessel items</Link>
               </article>
             );
@@ -88,7 +96,7 @@ export default async function VesselsPage() {
             </div>
             <dl>
               <div><dt>Open</dt><dd>{companyWideItems.filter((item) => !['complete', 'discontinued'].includes(item.status)).length}</dd></div>
-              <div><dt>Needs action</dt><dd>{companyWideItems.filter((item) => ['Ready', 'Overdue', 'In Progress', 'Submitted'].includes(displayState(item))).length}</dd></div>
+              <div><dt>Needs action</dt><dd>{companyWideItems.filter(isWorkQueueItem).length}</dd></div>
               <div><dt>Total records</dt><dd>{companyWideItems.length}</dd></div>
             </dl>
             <p>Company-wide records include food safety, administration, or fleet-level compliance items.</p>

@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { completeComplianceItem, saveComplianceItemReminders, updateComplianceItemCore, updateComplianceItemStatus } from '@/app/actions/items';
+import { StatusBadge } from '@/components/status-badge';
 import {
   type ComplianceItem,
+  daysUntil,
   displayState,
   formatDate,
   proposedNextDates,
-  stateClassName,
+  storedStatusLabels,
   todayIso
 } from '@/lib/compliance';
 import { itemVessel } from '@/lib/customer-data';
@@ -45,7 +47,14 @@ type HistoryEntry = {
   profiles?: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null;
 };
 
-function statusOptionLabel(value: string) {
+type OwnerOption = {
+  code: string;
+  display_name?: string | null;
+};
+
+function statusOptionLabel(value: string | null) {
+  if (!value) return 'New';
+  if (value in storedStatusLabels) return storedStatusLabels[value as keyof typeof storedStatusLabels];
   return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
@@ -108,6 +117,35 @@ function formatTimestamp(value: string | null) {
   return new Date(value).toLocaleString();
 }
 
+function daysRemainingLabel(item: ComplianceItem) {
+  if (item.status === 'complete') return item.completed_at ? `Completed ${formatDate(item.completed_at)}` : 'Complete';
+  if (item.status === 'discontinued') return 'Did not renew';
+
+  const days = daysUntil(item.expiration_date);
+  if (days === null) return 'No expiration date';
+  if (days < 0) return `${Math.abs(days)} days overdue`;
+  if (days === 0) return 'Due today';
+  if (days === 1) return '1 day remaining';
+  return `${days} days remaining`;
+}
+
+function workflowIndex(item: ComplianceItem) {
+  if (item.status === 'complete') return 4;
+  if (item.status === 'submitted') return 3;
+  if (item.status === 'in_progress') return 2;
+  if (displayState(item) === 'Due') return 1;
+  return 0;
+}
+
+function ownerOptionsWithCurrent(ownerOptions: OwnerOption[], item: ComplianceItem) {
+  const map = new Map<string, OwnerOption>();
+  ownerOptions.forEach((owner) => map.set(owner.code, owner));
+  [item.owner_current, item.owner_raw].forEach((code) => {
+    if (code && !map.has(code)) map.set(code, { code });
+  });
+  return Array.from(map.values()).sort((a, b) => a.code.localeCompare(b.code));
+}
+
 export function ComplianceItemDetail({
   item,
   history,
@@ -115,6 +153,7 @@ export function ComplianceItemDetail({
   recipients,
   reminderLogs,
   vessels,
+  ownerOptions = [],
   canUpdateStatus,
   canCompleteItem,
   canEditCore,
@@ -129,6 +168,7 @@ export function ComplianceItemDetail({
   recipients: ReminderRecipient[];
   reminderLogs: ReminderLog[];
   vessels: VesselOption[];
+  ownerOptions?: OwnerOption[];
   canUpdateStatus: boolean;
   canCompleteItem: boolean;
   canEditCore: boolean;
@@ -137,7 +177,6 @@ export function ComplianceItemDetail({
   backLabel: string;
   itemPathPrefix: string;
 }) {
-  const state = displayState(item);
   const nextDates = proposedNextDates(item);
   const canCreateNext = Boolean(nextDates.nextExpirationDate);
   const startRule = ruleFor(reminderRules, 'on_start_date');
@@ -146,16 +185,35 @@ export function ComplianceItemDetail({
   const additionalRecipients = recipients.filter((recipient) => recipient.recipient_type === 'additional');
   const latestReminder = reminderLogs[0];
   const nextReminder = nextExpectedReminder(item, reminderRules);
+  const currentStep = workflowIndex(item);
+  const itemHref = `${itemPathPrefix}/${item.id}`;
+  const statusFormId = `status-${item.id}`;
+  const availableOwnerOptions = ownerOptionsWithCurrent(ownerOptions, item);
+  const workflowSteps = [
+    { label: 'Not due yet', copy: 'Waiting for the start-working date.' },
+    { label: 'Due', copy: 'Office work can start.' },
+    { label: 'In progress', copy: 'Renewal or filing is underway.' },
+    { label: 'Submitted', copy: item.agency_type ? 'Waiting on outside confirmation.' : 'Skipped - internal item.' },
+    { label: 'Complete', copy: 'Evidence saved and rolled forward.' }
+  ];
 
   return (
-    <section className="detail-panel">
-      <div className="detail-header">
+    <section className="detail-panel item-redesign">
+      <div className="item-hero">
         <div>
           <Link className="secondary-link" href={backHref}>{backLabel}</Link>
-          <p className="eyebrow">{itemVessel(item)} / {item.owner_raw ?? item.owner_current ?? 'Unassigned'}</p>
           <h1>{item.item_name}</h1>
+          <div className="item-meta-line">
+            <span>{itemVessel(item)}</span>
+            <span className="own-chip">{item.owner_current ?? item.owner_raw ?? 'Unassigned'}</span>
+            <span>{item.agency_type ?? 'No agency'}</span>
+            <span>{item.frequency_label ?? 'No frequency'}</span>
+          </div>
         </div>
-        <span className={`status-chip state-${stateClassName(state)}`}>{state}</span>
+        <div className="item-status-top">
+          <StatusBadge item={item} />
+          <span className="days-remaining">{daysRemainingLabel(item)}</span>
+        </div>
       </div>
 
       {!canUpdateStatus && !canCompleteItem && !canEditCore ? (
@@ -165,291 +223,329 @@ export function ComplianceItemDetail({
         </section>
       ) : null}
 
-      <section className="detail-grid">
-        <article>
-          <span>Owner</span>
-          <strong>{item.owner_current ?? 'Unassigned'}</strong>
-        </article>
-        <article>
-          <span>Start working on</span>
-          <strong>{formatDate(item.start_working_on)}</strong>
-        </article>
-        <article>
-          <span>Expiration date</span>
-          <strong>{formatDate(item.expiration_date)}</strong>
-        </article>
-        <article>
-          <span>Frequency</span>
-          <strong>{item.frequency_label ?? 'None'}</strong>
-        </article>
-      </section>
-
-      <section className="workflow-steps" aria-label="Compliance workflow">
-        {[
-          ['not_started', 'Not started', 'Waiting for the start-working date or owner pickup.'],
-          ['in_progress', 'In progress', 'Renewal, filing, audit, or exercise is being worked.'],
-          ['submitted', 'Submitted', 'Waiting on agency, auditor, certifier, or confirmation.'],
-          ['complete', 'Complete', 'Evidence saved and next recurrence created if needed.']
-        ].map(([value, label, copy]) => (
-          <article className={item.status === value ? 'active' : ''} key={value}>
-            <strong>{label}</strong>
-            <p>{copy}</p>
+      <div className="wf-strip" aria-label="Compliance workflow">
+        {workflowSteps.map((step, index) => (
+          <article className={`step${index < currentStep ? ' is-past' : ''}${index === currentStep ? ' is-now' : ''}`} key={step.label}>
+            <b>{step.label}</b>
+            <span>{step.copy}</span>
           </article>
         ))}
-      </section>
+      </div>
 
-      <section className="detail-two-col">
-        <div className="detail-card">
-          <p className="eyebrow">Current notes</p>
-          <p>{item.status_notes || 'No status notes yet.'}</p>
-          <p className="eyebrow">Instructions</p>
-          <p>{item.instructions || 'No instructions saved.'}</p>
-          {item.sharepoint_url ? <p><a href={item.sharepoint_url}>Open SharePoint link</a></p> : null}
+      <div className="detail-layout">
+        <div className="primary-detail-column">
+          {(canUpdateStatus || canCompleteItem) ? (
+            <article className="detail-card act-card">
+              <div>
+                <p className="eyebrow">Update status</p>
+                <h2>Status and note</h2>
+              </div>
+              {canUpdateStatus ? (
+                <form action={updateComplianceItemStatus} id={statusFormId}>
+                  <input type="hidden" name="itemId" value={item.id} />
+                  <input type="hidden" name="itemPathPrefix" value={itemPathPrefix} />
+                </form>
+              ) : null}
+              <div className="stbtns">
+                {canUpdateStatus ? (
+                  <>
+                    <label>
+                      <input form={statusFormId} name="status" type="radio" value="in_progress" defaultChecked={item.status === 'in_progress'} />
+                      <span>In progress</span>
+                      <small>Working it now</small>
+                    </label>
+                    <label>
+                      <input form={statusFormId} name="status" type="radio" value="submitted" defaultChecked={item.status === 'submitted'} />
+                      <span>Submitted</span>
+                      <small>Waiting outside</small>
+                    </label>
+                  </>
+                ) : null}
+                {canCompleteItem ? (
+                  <details className="modal-details">
+                    <summary className="complete-trigger">
+                      <span>Complete</span>
+                      <small>Roll forward</small>
+                    </summary>
+                    <div className="modal-scrim" />
+                    <div className="roll-modal" role="dialog" aria-modal="true" aria-label="Complete and roll forward">
+                      <div className="drawer-head">
+                        <div>
+                          <span className="eyebrow">Complete item</span>
+                          <strong>{item.item_name}</strong>
+                        </div>
+                      </div>
+                      <form action={completeComplianceItem} className="status-form">
+                        <input type="hidden" name="itemId" value={item.id} />
+                        <input type="hidden" name="itemPathPrefix" value={itemPathPrefix} />
+                        {!canEditCore && canCreateNext ? <input type="hidden" name="createNext" value="on" /> : null}
+                        {!canEditCore && canCreateNext && nextDates.nextStartWorkingOn ? <input type="hidden" name="nextStartWorkingOn" value={nextDates.nextStartWorkingOn} /> : null}
+                        {!canEditCore && canCreateNext && nextDates.nextExpirationDate ? <input type="hidden" name="nextExpirationDate" value={nextDates.nextExpirationDate} /> : null}
+                        <div className="body">
+                          <label>
+                            Completed on
+                            <input name="completionDate" type="date" defaultValue={todayIso()} required />
+                          </label>
+                          <label>
+                            Final note
+                            <textarea name="finalNotes" rows={3} placeholder="Certificate filed, final confirmation, or document location." />
+                          </label>
+                          {canEditCore ? (
+                            <>
+                              <label className="checkbox-row">
+                                <input name="createNext" type="checkbox" defaultChecked={canCreateNext} disabled={!canCreateNext} />
+                                Create the next record
+                              </label>
+                              <label>
+                                Next start
+                                <input name="nextStartWorkingOn" type="date" defaultValue={nextDates.nextStartWorkingOn ?? ''} disabled={!canCreateNext} />
+                              </label>
+                              <label>
+                                Next expiration
+                                <input name="nextExpirationDate" type="date" defaultValue={nextDates.nextExpirationDate ?? ''} disabled={!canCreateNext} />
+                              </label>
+                            </>
+                          ) : (
+                            <p className="form-note">{canCreateNext ? 'The next recurring item will use the saved recurrence dates.' : 'No recurring item will be created because this item has no automatic recurrence.'}</p>
+                          )}
+                          <p className="carry-note">Reminder rules, vessel recipients, and instructions carry over automatically when this item rolls forward.</p>
+                        </div>
+                        <div className="drawer-foot">
+                          <Link className="secondary-link" href={itemHref}>Cancel</Link>
+                          <button type="submit">Complete item</button>
+                        </div>
+                      </form>
+                    </div>
+                  </details>
+                ) : null}
+              </div>
+              {canUpdateStatus ? (
+                <>
+                  <textarea className="note-input" form={statusFormId} name="notes" placeholder="waiting on check from accounting; mailed with check #4412" rows={3} />
+                  <p className="last-note">Last note: {item.status_notes || 'No status note yet.'}</p>
+                  <button form={statusFormId} type="submit">Save status</button>
+                </>
+              ) : null}
+            </article>
+          ) : null}
+
+          <article className="detail-card">
+            <div className="panel-heading" style={{ padding: 0, borderBottom: 0 }}>
+              <div>
+                <p className="eyebrow">Details</p>
+                <h2>Record definition</h2>
+              </div>
+              {canEditCore ? (
+                <details className="drawer-details">
+                  <summary className="secondary-link">Edit details</summary>
+                  <div className="drawer-scrim" />
+                  <div className="edit-drawer" role="dialog" aria-modal="true" aria-label="Edit item details">
+                    <div className="drawer-head">
+                      <div>
+                        <span className="eyebrow">Edit details</span>
+                        <strong>{item.item_name}</strong>
+                      </div>
+                    </div>
+                    <form action={updateComplianceItemCore} className="status-form">
+                      <input type="hidden" name="itemId" value={item.id} />
+                      <input type="hidden" name="itemPathPrefix" value={itemPathPrefix} />
+                      <div className="body">
+                        <section className="fsec">
+                          <h4>What it is</h4>
+                          <label>
+                            Item name
+                            <input name="itemName" defaultValue={item.item_name} required />
+                          </label>
+                          <div className="f2">
+                            <label>
+                              Item number
+                              <input name="itemNumber" defaultValue={item.item_number ?? ''} />
+                            </label>
+                            <label>
+                              Compliance area
+                              <input name="complianceArea" defaultValue={item.compliance_area ?? 'Other'} required />
+                            </label>
+                          </div>
+                          <label>
+                            Agency / Type
+                            <input name="agencyType" defaultValue={item.agency_type ?? ''} />
+                          </label>
+                        </section>
+                        <section className="fsec">
+                          <h4>Who and where</h4>
+                          <div className="f2">
+                            <label>
+                              Owner
+                              <select name="ownerCurrent" defaultValue={item.owner_current ?? ''}>
+                                <option value="">Unassigned</option>
+                                {availableOwnerOptions.map((owner) => <option value={owner.code} key={owner.code}>{owner.display_name ? `${owner.code} - ${owner.display_name}` : owner.code}</option>)}
+                              </select>
+                            </label>
+                            <label>
+                              Vessel
+                              <select name="vesselId" defaultValue={item.vessel_id ?? ''}>
+                                <option value="">Company-wide</option>
+                                {vessels.map((vessel) => <option value={vessel.id} key={vessel.id}>{vessel.name}</option>)}
+                              </select>
+                            </label>
+                          </div>
+                          <label>
+                            Owner code (from workbook)
+                            <input name="ownerRaw" defaultValue={item.owner_raw ?? ''} placeholder="SN, ES, MA" />
+                            <span className="form-note">Preserve the workbook owner code exactly, including compound codes.</span>
+                          </label>
+                        </section>
+                        <section className="fsec">
+                          <h4>Schedule</h4>
+                          <div className="f2">
+                            <label>
+                              Start working on
+                              <input name="startWorkingOn" type="date" defaultValue={item.start_working_on ?? ''} />
+                            </label>
+                            <label>
+                              Expiration date
+                              <input name="expirationDate" type="date" defaultValue={item.expiration_date ?? ''} />
+                            </label>
+                          </div>
+                          <div className="f2">
+                            <label>
+                              Frequency
+                              <input name="frequencyLabel" defaultValue={item.frequency_label ?? ''} />
+                            </label>
+                            <label>
+                              Recurrence unit
+                              <select name="recurrenceUnit" defaultValue={item.recurrence_unit}>
+                                <option value="none">None</option>
+                                <option value="manual">Manual</option>
+                                <option value="months">Months</option>
+                                <option value="years">Years</option>
+                              </select>
+                            </label>
+                          </div>
+                          <label>
+                            Recurrence interval
+                            <input name="recurrenceInterval" type="number" min="1" defaultValue={item.recurrence_interval ?? ''} />
+                          </label>
+                        </section>
+                        <section className="fsec">
+                          <h4>Email and documents</h4>
+                          <label>
+                            Status notes
+                            <textarea name="statusNotes" rows={3} defaultValue={item.status_notes ?? ''} />
+                          </label>
+                          <label>
+                            Instructions pasted into reminder emails
+                            <textarea name="instructions" rows={4} defaultValue={item.instructions ?? ''} />
+                          </label>
+                          <label>
+                            SharePoint link
+                            <input name="sharepointUrl" type="url" defaultValue={item.sharepoint_url ?? ''} />
+                          </label>
+                        </section>
+                      </div>
+                      <div className="drawer-foot">
+                        <Link className="secondary-link" href={itemHref}>Cancel</Link>
+                        <button type="submit">Save details</button>
+                      </div>
+                    </form>
+                  </div>
+                </details>
+              ) : null}
+            </div>
+            <dl className="definition-grid">
+              <div><dt>Vessel</dt><dd>{itemVessel(item)}</dd></div>
+              <div><dt>Owner</dt><dd>{item.owner_current ?? 'Unassigned'}</dd></div>
+              <div><dt>Agency</dt><dd>{item.agency_type ?? '-'}</dd></div>
+              <div><dt>Item #</dt><dd>{item.item_number ?? '-'}</dd></div>
+              <div><dt>Frequency</dt><dd>{item.frequency_label ?? '-'}</dd></div>
+              <div><dt>Dates</dt><dd>{formatDate(item.start_working_on)} to {formatDate(item.expiration_date)}</dd></div>
+              <div><dt>Compliance area</dt><dd>{item.compliance_area ?? 'Other'}</dd></div>
+              <div><dt>SharePoint</dt><dd>{item.sharepoint_url ? <a href={item.sharepoint_url}>Open document</a> : '-'}</dd></div>
+            </dl>
+          </article>
         </div>
 
-        {canManageReminders ? (
-          <div className="detail-card">
-            <p className="eyebrow">Reminder settings</p>
-            <ul className="reminder-summary-list">
-              {reminderRules.length === 0 ? <li>No reminder rules yet.</li> : null}
-              {reminderRules.map((rule) => (
-                <li key={`${rule.label}-${rule.trigger_type}`}>
-                  <strong>{rule.label}</strong>
-                  <span>{rule.active ? 'Active' : 'Inactive'}</span>
-                </li>
-              ))}
+        <aside className="detail-right-rail">
+          <article className="detail-card">
+            <p className="eyebrow">Reminders</p>
+            <ul className="reminder-card-list">
+              <li><strong>Start-working reminder</strong><span className="send-pill">{startRule?.active ? 'Active' : 'Off'}</span></li>
+              <li><strong>Before-expiration reminder</strong><span>{expirationRule?.active ? `${expirationRule.days_before ?? 14} days before` : 'Off'}</span></li>
+              <li><strong>Vessel-copy recipients</strong><span>{additionalRecipients.length}</span></li>
+              <li><strong>Next scheduled</strong><span>{nextReminder ? formatDate(nextReminder) : 'None'}</span></li>
+              <li><strong>Latest send</strong><span>{latestReminder ? `${statusOptionLabel(latestReminder.status)} - ${formatTimestamp(latestReminder.sent_at ?? latestReminder.scheduled_for)}` : 'None logged'}</span></li>
             </ul>
-            <p className="eyebrow">Additional recipients</p>
-            <ul className="reminder-summary-list">
-              {additionalRecipients.length === 0 ? <li>No additional recipients yet.</li> : null}
-              {additionalRecipients.map((recipient) => (
-                <li key={recipient.recipient_email}>
-                  <strong>{recipient.recipient_name || recipient.recipient_email}</strong>
-                  <span>{recipient.recipient_email}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="eyebrow">Latest send</p>
-            <p>{latestReminder ? `${statusOptionLabel(latestReminder.status)} / ${formatTimestamp(latestReminder.sent_at ?? latestReminder.scheduled_for)}` : 'No reminder sends logged yet.'}</p>
-            {latestReminder?.failure_reason ? <p>{latestReminder.failure_reason}</p> : null}
-            <p className="eyebrow">Next expected reminder</p>
-            <p>{nextReminder ? formatDate(nextReminder) : 'No upcoming reminder from active rules.'}</p>
-          </div>
-        ) : null}
-      </section>
+            <p className="carry-note">These settings carry over automatically when this item rolls forward.</p>
+            {canManageReminders ? (
+              <details className="filter-chip-menu">
+                <summary>Edit reminders</summary>
+                <div className="filter-pop" style={{ minWidth: 360 }}>
+                  <form action={saveComplianceItemReminders} className="status-form reminder-editor-form">
+                    <input type="hidden" name="itemId" value={item.id} />
+                    <input type="hidden" name="itemPathPrefix" value={itemPathPrefix} />
+                    <label>
+                      Instructions
+                      <textarea name="instructions" rows={4} defaultValue={item.instructions ?? ''} placeholder="Standing instructions included in reminder emails." />
+                    </label>
+                    <label className="checkbox-row">
+                      <input name="startRuleActive" type="checkbox" defaultChecked={startRule?.active ?? true} />
+                      Start date
+                    </label>
+                    <label className="checkbox-row">
+                      <input name="expirationRuleActive" type="checkbox" defaultChecked={expirationRule?.active ?? true} />
+                      Before expiration
+                    </label>
+                    <label>
+                      Days before
+                      <input name="expirationDaysBefore" type="number" min="0" defaultValue={expirationRule?.days_before ?? 14} />
+                    </label>
+                    <label className="checkbox-row">
+                      <input name="repeatRuleActive" type="checkbox" defaultChecked={repeatRule?.active ?? false} />
+                      Repeat after start
+                    </label>
+                    <label>
+                      Repeat every days
+                      <input name="repeatEveryDays" type="number" min="1" defaultValue={repeatRule?.repeat_every_days ?? ''} />
+                    </label>
+                    {additionalRecipients.map((recipient) => (
+                      <div className="recipient-editor-row" key={recipient.recipient_email}>
+                        <input name="additionalRecipientName" defaultValue={recipient.recipient_name ?? ''} placeholder="Name" />
+                        <input name="additionalRecipientEmail" type="email" defaultValue={recipient.recipient_email} placeholder="email@company.com" />
+                      </div>
+                    ))}
+                    {blankRecipientRows(2).map((key) => (
+                      <div className="recipient-editor-row" key={key}>
+                        <input name="additionalRecipientName" placeholder="Name" />
+                        <input name="additionalRecipientEmail" type="email" placeholder="email@company.com" />
+                      </div>
+                    ))}
+                    <label>
+                      Add recipients by line
+                      <textarea name="additionalRecipients" rows={3} placeholder="name@company.com or Name <name@company.com>" />
+                    </label>
+                    <button type="submit">Save reminders</button>
+                  </form>
+                </div>
+              </details>
+            ) : null}
+          </article>
 
-      {canEditCore ? (
-        <form action={updateComplianceItemCore} className="detail-card status-form item-core-editor">
-          <input type="hidden" name="itemId" value={item.id} />
-          <input type="hidden" name="itemPathPrefix" value={itemPathPrefix} />
-          <div>
-            <p className="eyebrow">Core record</p>
-            <h2>Edit compliance item</h2>
-          </div>
-          <label className="wide-field">
-            Item name
-            <input name="itemName" defaultValue={item.item_name} required />
-          </label>
-          <label>
-            Owner
-            <input name="ownerRaw" defaultValue={item.owner_raw ?? ''} placeholder="SN, ES, MA" />
-          </label>
-          <label>
-            Owner for filters
-            <input name="ownerCurrent" defaultValue={item.owner_current ?? ''} placeholder="SN" />
-          </label>
-          <label>
-            Vessel
-            <select name="vesselId" defaultValue={item.vessel_id ?? ''}>
-              <option value="">Company-wide</option>
-              {vessels.map((vessel) => <option value={vessel.id} key={vessel.id}>{vessel.name}</option>)}
-            </select>
-          </label>
-          <label>
-            Item number
-            <input name="itemNumber" defaultValue={item.item_number ?? ''} />
-          </label>
-          <label>
-            Agency / Type
-            <input name="agencyType" defaultValue={item.agency_type ?? ''} />
-          </label>
-          <label>
-            Compliance area
-            <input name="complianceArea" defaultValue={item.compliance_area ?? 'Other'} required />
-          </label>
-          <label>
-            Frequency
-            <input name="frequencyLabel" defaultValue={item.frequency_label ?? ''} />
-          </label>
-          <label>
-            Recurrence unit
-            <select name="recurrenceUnit" defaultValue={item.recurrence_unit}>
-              <option value="none">None</option>
-              <option value="manual">Manual</option>
-              <option value="months">Months</option>
-              <option value="years">Years</option>
-            </select>
-          </label>
-          <label>
-            Recurrence interval
-            <input name="recurrenceInterval" type="number" min="1" defaultValue={item.recurrence_interval ?? ''} />
-          </label>
-          <label>
-            Start working on
-            <input name="startWorkingOn" type="date" defaultValue={item.start_working_on ?? ''} />
-          </label>
-          <label>
-            Expiration date
-            <input name="expirationDate" type="date" defaultValue={item.expiration_date ?? ''} />
-          </label>
-          <label className="wide-field">
-            Status notes
-            <textarea name="statusNotes" rows={3} defaultValue={item.status_notes ?? ''} />
-          </label>
-          <label className="wide-field">
-            Instructions
-            <textarea name="instructions" rows={4} defaultValue={item.instructions ?? ''} />
-          </label>
-          <label className="wide-field">
-            SharePoint link
-            <input name="sharepointUrl" type="url" defaultValue={item.sharepoint_url ?? ''} />
-          </label>
-          <button type="submit">Save item details</button>
-        </form>
-      ) : null}
-
-      {canUpdateStatus || canCompleteItem ? (
-        <section className="detail-two-col">
-          {canUpdateStatus ? (
-            <form action={updateComplianceItemStatus} className="detail-card status-form">
-              <input type="hidden" name="itemId" value={item.id} />
-              <input type="hidden" name="itemPathPrefix" value={itemPathPrefix} />
-              <p className="eyebrow">Update status</p>
-              <label>
-                Status
-                <select name="status" defaultValue={item.status}>
-                  {['not_started', 'in_progress', 'submitted', 'discontinued'].map((status) => <option value={status} key={status}>{statusOptionLabel(status)}</option>)}
-                </select>
-              </label>
-              <label>
-                Status notes
-                <textarea name="notes" rows={4} placeholder="Add progress notes, submission details, or reason discontinued." />
-              </label>
-              <button type="submit">Save status</button>
-            </form>
-          ) : null}
-
-          {canCompleteItem ? (
-            <form action={completeComplianceItem} className="detail-card status-form">
-              <input type="hidden" name="itemId" value={item.id} />
-              <input type="hidden" name="itemPathPrefix" value={itemPathPrefix} />
-              {!canEditCore && canCreateNext ? <input type="hidden" name="createNext" value="on" /> : null}
-              {!canEditCore && canCreateNext && nextDates.nextStartWorkingOn ? <input type="hidden" name="nextStartWorkingOn" value={nextDates.nextStartWorkingOn} /> : null}
-              {!canEditCore && canCreateNext && nextDates.nextExpirationDate ? <input type="hidden" name="nextExpirationDate" value={nextDates.nextExpirationDate} /> : null}
-              <p className="eyebrow">Complete and roll forward</p>
-              <label>
-                Completion date
-                <input name="completionDate" type="date" defaultValue={todayIso()} required />
-              </label>
-              <label>
-                Final notes
-                <textarea name="finalNotes" rows={3} placeholder="Final confirmation, certificate filed, or document location." />
-              </label>
-              {canEditCore ? (
-                <>
-                  <label className="checkbox-row">
-                    <input name="createNext" type="checkbox" defaultChecked={canCreateNext} disabled={!canCreateNext} />
-                    Create next item from recurrence
-                  </label>
-                  <label>
-                    Next start working on
-                    <input name="nextStartWorkingOn" type="date" defaultValue={nextDates.nextStartWorkingOn ?? ''} disabled={!canCreateNext} />
-                  </label>
-                  <label>
-                    Next expiration date
-                    <input name="nextExpirationDate" type="date" defaultValue={nextDates.nextExpirationDate ?? ''} disabled={!canCreateNext} />
-                  </label>
-                </>
-              ) : (
-                <p className="form-note">{canCreateNext ? 'The next recurring item will use the saved recurrence dates.' : 'No recurring item will be created because this item has no automatic recurrence.'}</p>
-              )}
-              <button type="submit">Mark complete</button>
-            </form>
-          ) : null}
-        </section>
-      ) : null}
-
-      {canManageReminders ? (
-        <form action={saveComplianceItemReminders} className="detail-card status-form reminder-editor-form">
-          <input type="hidden" name="itemId" value={item.id} />
-          <input type="hidden" name="itemPathPrefix" value={itemPathPrefix} />
-          <div>
-            <p className="eyebrow">Reminder rules</p>
-            <h2>Instructions and recipients</h2>
-          </div>
-          <label>
-            Instructions
-            <textarea name="instructions" rows={4} defaultValue={item.instructions ?? ''} placeholder="Standing instructions included in reminder emails." />
-          </label>
-          <div className="reminder-rule-grid">
-            <label className="checkbox-row">
-              <input name="startRuleActive" type="checkbox" defaultChecked={startRule?.active ?? true} />
-              Start date
-            </label>
-            <label className="checkbox-row">
-              <input name="expirationRuleActive" type="checkbox" defaultChecked={expirationRule?.active ?? true} />
-              Before expiration
-            </label>
-            <label>
-              Days before
-              <input name="expirationDaysBefore" type="number" min="0" defaultValue={expirationRule?.days_before ?? 14} />
-            </label>
-            <label className="checkbox-row">
-              <input name="repeatRuleActive" type="checkbox" defaultChecked={repeatRule?.active ?? false} />
-              Repeat after start
-            </label>
-            <label>
-              Repeat every days
-              <input name="repeatEveryDays" type="number" min="1" defaultValue={repeatRule?.repeat_every_days ?? ''} />
-            </label>
-          </div>
-          <div className="recipient-editor-grid" aria-label="Additional reminder recipients">
-            <span>Name</span>
-            <span>Email</span>
-            {additionalRecipients.map((recipient) => (
-              <div className="recipient-editor-row" key={recipient.recipient_email}>
-                <input name="additionalRecipientName" defaultValue={recipient.recipient_name ?? ''} placeholder="Name" />
-                <input name="additionalRecipientEmail" type="email" defaultValue={recipient.recipient_email} placeholder="email@company.com" />
+          <article className="detail-card">
+            <p className="eyebrow">History</p>
+            {history.length === 0 ? <p>No status changes recorded yet.</p> : null}
+            {history.map((entry, index) => (
+              <div className={`tl-ev${index === 0 ? ' is-current' : ''}`} key={`${entry.changed_at}-${entry.to_status}`}>
+                <span className="dot" />
+                <div>
+                  <strong>{statusOptionLabel(entry.from_status)} to {statusOptionLabel(entry.to_status)}</strong>
+                  <div className="who">{new Date(entry.changed_at).toLocaleString()} / {actorLabel(entry)}</div>
+                  {entry.notes ? <p>{entry.notes}</p> : null}
+                </div>
               </div>
             ))}
-            {blankRecipientRows(2).map((key) => (
-              <div className="recipient-editor-row" key={key}>
-                <input name="additionalRecipientName" placeholder="Name" />
-                <input name="additionalRecipientEmail" type="email" placeholder="email@company.com" />
-              </div>
-            ))}
-          </div>
-          <label>
-            Add recipients by line
-            <textarea name="additionalRecipients" rows={3} placeholder="name@company.com or Name <name@company.com>" />
-          </label>
-          <button type="submit">Save reminders</button>
-        </form>
-      ) : null}
-
-      <section className="detail-card">
-        <p className="eyebrow">Status history</p>
-        {history.length === 0 ? <p>No status changes recorded yet.</p> : null}
-        <ul className="history-list">
-          {history.map((entry) => (
-            <li key={`${entry.changed_at}-${entry.to_status}`}>
-              <strong>{statusOptionLabel(entry.from_status ?? 'new')} -&gt; {statusOptionLabel(entry.to_status)}</strong>
-              <span>{new Date(entry.changed_at).toLocaleString()} / {actorLabel(entry)}</span>
-              {entry.notes ? <p>{entry.notes}</p> : null}
-            </li>
-          ))}
-        </ul>
-      </section>
+          </article>
+        </aside>
+      </div>
     </section>
   );
 }

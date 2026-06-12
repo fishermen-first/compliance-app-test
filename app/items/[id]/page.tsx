@@ -7,7 +7,7 @@ import { accessRoleLabel } from '@/lib/roles';
 type ItemDetailPageProps = { params: { id: string } };
 
 export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
-  const { supabase, membership, company } = await getCustomerContext();
+  const { supabase, membership, company, profile, user } = await getCustomerContext();
 
   const [{ data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }, { data: reminderLogs }, { data: vessels }, ownerCodes] = await Promise.all([
     supabase
@@ -62,7 +62,13 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} activePath="/" />
+      <AppSidebar
+        companyName={company?.name ?? 'FF Compliance'}
+        userRole={accessRoleLabel(membership.role)}
+        userName={profile?.full_name ?? user.email}
+        userEmail={user.email}
+        activePath="/"
+      />
       <main className="workspace list-workspace item-detail-page">
         <ComplianceItemDetail
           item={item}
@@ -71,6 +77,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
           recipients={recipients ?? []}
           reminderLogs={reminderLogs ?? []}
           vessels={vessels ?? []}
+          ownerOptions={ownerCodes.map((owner) => ({ code: owner.code, display_name: owner.display_name }))}
           canUpdateStatus={isOwner || isAssignedOfficeUser}
           canCompleteItem={isOwner || isAssignedOfficeUser}
           canEditCore={isOwner}

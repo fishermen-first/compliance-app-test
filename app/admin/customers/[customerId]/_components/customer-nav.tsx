@@ -61,7 +61,7 @@ function formatRelative(value: string) {
 
 function badgeFor(sectionId: string, customer: CustomerNavData) {
   if (sectionId === 'overview') return `${customer.gates.filter((gate) => gate.done).length}/${customer.gates.length}`;
-  if (sectionId === 'setup') return customer.gates.find((gate) => gate.current)?.label.split(' ')[0] ?? 'Ready';
+  if (sectionId === 'setup') return customer.gates.find((gate) => gate.current)?.label.split(' ')[0] ?? 'Done';
   if (sectionId === 'import') return String(customer.itemCount);
   if (sectionId === 'codes') return String(customer.ownerCodeCount);
   if (sectionId === 'users') return String(customer.userCount);

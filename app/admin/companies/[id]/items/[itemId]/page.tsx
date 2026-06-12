@@ -23,7 +23,7 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
   const companyId = params.id;
   const itemId = params.itemId;
 
-  const [{ data: company }, { data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }, { data: reminderLogs }, { data: vessels }] = await Promise.all([
+  const [{ data: company }, { data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }, { data: reminderLogs }, { data: vessels }, { data: ownerCodes }] = await Promise.all([
     supabase.from('companies').select('id, name, timezone').eq('id', companyId).maybeSingle(),
     supabase
       .from('compliance_items')
@@ -61,7 +61,12 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
       .select('id, name')
       .eq('company_id', companyId)
       .eq('active', true)
-      .order('name')
+      .order('name'),
+    supabase
+      .from('company_owner_codes')
+      .select('code, display_name')
+      .eq('company_id', companyId)
+      .order('code')
   ]);
 
   if (!company || !rawItem) notFound();
@@ -98,6 +103,7 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
           recipients={recipients ?? []}
           reminderLogs={reminderLogs ?? []}
           vessels={vessels ?? []}
+          ownerOptions={ownerCodes ?? []}
           canUpdateStatus
           canCompleteItem
           canEditCore

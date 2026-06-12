@@ -1,13 +1,14 @@
 import Link from 'next/link';
-import { Archive, CalendarDays, ClipboardList, LogOut, Ship, ShieldCheck, Settings } from 'lucide-react';
+import { Archive, Bell, CalendarDays, ClipboardList, HelpCircle, ListChecks, LogOut, Settings, ShieldCheck } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
 
 const navItems = [
-  { label: 'Work Queue', icon: ClipboardList, href: '/' },
+  { label: 'Dashboard', icon: ClipboardList, href: '/' },
+  { label: 'All items', icon: ListChecks, href: '/items' },
   { label: 'Calendar', icon: CalendarDays, href: '/calendar' },
-  { label: 'Vessels', icon: Ship, href: '/vessels' },
   { label: 'Completed', icon: Archive, href: '/completed' },
-  { label: 'Settings', icon: Settings, href: '/settings' }
+  { label: 'Reminders', icon: Bell, href: '/reminders' },
+  { label: 'Workspace setup', icon: Settings, href: '/settings' }
 ];
 
 function initials(name: string) {
@@ -19,7 +20,25 @@ function initials(name: string) {
     .join('') || 'FF';
 }
 
-export function AppSidebar({ companyName, userRole, isAppAdmin = false, activePath = '/' }: { companyName: string; userRole?: string; isAppAdmin?: boolean; activePath?: string }) {
+export function AppSidebar({
+  companyName,
+  userRole,
+  userName,
+  userEmail,
+  dueCount,
+  isAppAdmin = false,
+  activePath = '/'
+}: {
+  companyName: string;
+  userRole?: string;
+  userName?: string | null;
+  userEmail?: string | null;
+  dueCount?: number;
+  isAppAdmin?: boolean;
+  activePath?: string;
+}) {
+  const displayName = userName || userEmail || 'Workspace user';
+
   return (
     <aside className="app-sidebar">
       <div className="brand-block">
@@ -34,21 +53,27 @@ export function AppSidebar({ companyName, userRole, isAppAdmin = false, activePa
       <nav className="side-nav" aria-label="Application navigation">
         {[...navItems, ...(isAppAdmin ? [{ label: 'Admin', icon: ShieldCheck, href: '/admin' }] : [])].map((item) => {
           const Icon = item.icon;
+          const isDashboard = item.href === '/';
           return (
             <Link className={activePath === item.href ? 'active' : ''} href={item.href} key={item.label}>
               <Icon aria-hidden="true" />
               <span>{item.label}</span>
+              {isDashboard && typeof dueCount === 'number' ? <b>{dueCount}</b> : null}
             </Link>
           );
         })}
       </nav>
 
-      <div className="sidebar-status">
-        <span />
+      <div className="sidebar-user-block">
+        <span className="avatar">{initials(displayName)}</span>
         <div>
-          <strong>All systems operational</strong>
-          <small>v0.1.0 · connected to Supabase</small>
+          <strong>{displayName}</strong>
+          <small>{userRole?.replaceAll('_', ' ') ?? 'Workspace access'}</small>
         </div>
+        <a href="mailto:support@fishermenfirst.org">
+          <HelpCircle aria-hidden="true" />
+          <span>Help &amp; support</span>
+        </a>
       </div>
       <form action={signOut}>
         <button className="sidebar-logout" type="submit">

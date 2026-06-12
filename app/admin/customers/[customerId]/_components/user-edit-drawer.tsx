@@ -44,6 +44,10 @@ function avatarHue(value: string | null) {
   return colors[hash % colors.length];
 }
 
+function normalizeOwnerCode(value: string) {
+  return value.trim();
+}
+
 function formatDate(value: Date | string | null) {
   if (!value) return 'Never';
   const date = value instanceof Date ? value : new Date(value);
@@ -67,10 +71,23 @@ export function UserEditDrawer({
   const [email, setEmail] = useState(user.email ?? '');
   const [role, setRole] = useState<CustomerRole>(user.role);
   const [codes, setCodes] = useState(new Set(user.codes));
+  const [ownerCodeDraft, setOwnerCodeDraft] = useState('');
   const [message, setMessage] = useState('Unsaved changes');
+  const visibleOwnerCodes = useMemo(() => {
+    const knownCodes = new Set(ownerCodes.map((owner) => owner.code));
+    const addedCodes = Array.from(codes)
+      .filter((code) => !knownCodes.has(code))
+      .map((code) => ({
+        code,
+        displayName: 'Added owner code',
+        records: 0
+      }));
+
+    return [...ownerCodes, ...addedCodes];
+  }, [codes, ownerCodes]);
   const visibleRecords = useMemo(
-    () => ownerCodes.filter((owner) => codes.has(owner.code)).reduce((sum, owner) => sum + owner.records, 0),
-    [codes, ownerCodes]
+    () => visibleOwnerCodes.filter((owner) => codes.has(owner.code)).reduce((sum, owner) => sum + owner.records, 0),
+    [codes, visibleOwnerCodes]
   );
 
   useEffect(() => {
@@ -78,6 +95,7 @@ export function UserEditDrawer({
     setEmail(user.email ?? '');
     setRole(user.role);
     setCodes(new Set(user.codes));
+    setOwnerCodeDraft('');
     setMessage('Unsaved changes');
   }, [user]);
 
@@ -86,6 +104,28 @@ export function UserEditDrawer({
     if (next.has(code)) next.delete(code);
     else next.add(code);
     setCodes(next);
+  }
+
+  function addOwnerCode() {
+    const code = normalizeOwnerCode(ownerCodeDraft);
+
+    if (!code) return;
+
+    if (code.length > 48) {
+      setMessage('Owner codes must be 48 characters or fewer.');
+      return;
+    }
+
+    if (/[\r\n\t]/.test(code)) {
+      setMessage('Owner codes cannot include tabs or line breaks.');
+      return;
+    }
+
+    const next = new Set(codes);
+    next.add(code);
+    setCodes(next);
+    setOwnerCodeDraft('');
+    setMessage(`${code} will be added when you save.`);
   }
 
   function save(event: FormEvent<HTMLFormElement>) {
@@ -198,7 +238,7 @@ export function UserEditDrawer({
                 <span className="meta">{visibleRecords} records visible</span>
               </div>
               <div className="codes-grid">
-                {ownerCodes.map((owner) => {
+                {visibleOwnerCodes.map((owner) => {
                   const checked = codes.has(owner.code);
                   return (
                     <label key={owner.code} className="code-check" data-checked={checked}>
@@ -210,6 +250,27 @@ export function UserEditDrawer({
                     </label>
                   );
                 })}
+              </div>
+              <div className="code-add-row">
+                <label htmlFor="d-owner-code">Add owner code</label>
+                <div>
+                  <input
+                    id="d-owner-code"
+                    type="text"
+                    value={ownerCodeDraft}
+                    maxLength={48}
+                    placeholder="SN or SN/BJ"
+                    onChange={(event) => setOwnerCodeDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        addOwnerCode();
+                      }
+                    }}
+                  />
+                  <button type="button" className="secondary" onClick={addOwnerCode}>Add code</button>
+                </div>
+                <span className="hint">Use the exact workbook owner code. The code is created when you save changes.</span>
               </div>
             </div>
 

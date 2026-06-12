@@ -1,5 +1,5 @@
 export type ComplianceItemStatus = 'not_started' | 'in_progress' | 'submitted' | 'complete' | 'discontinued';
-export type DisplayState = 'Upcoming' | 'Ready' | 'In Progress' | 'Submitted' | 'Complete' | 'Discontinued' | 'Overdue';
+export type DisplayState = 'Not due yet' | 'Due' | 'In progress' | 'Submitted' | 'Complete' | 'Did not renew';
 export type RecurrenceUnit = 'years' | 'months' | 'manual' | 'none';
 
 export type ComplianceItem = {
@@ -29,11 +29,29 @@ export type ComplianceItem = {
 };
 
 export const storedStatusLabels: Record<ComplianceItemStatus, string> = {
-  not_started: 'Not Started',
-  in_progress: 'In Progress',
+  not_started: 'Not due yet',
+  in_progress: 'In progress',
   submitted: 'Submitted',
   complete: 'Complete',
-  discontinued: 'Discontinued'
+  discontinued: 'Did not renew'
+};
+
+export const displayStateParams: Record<DisplayState, string> = {
+  'Not due yet': 'not_due_yet',
+  Due: 'due',
+  'In progress': 'in_progress',
+  Submitted: 'submitted',
+  Complete: 'complete',
+  'Did not renew': 'did_not_renew'
+};
+
+export const statusChipClasses: Record<DisplayState, string> = {
+  'Not due yet': 'st st-notdue',
+  Due: 'st st-due',
+  'In progress': 'st st-prog',
+  Submitted: 'st st-subm',
+  Complete: 'st st-comp',
+  'Did not renew': 'st st-disc'
 };
 
 export function todayIso() {
@@ -60,21 +78,38 @@ export function daysUntil(value: string | null) {
 }
 
 export function displayState(item: Pick<ComplianceItem, 'status' | 'start_working_on' | 'expiration_date'>): DisplayState {
-  const expirationDays = daysUntil(item.expiration_date);
-
   if (item.status === 'complete') return 'Complete';
-  if (item.status === 'discontinued') return 'Discontinued';
-  if (expirationDays !== null && expirationDays < 0) return 'Overdue';
-  if (item.status === 'in_progress') return 'In Progress';
+  if (item.status === 'discontinued') return 'Did not renew';
+  if (item.status === 'in_progress') return 'In progress';
   if (item.status === 'submitted') return 'Submitted';
 
   const startDays = daysUntil(item.start_working_on);
-  if (startDays !== null && startDays > 0) return 'Upcoming';
-  return 'Ready';
+  if (startDays !== null && startDays > 0) return 'Not due yet';
+  return 'Due';
+}
+
+export function itemIsOverdue(item: Pick<ComplianceItem, 'status' | 'expiration_date'>) {
+  if (item.status === 'complete' || item.status === 'discontinued') return false;
+  const expirationDays = daysUntil(item.expiration_date);
+  return expirationDays !== null && expirationDays < 0;
+}
+
+export function displayStateParam(item: Pick<ComplianceItem, 'status' | 'start_working_on' | 'expiration_date'>) {
+  return displayStateParams[displayState(item)];
+}
+
+export function statusChipClassName(state: DisplayState) {
+  return statusChipClasses[state];
 }
 
 export function stateClassName(state: DisplayState) {
-  return state.toLowerCase().replaceAll(' ', '-');
+  return displayStateParams[state].replaceAll('_', '-');
+}
+
+export function isWorkQueueItem(item: Pick<ComplianceItem, 'status' | 'start_working_on' | 'expiration_date'>) {
+  if (item.status === 'complete' || item.status === 'discontinued') return false;
+  const state = displayState(item);
+  return state === 'Due' || state === 'In progress' || state === 'Submitted' || itemIsOverdue(item);
 }
 
 export function formatDate(value: string | null) {

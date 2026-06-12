@@ -29,12 +29,28 @@ function requiredRole(formData: FormData, name: string) {
   return value as AppRole;
 }
 
+function normalizeOwnerCode(value: string) {
+  const code = value.trim();
+
+  if (!code) return null;
+
+  if (code.length > 48) {
+    throw new Error('Owner codes must be 48 characters or fewer.');
+  }
+
+  if (/[\r\n\t]/.test(code)) {
+    throw new Error('Owner codes cannot include tabs or line breaks.');
+  }
+
+  return code;
+}
+
 function ownerCodes(formData: FormData) {
   return Array.from(new Set(
     formData
       .getAll('ownerCodes')
-      .map((value) => String(value ?? '').trim())
-      .filter(Boolean)
+      .map((value) => normalizeOwnerCode(String(value ?? '')))
+      .filter((code): code is string => Boolean(code))
   ));
 }
 
@@ -68,6 +84,20 @@ function rpcMessage(error: { message?: string } | null) {
   return message;
 }
 
+function ownerCodeMutationMessage(error: { message?: string } | null) {
+  const message = error?.message ?? 'Owner-code update failed.';
+
+  if (message.includes('row-level security')) {
+    return 'Only workspace owners can add owner codes.';
+  }
+
+  if (message.includes('company_owner_codes_code_trimmed_check')) {
+    return 'Owner codes cannot include leading or trailing spaces.';
+  }
+
+  return message;
+}
+
 async function callSettingsRpc<TArgs extends Record<string, unknown>>(name: string, args: TArgs) {
   const supabase = createClient();
   const { error } = await supabase.rpc(name as never, args as never);
@@ -77,6 +107,54 @@ async function callSettingsRpc<TArgs extends Record<string, unknown>>(name: stri
   }
 
   revalidatePath('/settings');
+}
+
+async function ensureOwnerCodesExist(targetCompanyId: string, codes: string[]) {
+  if (codes.length === 0) return;
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('company_owner_codes')
+    .select('code')
+    .eq('company_id', targetCompanyId)
+    .in('code', codes);
+
+  if (error) {
+    settingsRedirect(ownerCodeMutationMessage(error));
+  }
+
+  const existingCodes = new Set((data ?? []).map((row) => row.code));
+  const missingCodes = codes.filter((code) => !existingCodes.has(code));
+
+  if (missingCodes.length === 0) return;
+
+  const { error: insertError } = await supabase
+    .from('company_owner_codes')
+    .upsert(
+      missingCodes.map((code) => ({
+        company_id: targetCompanyId,
+        code,
+        updated_at: new Date().toISOString()
+      })),
+      { onConflict: 'company_id,code' }
+    );
+
+  if (insertError) {
+    settingsRedirect(ownerCodeMutationMessage(insertError));
+  }
+}
+
+export async function createOwnerCode(formData: FormData) {
+  const targetCompanyId = requiredString(formData, 'companyId');
+  const code = normalizeOwnerCode(requiredString(formData, 'ownerCode'));
+
+  if (!code) {
+    throw new Error('Owner code is required.');
+  }
+
+  await ensureOwnerCodesExist(targetCompanyId, [code]);
+  revalidatePath('/settings');
+  settingsRedirect(`Owner code ${code} added.`);
 }
 
 export async function updateMemberRole(formData: FormData) {
@@ -118,11 +196,15 @@ export async function cancelPendingInvite(formData: FormData) {
 }
 
 export async function updateOwnerCodeAssignment(formData: FormData) {
+  const targetCompanyId = requiredString(formData, 'companyId');
+  const codes = ownerCodes(formData);
+
+  await ensureOwnerCodesExist(targetCompanyId, codes);
   await callSettingsRpc('settings_update_owner_code_assignment', {
-    target_company_id: requiredString(formData, 'companyId'),
+    target_company_id: targetCompanyId,
     target_kind: requiredString(formData, 'targetKind'),
     target_id: requiredString(formData, 'targetId'),
-    owner_codes: ownerCodes(formData)
+    owner_codes: codes
   });
 
   settingsRedirect('Owner-code assignments updated.');
@@ -162,11 +244,14 @@ export async function updateAccessDrawerSettings(formData: FormData) {
   }
 
   if (shouldUpdateOwnerCodes) {
+    const codes = ownerCodes(formData);
+
+    await ensureOwnerCodesExist(target_company_id, codes);
     await callSettingsRpc('settings_update_owner_code_assignment', {
       target_company_id,
       target_kind,
       target_id,
-      owner_codes: ownerCodes(formData)
+      owner_codes: codes
     });
   }
 

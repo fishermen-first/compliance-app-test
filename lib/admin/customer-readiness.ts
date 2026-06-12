@@ -75,7 +75,7 @@ export function buildChecks(company: CompanyIndexRow): ReadinessCheck[] {
 export function stageFromChecks(checks: ReadinessCheck[], company: CompanyIndexRow): StageTone {
   // Blocked = nothing imported yet (the workbook is the gating prerequisite).
   if (!checks[0].done) return 'blocked';
-  // Ready = every check is done.
+  // Done = every check is complete.
   if (checks.every((c) => c.done)) return 'ready';
   return 'attention';
 }

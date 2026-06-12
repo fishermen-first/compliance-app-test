@@ -1,48 +1,61 @@
 import Link from 'next/link';
-import { type CSSProperties } from 'react';
+import { type ReactNode } from 'react';
+import { Columns3, Plus } from 'lucide-react';
 import { AppSidebar } from '@/components/app-sidebar';
-import { type ComplianceItem, displayState, formatDate, stateClassName } from '@/lib/compliance';
-import { getCustomerContext, getCustomerItems, titleCase } from '@/lib/customer-data';
+import { StatusBadge } from '@/components/status-badge';
+import { type ComplianceItem, displayState, displayStateParam, formatDate, itemIsOverdue } from '@/lib/compliance';
+import { getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer-data';
 import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
 
 type ItemsPageProps = {
-  searchParams?: { status?: string; owner?: string; vessel?: string; area?: string; sort?: string; dir?: string; columns?: string };
+  searchParams?: {
+    q?: string;
+    status?: string;
+    owner?: string;
+    vessel?: string;
+    area?: string;
+    sort?: string;
+    dir?: string;
+    columns?: string;
+    page?: string;
+  };
 };
 
-type ColumnKey = 'owner' | 'vessel' | 'item' | 'agency' | 'area' | 'frequency' | 'start' | 'expiration' | 'status' | 'notes';
-type SortKey = 'owner' | 'vessel' | 'item' | 'agency' | 'area' | 'frequency' | 'start' | 'expiration' | 'status';
+type ColumnKey = 'item' | 'vessel' | 'owner' | 'agency' | 'frequency' | 'start' | 'expiration' | 'status' | 'note' | 'itemNumber';
+type SortKey = 'item' | 'vessel' | 'owner' | 'agency' | 'frequency' | 'start' | 'expiration' | 'status';
 
-const columns: Array<{ key: ColumnKey; label: string; track: string }> = [
-  { key: 'owner', label: 'Owner', track: '62px' },
-  { key: 'vessel', label: 'Vessel', track: 'minmax(118px, 145px)' },
-  { key: 'item', label: 'Item', track: 'minmax(250px, 1.4fr)' },
-  { key: 'agency', label: 'Agency', track: 'minmax(80px, 0.45fr)' },
-  { key: 'area', label: 'Area', track: 'minmax(130px, 0.75fr)' },
-  { key: 'frequency', label: 'Frequency', track: 'minmax(105px, 0.6fr)' },
-  { key: 'start', label: 'Start', track: 'minmax(112px, 0.65fr)' },
-  { key: 'expiration', label: 'Expiration', track: 'minmax(112px, 0.65fr)' },
-  { key: 'status', label: 'Status', track: 'minmax(112px, 0.65fr)' },
-  { key: 'notes', label: 'Notes', track: 'minmax(160px, 0.9fr)' }
+const pageSize = 10;
+
+const columns: Array<{ key: ColumnKey; label: string }> = [
+  { key: 'item', label: 'Item' },
+  { key: 'vessel', label: 'Vessel' },
+  { key: 'owner', label: 'Owner' },
+  { key: 'agency', label: 'Agency' },
+  { key: 'frequency', label: 'Frequency' },
+  { key: 'start', label: 'Start' },
+  { key: 'expiration', label: 'Expiration' },
+  { key: 'status', label: 'Status' },
+  { key: 'note', label: 'Latest note' },
+  { key: 'itemNumber', label: 'Item #' }
 ];
 
-const defaultColumns = columns.map((column) => column.key);
-const sortKeys = new Set<SortKey>(['owner', 'vessel', 'item', 'agency', 'area', 'frequency', 'start', 'expiration', 'status']);
-const statusRank: Record<string, number> = {
-  Overdue: 0,
-  Ready: 1,
-  'In Progress': 2,
-  Submitted: 3,
-  Upcoming: 4,
-  Complete: 5,
-  Discontinued: 6
-};
+const defaultColumns: ColumnKey[] = ['item', 'vessel', 'owner', 'agency', 'frequency', 'start', 'expiration', 'status', 'note'];
+const sortKeys = new Set<SortKey>(['item', 'vessel', 'owner', 'agency', 'frequency', 'start', 'expiration', 'status']);
+const statusFilterOptions = [
+  { value: 'due', label: 'Due' },
+  { value: 'overdue', label: 'Overdue' },
+  { value: 'not_due_yet', label: 'Not due yet' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'submitted', label: 'Submitted' },
+  { value: 'complete', label: 'Complete' },
+  { value: 'did_not_renew', label: 'Did not renew' }
+];
 
 function selectedColumns(value?: string) {
   const requested = (value ?? '')
     .split(',')
     .map((column) => column.trim())
     .filter((column): column is ColumnKey => columns.some((candidate) => candidate.key === column));
-
   const unique = Array.from(new Set(requested));
   return unique.length > 0 ? unique : defaultColumns;
 }
@@ -50,7 +63,7 @@ function selectedColumns(value?: string) {
 function itemsHref(searchParams: ItemsPageProps['searchParams'], updates: Record<string, string | null | undefined>) {
   const params = new URLSearchParams();
 
-  for (const key of ['status', 'owner', 'vessel', 'area', 'sort', 'dir', 'columns']) {
+  for (const key of ['q', 'status', 'owner', 'vessel', 'area', 'sort', 'dir', 'columns', 'page']) {
     const value = Object.prototype.hasOwnProperty.call(updates, key) ? updates[key] : searchParams?.[key as keyof NonNullable<ItemsPageProps['searchParams']>];
     if (value) params.set(key, value);
   }
@@ -61,151 +74,228 @@ function itemsHref(searchParams: ItemsPageProps['searchParams'], updates: Record
 
 function sortValue(item: ComplianceItem, sort: SortKey) {
   if (sort === 'owner') return item.owner_current ?? '';
-  if (sort === 'vessel') return item.vessel_name ?? 'Company-wide';
+  if (sort === 'vessel') return itemVessel(item);
   if (sort === 'item') return item.item_name;
   if (sort === 'agency') return item.agency_type ?? '';
-  if (sort === 'area') return item.compliance_area ?? '';
   if (sort === 'frequency') return item.frequency_label ?? '';
   if (sort === 'start') return item.start_working_on ?? '9999-12-31';
   if (sort === 'expiration') return item.expiration_date ?? '9999-12-31';
-  return statusRank[displayState(item)] ?? 99;
+  return displayState(item);
 }
 
 function sortItems(items: ComplianceItem[], sort: SortKey, dir: 'asc' | 'desc') {
   const multiplier = dir === 'desc' ? -1 : 1;
   return [...items].sort((a, b) => {
-    const aValue = sortValue(a, sort);
-    const bValue = sortValue(b, sort);
-    const compared = typeof aValue === 'number' && typeof bValue === 'number'
-      ? aValue - bValue
-      : String(aValue).localeCompare(String(bValue));
-
+    const compared = String(sortValue(a, sort)).localeCompare(String(sortValue(b, sort)));
     return compared === 0 ? a.item_name.localeCompare(b.item_name) : compared * multiplier;
   });
 }
 
-function tableStyle(visibleColumns: ColumnKey[]): CSSProperties {
-  return {
-    '--item-grid-template': columns
-      .filter((column) => visibleColumns.includes(column.key))
-      .map((column) => column.track)
-      .join(' ')
-  } as CSSProperties;
+function SortHeader({ column, searchParams, sort, dir }: { column: { key: ColumnKey; label: string }; searchParams: ItemsPageProps['searchParams']; sort: SortKey; dir: 'asc' | 'desc' }) {
+  if (!sortKeys.has(column.key as SortKey)) return <span>{column.label}</span>;
+
+  const key = column.key as SortKey;
+  const active = sort === key;
+  const nextDir = active && dir === 'asc' ? 'desc' : 'asc';
+
+  return (
+    <Link className="th-sort" data-sorted={active ? 'true' : undefined} href={itemsHref(searchParams, { sort: key, dir: nextDir, page: undefined })} scroll={false}>
+      <span>{column.label}</span>
+      <span className="arr">{active ? (dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+    </Link>
+  );
 }
 
-function itemCell(item: ComplianceItem, column: ColumnKey) {
-  const state = displayState(item);
+function ColumnChooser({ searchParams, visibleColumns }: { searchParams: ItemsPageProps['searchParams']; visibleColumns: ColumnKey[] }) {
+  return (
+    <details className="column-menu">
+      <summary><Columns3 aria-hidden="true" /> Columns</summary>
+      <div className="colpop">
+        {columns.map((column) => {
+          const nextColumns = visibleColumns.includes(column.key)
+            ? visibleColumns.filter((key) => key !== column.key)
+            : [...visibleColumns, column.key];
+          const safeColumns = nextColumns.length > 0 ? nextColumns : visibleColumns;
+          const value = safeColumns.length === defaultColumns.length ? undefined : safeColumns.join(',');
 
-  if (column === 'owner') return <span>{item.owner_current ?? 'Unassigned'}</span>;
-  if (column === 'vessel') return <span>{item.vessel_name ?? 'Company-wide'}</span>;
-  if (column === 'item') return <strong>{item.item_name}</strong>;
-  if (column === 'agency') return <span>{item.agency_type ?? '-'}</span>;
-  if (column === 'area') return <span>{item.compliance_area ?? 'Other'}</span>;
-  if (column === 'frequency') return <span>{item.frequency_label ?? '-'}</span>;
-  if (column === 'start') return <span>{formatDate(item.start_working_on)}</span>;
-  if (column === 'expiration') return <span>{formatDate(item.expiration_date)}</span>;
-  if (column === 'status') return <span className={`status-chip state-${stateClassName(state)}`}>{state}</span>;
-  return <span>{item.status_notes || '-'}</span>;
+          return (
+            <Link className={visibleColumns.includes(column.key) ? 'active' : ''} href={itemsHref(searchParams, { columns: value, page: undefined })} key={column.key} scroll={false}>
+              <span>{column.label}</span>
+              <span>{visibleColumns.includes(column.key) ? '✓' : ''}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
+function FilterMenu({ label, selectedLabel, children }: { label: string; selectedLabel: string; children: ReactNode }) {
+  return (
+    <details className="filter-chip-menu">
+      <summary>{label}: {selectedLabel}</summary>
+      <div className="filter-pop">{children}</div>
+    </details>
+  );
+}
+
+function ItemCell({ item, column }: { item: ComplianceItem; column: ColumnKey }) {
+  if (column === 'item') {
+    return (
+      <td>
+        <Link className="item-link" href={`/items/${item.id}`}>
+          <span>{item.item_name}</span>
+          <small className="subline">{item.compliance_area ?? 'Other'}</small>
+        </Link>
+      </td>
+    );
+  }
+  if (column === 'vessel') return <td>{itemVessel(item)}</td>;
+  if (column === 'owner') return <td><span className="own-chip">{item.owner_current ?? '-'}</span></td>;
+  if (column === 'agency') return <td>{item.agency_type ?? '-'}</td>;
+  if (column === 'frequency') return <td>{item.frequency_label ?? '-'}</td>;
+  if (column === 'start') return <td>{formatDate(item.start_working_on)}</td>;
+  if (column === 'expiration') return <td>{formatDate(item.expiration_date)}</td>;
+  if (column === 'status') return <td><StatusBadge item={item} /></td>;
+  if (column === 'note') return <td><span className="cell-note">{item.status_notes || 'No note yet'}</span></td>;
+  return <td>{item.item_number ?? '-'}</td>;
 }
 
 export default async function ItemsPage({ searchParams }: ItemsPageProps) {
-  const { membership, company } = await getCustomerContext();
+  const { membership, company, profile, user } = await getCustomerContext();
   const allItems = await getCustomerItems(membership.company_id);
   const canCreateItems = isCustomerOwnerRole(membership.role);
   const owners = Array.from(new Set(allItems.map((item) => item.owner_current).filter(Boolean) as string[])).sort();
-  const vessels = Array.from(new Set(allItems.map((item) => item.vessel_name).filter(Boolean) as string[])).sort();
-  const areas = Array.from(new Set(allItems.map((item) => item.compliance_area).filter(Boolean) as string[])).sort();
-  const sort = sortKeys.has(searchParams?.sort as SortKey) ? searchParams?.sort as SortKey : 'expiration';
+  const vessels = Array.from(new Set(allItems.map(itemVessel))).sort();
+  const sort = sortKeys.has(searchParams?.sort as SortKey) ? searchParams?.sort as SortKey : 'start';
   const dir = searchParams?.dir === 'desc' ? 'desc' : 'asc';
   const visibleColumns = selectedColumns(searchParams?.columns);
-  const rowStyle = tableStyle(visibleColumns);
+  const q = (searchParams?.q ?? '').trim().toLowerCase();
+  const currentPage = Math.max(1, Number(searchParams?.page ?? 1) || 1);
 
   const filteredItems = sortItems(allItems.filter((item) => {
-    const state = displayState(item).toLowerCase().replaceAll(' ', '_');
-    if (searchParams?.status && searchParams.status !== item.status && searchParams.status !== state) return false;
+    if (q) {
+      const haystack = [item.item_name, itemVessel(item), item.item_number].filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    if (searchParams?.status === 'overdue' && !itemIsOverdue(item)) return false;
+    if (searchParams?.status && searchParams.status !== 'overdue' && searchParams.status !== item.status && searchParams.status !== displayStateParam(item)) return false;
     if (searchParams?.owner && item.owner_current !== searchParams.owner) return false;
-    if (searchParams?.vessel === 'company-wide' && item.vessel_name) return false;
-    if (searchParams?.vessel && searchParams.vessel !== 'company-wide' && item.vessel_name !== searchParams.vessel) return false;
-    if (searchParams?.area && item.compliance_area !== searchParams.area) return false;
+    if (searchParams?.vessel && itemVessel(item) !== searchParams.vessel) return false;
     return true;
   }), sort, dir);
 
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const page = Math.min(currentPage, totalPages);
+  const startIndex = (page - 1) * pageSize;
+  const pagedItems = filteredItems.slice(startIndex, startIndex + pageSize);
+  const showingStart = filteredItems.length === 0 ? 0 : startIndex + 1;
+  const showingEnd = Math.min(startIndex + pageSize, filteredItems.length);
+  const dueCount = allItems.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item) === 'Due' || itemIsOverdue(item))).length;
+  const userName = profile?.full_name ?? user.email ?? 'User';
+  const statusLabel = statusFilterOptions.find((option) => option.value === searchParams?.status)?.label ?? 'All';
+  const vesselLabel = searchParams?.vessel ?? 'All';
+  const ownerLabel = searchParams?.owner ?? 'All';
+
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} activePath="" />
+      <AppSidebar
+        companyName={company?.name ?? 'FF Compliance'}
+        userRole={accessRoleLabel(membership.role)}
+        userName={userName}
+        userEmail={user.email}
+        dueCount={dueCount}
+        activePath="/items"
+      />
       <main className="workspace list-workspace">
         <header className="list-header">
           <div>
             <p className="eyebrow">Records</p>
-            <h1>Compliance item list</h1>
-            <p>Search the full imported spreadsheet replacement: current, upcoming, submitted, overdue, complete, and discontinued items.</p>
+            <h1>All items</h1>
+            <p>Every record in the workspace - current, upcoming, complete, and discontinued.</p>
           </div>
-          {canCreateItems ? <Link className="primary-action" href="/items/new">New Item</Link> : null}
+          <div className="header-action-row">
+            <form action="/items" className="search-form">
+              <input name="q" defaultValue={searchParams?.q ?? ''} placeholder="Search item, vessel, or item #" />
+              <button className="secondary-action" type="submit">Search</button>
+            </form>
+            {canCreateItems ? (
+              <Link className="primary-action" href="/items/new">
+                <Plus aria-hidden="true" />
+                <span>New item</span>
+              </Link>
+            ) : null}
+          </div>
         </header>
 
-        <section className="panel filter-panel">
-          <div>
-            <span>Owner</span>
-            <Link className={!searchParams?.owner ? 'active' : ''} href={itemsHref(searchParams, { owner: undefined })} scroll={false}>All</Link>
-            {owners.map((owner) => <Link className={searchParams?.owner === owner ? 'active' : ''} href={itemsHref(searchParams, { owner })} key={owner} scroll={false}>{owner}</Link>)}
-          </div>
-          <div>
-            <span>Status</span>
-            {['all', 'ready', 'overdue', 'in_progress', 'submitted', 'complete', 'discontinued'].map((status) => (
-              <Link className={(status === 'all' && !searchParams?.status) || searchParams?.status === status ? 'active' : ''} href={itemsHref(searchParams, { status: status === 'all' ? undefined : status })} key={status} scroll={false}>{titleCase(status)}</Link>
-            ))}
-          </div>
-          <div>
-            <span>Area</span>
-            <Link className={!searchParams?.area ? 'active' : ''} href={itemsHref(searchParams, { area: undefined })} scroll={false}>All areas</Link>
-            {areas.slice(0, 8).map((area) => <Link className={searchParams?.area === area ? 'active' : ''} href={itemsHref(searchParams, { area })} key={area} scroll={false}>{area}</Link>)}
-          </div>
-          <div>
-            <span>Vessel</span>
-            <Link className={!searchParams?.vessel ? 'active' : ''} href={itemsHref(searchParams, { vessel: undefined })} scroll={false}>All vessels</Link>
-            <Link className={searchParams?.vessel === 'company-wide' ? 'active' : ''} href={itemsHref(searchParams, { vessel: 'company-wide' })} scroll={false}>Company-wide</Link>
-            {vessels.slice(0, 10).map((vessel) => <Link className={searchParams?.vessel === vessel ? 'active' : ''} href={itemsHref(searchParams, { vessel })} key={vessel} scroll={false}>{vessel}</Link>)}
-          </div>
-          <div>
-            <span>Sort</span>
-            {columns.filter((column) => sortKeys.has(column.key as SortKey)).map((column) => {
-              const active = sort === column.key;
-              const nextDir = active && dir === 'asc' ? 'desc' : 'asc';
-              return <Link className={active ? 'active' : ''} href={itemsHref(searchParams, { sort: column.key, dir: nextDir })} key={column.key} scroll={false}>{column.label}{active ? ` ${dir}` : ''}</Link>;
-            })}
-          </div>
-          <div>
-            <span>Columns</span>
-            {columns.map((column) => {
-              const nextColumns = visibleColumns.includes(column.key)
-                ? visibleColumns.filter((key) => key !== column.key)
-                : [...visibleColumns, column.key];
-              const safeColumns = nextColumns.length > 0 ? nextColumns : visibleColumns;
-              const value = safeColumns.length === defaultColumns.length ? undefined : safeColumns.join(',');
-              return <Link className={visibleColumns.includes(column.key) ? 'active' : ''} href={itemsHref(searchParams, { columns: value })} key={column.key} scroll={false}>{column.label}</Link>;
-            })}
+        <section className="panel queue-filter-panel" aria-label="Item filters">
+          <div className="queue-tools">
+            <div className="filter-chip-bar">
+              <FilterMenu label="Owner" selectedLabel={ownerLabel}>
+                <Link className={!searchParams?.owner ? 'active' : ''} href={itemsHref(searchParams, { owner: undefined, page: undefined })} scroll={false}>All owners</Link>
+                {owners.map((owner) => <Link className={searchParams?.owner === owner ? 'active' : ''} href={itemsHref(searchParams, { owner, page: undefined })} key={owner} scroll={false}>{owner}</Link>)}
+              </FilterMenu>
+              <FilterMenu label="Vessel" selectedLabel={vesselLabel}>
+                <Link className={!searchParams?.vessel ? 'active' : ''} href={itemsHref(searchParams, { vessel: undefined, page: undefined })} scroll={false}>All vessels</Link>
+                {vessels.map((vessel) => <Link className={searchParams?.vessel === vessel ? 'active' : ''} href={itemsHref(searchParams, { vessel, page: undefined })} key={vessel} scroll={false}>{vessel}</Link>)}
+              </FilterMenu>
+              <FilterMenu label="Status" selectedLabel={statusLabel}>
+                <Link className={!searchParams?.status ? 'active' : ''} href={itemsHref(searchParams, { status: undefined, page: undefined })} scroll={false}>All statuses</Link>
+                {statusFilterOptions.map((status) => <Link className={searchParams?.status === status.value ? 'active' : ''} href={itemsHref(searchParams, { status: status.value, page: undefined })} key={status.value} scroll={false}>{status.label}</Link>)}
+              </FilterMenu>
+            </div>
+            <div className="table-tools">
+              {(searchParams?.q || searchParams?.owner || searchParams?.vessel || searchParams?.status) ? <Link className="secondary-link" href="/items" scroll={false}>Clear filters</Link> : null}
+              <ColumnChooser searchParams={searchParams} visibleColumns={visibleColumns} />
+            </div>
           </div>
         </section>
 
         <section className="panel list-panel">
           <div className="panel-heading">
             <div>
-              <span>{filteredItems.length} items</span>
-              <h2>Current compliance records</h2>
+              <span>{filteredItems.length} records</span>
+              <h2>Workspace records</h2>
             </div>
           </div>
 
-          <div className="work-table all-items-table" role="table" aria-label="All compliance items">
-            <div className="work-table-row work-table-head" role="row" style={rowStyle}>
-              {columns.filter((column) => visibleColumns.includes(column.key)).map((column) => <span key={column.key}>{column.label}</span>)}
-            </div>
-            {filteredItems.map((item) => {
-              return (
-                <Link className="work-table-row" href={`/items/${item.id}`} role="row" key={item.id} style={rowStyle}>
-                  {visibleColumns.map((column) => <span className="item-cell" key={column}>{itemCell(item, column)}</span>)}
+          <div className="redesign-table-wrap">
+            <table className="redesign-table" aria-label="All compliance items">
+              <thead>
+                <tr>
+                  {visibleColumns.map((columnKey) => {
+                    const column = columns.find((candidate) => candidate.key === columnKey)!;
+                    return <th key={column.key}><SortHeader column={column} dir={dir} searchParams={searchParams} sort={sort} /></th>;
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {pagedItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={visibleColumns.length}>
+                      <div className="empty-state">
+                        <h3>No items match this view</h3>
+                        <p>Adjust the search or filters to bring more compliance records back into view.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : pagedItems.map((item) => (
+                  <tr key={item.id}>
+                    {visibleColumns.map((column) => <ItemCell column={column} item={item} key={column} />)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="tbl-foot">
+            <span>Showing {showingStart}-{showingEnd} of {filteredItems.length}</span>
+            <div className="pagination-links">
+              {Array.from({ length: totalPages }, (_, index) => index + 1).slice(0, 8).map((pageNumber) => (
+                <Link className={`page-link${pageNumber === page ? ' active' : ''}`} href={itemsHref(searchParams, { page: pageNumber === 1 ? undefined : String(pageNumber) })} key={pageNumber} scroll={false}>
+                  {pageNumber}
                 </Link>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </section>
       </main>

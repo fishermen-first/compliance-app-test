@@ -32,6 +32,22 @@ function isExistingAuthUserError(message: string) {
   return normalized.includes('already') && (normalized.includes('registered') || normalized.includes('exists'));
 }
 
+function normalizeOwnerCode(value: string) {
+  const code = value.trim();
+
+  if (!code) return null;
+
+  if (code.length > 48) {
+    throw new Error('Owner codes must be 48 characters or fewer.');
+  }
+
+  if (/[\r\n\t]/.test(code)) {
+    throw new Error('Owner codes cannot include tabs or line breaks.');
+  }
+
+  return code;
+}
+
 async function provisionAuthUser(email: string, supabaseAdmin: ReturnType<typeof createAdminClient>) {
   const { error } = await supabaseAdmin.auth.admin.createUser({
     email,
@@ -54,8 +70,8 @@ function parseOwnerCodes(formData: FormData) {
   return Array.from(new Set(
     values
       .flatMap((value) => String(value ?? '').split(','))
-      .map((code) => code.trim())
-      .filter(Boolean)
+      .map(normalizeOwnerCode)
+      .filter((code): code is string => Boolean(code))
   ));
 }
 

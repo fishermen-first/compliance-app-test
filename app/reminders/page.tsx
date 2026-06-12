@@ -24,8 +24,9 @@ export default async function RemindersPage() {
   if (!membership) redirect('/');
 
   const canManageReminders = membership.role === 'owner';
-  const [{ data: company }, { data: logs }, { data: rules }, { data: isAppAdmin }] = await Promise.all([
+  const [{ data: company }, { data: profile }, { data: logs }, { data: rules }, { data: isAppAdmin }] = await Promise.all([
     supabase.from('companies').select('name').eq('id', membership.company_id).single(),
+    supabase.from('profiles').select('full_name').eq('id', userData.user.id).maybeSingle(),
     canManageReminders
       ? supabase
           .from('reminder_send_log')
@@ -45,7 +46,14 @@ export default async function RemindersPage() {
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} isAppAdmin={Boolean(isAppAdmin)} activePath="/reminders" />
+      <AppSidebar
+        companyName={company?.name ?? 'FF Compliance'}
+        userRole={accessRoleLabel(membership.role)}
+        userName={profile?.full_name ?? userData.user.email}
+        userEmail={userData.user.email}
+        isAppAdmin={Boolean(isAppAdmin)}
+        activePath="/reminders"
+      />
       <main className="workspace list-workspace">
         <header className="list-header">
           <div>

@@ -3,12 +3,13 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { Dashboard, type DashboardFilters } from '@/components/dashboard';
 import { NoAccessScreen } from '@/components/no-access-screen';
 import { WorkspaceBlockedScreen } from '@/components/workspace-blocked-screen';
+import { displayState, itemIsOverdue } from '@/lib/compliance';
 import { getCompanyOwnerCodes, getCustomerItems } from '@/lib/customer-data';
 import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
 type HomeProps = {
-  searchParams?: { message?: string; owner?: string; status?: string; type?: string; vessel?: string; frequency?: string };
+  searchParams?: { message?: string; owner?: string; status?: string; type?: string; vessel?: string; frequency?: string; sort?: string; dir?: string; columns?: string };
 };
 
 function filterValue(value?: string) {
@@ -98,17 +99,32 @@ export default async function Home({ searchParams }: HomeProps) {
   const ownerFilterCodes = isCustomerOwner
     ? Array.from(validOwnerCodes).sort((a, b) => a.localeCompare(b))
     : mappedOwnerCodes;
+  const sidebarDueCount = items.filter((item) => {
+    if (['complete', 'discontinued'].includes(item.status)) return false;
+    if (!showAllOwners && selectedOwnerCodes.length > 0 && (!item.owner_current || !selectedOwnerCodes.includes(item.owner_current))) return false;
+    if (!showAllOwners && selectedOwnerCodes.length === 0) return false;
+    return displayState(item) === 'Due' || itemIsOverdue(item);
+  }).length;
   const filters: DashboardFilters = {
     owner: filterValue(validOwnerFilter),
     status: filterValue(searchParams?.status),
     type: filterValue(searchParams?.type),
     vessel: filterValue(searchParams?.vessel),
-    frequency: filterValue(searchParams?.frequency)
+    frequency: filterValue(searchParams?.frequency),
+    sort: filterValue(searchParams?.sort),
+    dir: filterValue(searchParams?.dir),
+    columns: filterValue(searchParams?.columns)
   };
 
   return (
     <div className="app-shell">
-      <AppSidebar companyName={company?.name ?? 'FF Compliance'} userRole={accessRoleLabel(membership.role)} />
+      <AppSidebar
+        companyName={company?.name ?? 'FF Compliance'}
+        userRole={accessRoleLabel(membership.role)}
+        userName={currentUserName}
+        userEmail={userData.user.email}
+        dueCount={sidebarDueCount}
+      />
       <Dashboard
         companyName={company?.name ?? 'FF Compliance'}
         items={items}
