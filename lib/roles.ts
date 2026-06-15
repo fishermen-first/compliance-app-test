@@ -10,6 +10,10 @@ export function isCustomerOwnerRole(role: string | null | undefined) {
   return role === 'owner';
 }
 
+export function canCreateComplianceItems(role: string | null | undefined) {
+  return role === 'owner' || role === 'office_user';
+}
+
 export function accessRoleLabel(role: string) {
   const labels: Record<string, string> = {
     app_admin: 'FF Admin',

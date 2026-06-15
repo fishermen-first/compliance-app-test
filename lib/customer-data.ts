@@ -25,6 +25,7 @@ export function mapComplianceItem(row: any): ComplianceItem {
     sharepoint_url: row.sharepoint_url,
     completed_at: row.completed_at,
     discontinued_at: row.discontinued_at,
+    created_by: row.created_by,
     source_row_number: row.source_row_number,
     previous_item_id: row.previous_item_id
   };

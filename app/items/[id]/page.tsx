@@ -54,11 +54,14 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
 
   const item = mapComplianceItem(rawItem);
   const isOwner = membership.role === 'owner';
+  const isCreator = item.created_by === user.id;
   const isAssignedOfficeUser = (
     membership.role === 'office_user'
     && Boolean(item.owner_current)
     && ownerCodes.some((owner) => owner.code === item.owner_current && owner.is_assigned_to_current_user)
   );
+  const canManageItem = isOwner || isAssignedOfficeUser || isCreator;
+  const canEditCore = isOwner || isCreator;
 
   return (
     <div className="app-shell">
@@ -78,10 +81,10 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
           reminderLogs={reminderLogs ?? []}
           vessels={vessels ?? []}
           ownerOptions={ownerCodes.map((owner) => ({ code: owner.code, display_name: owner.display_name }))}
-          canUpdateStatus={isOwner || isAssignedOfficeUser}
-          canCompleteItem={isOwner || isAssignedOfficeUser}
-          canEditCore={isOwner}
-          canManageReminders={isOwner}
+          canUpdateStatus={canManageItem}
+          canCompleteItem={canManageItem}
+          canEditCore={canEditCore}
+          canManageReminders={canEditCore}
           backHref="/"
           backLabel="Back to work queue"
           itemPathPrefix="/items"

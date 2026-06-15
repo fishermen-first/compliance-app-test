@@ -5,7 +5,7 @@ import { NoAccessScreen } from '@/components/no-access-screen';
 import { WorkspaceBlockedScreen } from '@/components/workspace-blocked-screen';
 import { displayState, itemIsOverdue } from '@/lib/compliance';
 import { getCompanyOwnerCodes, getCustomerItems } from '@/lib/customer-data';
-import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
+import { accessRoleLabel, canCreateComplianceItems, isCustomerOwnerRole } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
 type HomeProps = {
@@ -90,7 +90,7 @@ export default async function Home({ searchParams }: HomeProps) {
     : showAllOwners
       ? []
       : mappedOwnerCodes;
-  const canCreateItems = isCustomerOwner;
+  const canCreateItems = canCreateComplianceItems(membership.role);
   const validOwnerFilter = requestedOwner === 'all' && isCustomerOwner
     ? 'all'
     : requestedOwnerAllowed && requestedOwnerCode

@@ -5,7 +5,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { StatusBadge } from '@/components/status-badge';
 import { type ComplianceItem, displayState, displayStateParam, formatDate, itemIsOverdue } from '@/lib/compliance';
 import { getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer-data';
-import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
+import { accessRoleLabel, canCreateComplianceItems } from '@/lib/roles';
 
 type ItemsPageProps = {
   searchParams?: {
@@ -164,7 +164,7 @@ function ItemCell({ item, column }: { item: ComplianceItem; column: ColumnKey })
 export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const { membership, company, profile, user } = await getCustomerContext();
   const allItems = await getCustomerItems(membership.company_id);
-  const canCreateItems = isCustomerOwnerRole(membership.role);
+  const canCreateItems = canCreateComplianceItems(membership.role);
   const owners = Array.from(new Set(allItems.map((item) => item.owner_current).filter(Boolean) as string[])).sort();
   const vessels = Array.from(new Set(allItems.map(itemVessel))).sort();
   const sort = sortKeys.has(searchParams?.sort as SortKey) ? searchParams?.sort as SortKey : 'start';

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createComplianceItem } from '@/app/actions/items';
+import { canCreateComplianceItems } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
 const complianceAreas = [
@@ -30,7 +31,7 @@ export default async function NewItemPage() {
     .limit(1)
     .maybeSingle();
 
-  if (!membership || membership.role !== 'owner') redirect('/');
+  if (!membership || !canCreateComplianceItems(membership.role)) redirect('/');
 
   const { data: vessels } = await supabase
     .from('vessels')

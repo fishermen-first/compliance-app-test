@@ -133,7 +133,6 @@ export async function createComplianceItem(formData: FormData) {
   const { supabase, membership } = await requireMembership({ allowAppAdmin: true });
   const targetCompanyId = membership?.company_id ?? optionalString(formData, 'companyId');
 
-  if (membership && membership.role !== 'owner') redirect('/');
   if (!targetCompanyId) redirect('/');
 
   const ownerRaw = optionalString(formData, 'ownerRaw');

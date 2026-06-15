@@ -24,6 +24,7 @@ export type ComplianceItem = {
   sharepoint_url: string | null;
   completed_at: string | null;
   discontinued_at: string | null;
+  created_by: string | null;
   source_row_number: number | null;
   previous_item_id?: string | null;
 };
