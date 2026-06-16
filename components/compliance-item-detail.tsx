@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { completeComplianceItem, saveComplianceItemReminders, updateComplianceItemCore, updateComplianceItemStatus } from '@/app/actions/items';
+import { completeComplianceItem, updateComplianceItemCore, updateComplianceItemStatus } from '@/app/actions/items';
+import { ReminderScheduleDrawer } from '@/components/reminder-schedule-drawer';
 import { StatusBadge } from '@/components/status-badge';
 import {
   type ComplianceItem,
@@ -17,6 +18,7 @@ type ReminderRule = {
   trigger_type: string;
   days_before: number | null;
   repeat_every_days: number | null;
+  send_on: string | null;
   active: boolean;
 };
 
@@ -71,10 +73,6 @@ function ruleFor(rules: ReminderRule[], triggerType: string) {
   return rules.find((rule) => rule.trigger_type === triggerType);
 }
 
-function blankRecipientRows(count: number) {
-  return Array.from({ length: count }, (_, index) => `blank-${index}`);
-}
-
 function addDays(value: string, days: number) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return null;
@@ -99,6 +97,7 @@ function nextExpectedReminder(item: ComplianceItem, rules: ReminderRule[]) {
       return date ? [date] : [];
     }
     if (rule.trigger_type === 'repeat_after_start' && item.start_working_on && rule.repeat_every_days) {
+      if (item.status === 'submitted') return [];
       const elapsed = daysBetweenIso(item.start_working_on, today);
       if (elapsed === null) return [];
       const interval = rule.repeat_every_days;
@@ -106,10 +105,26 @@ function nextExpectedReminder(item: ComplianceItem, rules: ReminderRule[]) {
       const date = addDays(item.start_working_on, nextOffset);
       return date ? [date] : [];
     }
+    if (rule.trigger_type === 'on_specific_date' && rule.send_on) return [rule.send_on];
     return [];
   });
 
   return dates.filter((date) => date >= today).sort()[0] ?? null;
+}
+
+function uniqueNumbers(values: Array<number | null>) {
+  return Array.from(new Set(values.filter((value): value is number => value !== null && value >= 0))).sort((a, b) => b - a);
+}
+
+function uniqueDates(values: Array<string | null>) {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value)))).sort();
+}
+
+function joinLeadTimes(values: number[]) {
+  if (values.length === 0) return '';
+  if (values.length === 1) return `${values[0]}`;
+  if (values.length === 2) return `${values[0]} & ${values[1]}`;
+  return `${values.slice(0, -1).join(', ')} & ${values[values.length - 1]}`;
 }
 
 function formatTimestamp(value: string | null) {
@@ -180,8 +195,12 @@ export function ComplianceItemDetail({
   const nextDates = proposedNextDates(item);
   const canCreateNext = Boolean(nextDates.nextExpirationDate);
   const startRule = ruleFor(reminderRules, 'on_start_date');
-  const expirationRule = ruleFor(reminderRules, 'days_before_expiration');
+  const expirationRules = reminderRules.filter((rule) => rule.trigger_type === 'days_before_expiration');
+  const activeExpirationLeadTimes = uniqueNumbers(expirationRules.filter((rule) => rule.active).map((rule) => rule.days_before));
   const repeatRule = ruleFor(reminderRules, 'repeat_after_start');
+  const oneOffDates = uniqueDates(reminderRules
+    .filter((rule) => rule.trigger_type === 'on_specific_date' && rule.active)
+    .map((rule) => rule.send_on));
   const additionalRecipients = recipients.filter((recipient) => recipient.recipient_type === 'additional');
   const latestReminder = reminderLogs[0];
   const nextReminder = nextExpectedReminder(item, reminderRules);
@@ -470,63 +489,27 @@ export function ComplianceItemDetail({
             <p className="eyebrow">Reminders</p>
             <ul className="reminder-card-list">
               <li><strong>Start-working reminder</strong><span className="send-pill">{startRule?.active ? 'Active' : 'Off'}</span></li>
-              <li><strong>Before-expiration reminder</strong><span>{expirationRule?.active ? `${expirationRule.days_before ?? 14} days before` : 'Off'}</span></li>
+              <li><strong>Before-expiration reminder</strong><span>{activeExpirationLeadTimes.length ? `${joinLeadTimes(activeExpirationLeadTimes)} days before` : 'Off'}</span></li>
+              <li><strong>One-off dates</strong><span>{oneOffDates.length ? oneOffDates.map((date) => formatDate(date)).join(', ') : 'None'}</span></li>
               <li><strong>Vessel-copy recipients</strong><span>{additionalRecipients.length}</span></li>
               <li><strong>Next scheduled</strong><span>{nextReminder ? formatDate(nextReminder) : 'None'}</span></li>
               <li><strong>Latest send</strong><span>{latestReminder ? `${statusOptionLabel(latestReminder.status)} - ${formatTimestamp(latestReminder.sent_at ?? latestReminder.scheduled_for)}` : 'None logged'}</span></li>
             </ul>
             <p className="carry-note">These settings carry over automatically when this item rolls forward.</p>
             {canManageReminders ? (
-              <details className="filter-chip-menu">
-                <summary>Edit reminders</summary>
-                <div className="filter-pop" style={{ minWidth: 360 }}>
-                  <form action={saveComplianceItemReminders} className="status-form reminder-editor-form">
-                    <input type="hidden" name="itemId" value={item.id} />
-                    <input type="hidden" name="itemPathPrefix" value={itemPathPrefix} />
-                    <label>
-                      Instructions
-                      <textarea name="instructions" rows={4} defaultValue={item.instructions ?? ''} placeholder="Standing instructions included in reminder emails." />
-                    </label>
-                    <label className="checkbox-row">
-                      <input name="startRuleActive" type="checkbox" defaultChecked={startRule?.active ?? true} />
-                      Start date
-                    </label>
-                    <label className="checkbox-row">
-                      <input name="expirationRuleActive" type="checkbox" defaultChecked={expirationRule?.active ?? true} />
-                      Before expiration
-                    </label>
-                    <label>
-                      Days before
-                      <input name="expirationDaysBefore" type="number" min="0" defaultValue={expirationRule?.days_before ?? 14} />
-                    </label>
-                    <label className="checkbox-row">
-                      <input name="repeatRuleActive" type="checkbox" defaultChecked={repeatRule?.active ?? false} />
-                      Repeat after start
-                    </label>
-                    <label>
-                      Repeat every days
-                      <input name="repeatEveryDays" type="number" min="1" defaultValue={repeatRule?.repeat_every_days ?? ''} />
-                    </label>
-                    {additionalRecipients.map((recipient) => (
-                      <div className="recipient-editor-row" key={recipient.recipient_email}>
-                        <input name="additionalRecipientName" defaultValue={recipient.recipient_name ?? ''} placeholder="Name" />
-                        <input name="additionalRecipientEmail" type="email" defaultValue={recipient.recipient_email} placeholder="email@company.com" />
-                      </div>
-                    ))}
-                    {blankRecipientRows(2).map((key) => (
-                      <div className="recipient-editor-row" key={key}>
-                        <input name="additionalRecipientName" placeholder="Name" />
-                        <input name="additionalRecipientEmail" type="email" placeholder="email@company.com" />
-                      </div>
-                    ))}
-                    <label>
-                      Add recipients by line
-                      <textarea name="additionalRecipients" rows={3} placeholder="name@company.com or Name <name@company.com>" />
-                    </label>
-                    <button type="submit">Save reminders</button>
-                  </form>
-                </div>
-              </details>
+              <ReminderScheduleDrawer
+                itemId={item.id}
+                itemName={item.item_name}
+                itemPathPrefix={itemPathPrefix}
+                itemVesselName={itemVessel(item)}
+                ownerCode={item.owner_current ?? item.owner_raw}
+                startWorkingOn={item.start_working_on}
+                expirationDate={item.expiration_date}
+                instructions={item.instructions}
+                reminderRules={reminderRules}
+                additionalRecipients={additionalRecipients}
+                today={todayIso()}
+              />
             ) : null}
           </article>
 

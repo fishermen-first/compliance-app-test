@@ -24,7 +24,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
       .order('changed_at', { ascending: false }),
     supabase
       .from('compliance_item_reminder_rules')
-      .select('label, trigger_type, days_before, repeat_every_days, active')
+      .select('label, trigger_type, days_before, repeat_every_days, send_on, active')
       .eq('company_id', membership.company_id)
       .eq('item_id', params.id)
       .order('created_at', { ascending: true }),

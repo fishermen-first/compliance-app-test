@@ -883,6 +883,7 @@ export type Database = {
           item_id: string
           label: string
           repeat_every_days: number | null
+          send_on: string | null
           trigger_type: string
         }
         Insert: {
@@ -894,6 +895,7 @@ export type Database = {
           item_id: string
           label: string
           repeat_every_days?: number | null
+          send_on?: string | null
           trigger_type: string
         }
         Update: {
@@ -905,6 +907,7 @@ export type Database = {
           item_id?: string
           label?: string
           repeat_every_days?: number | null
+          send_on?: string | null
           trigger_type?: string
         }
         Relationships: [
@@ -1593,9 +1596,10 @@ export type Database = {
       save_compliance_item_reminders: {
         Args: {
           additional_recipients: Json
-          expiration_days_before: number
+          expiration_days_before: number[]
           expiration_rule_active: boolean
           item_instructions: string
+          one_off_dates: string[]
           repeat_every_days: number
           repeat_rule_active: boolean
           start_rule_active: boolean

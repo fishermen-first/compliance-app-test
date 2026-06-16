@@ -34,6 +34,41 @@ function optionalInteger(formData: FormData, name: string) {
   return parsed;
 }
 
+function integerList(formData: FormData, name: string) {
+  const values = new Set<number>();
+
+  for (const entry of formData.getAll(name)) {
+    const value = String(entry ?? '').trim();
+    if (!value) continue;
+
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed)) throw new Error(`${name} must be a whole number`);
+    if (parsed < 0) throw new Error(`${name} must be zero or greater`);
+    values.add(parsed);
+  }
+
+  return Array.from(values).sort((a, b) => b - a);
+}
+
+function dateList(formData: FormData, name: string) {
+  const values = new Set<string>();
+
+  for (const entry of formData.getAll(name)) {
+    const value = String(entry ?? '').trim();
+    if (!value) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error(`${name} must be a date`);
+
+    const parsed = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+      throw new Error(`${name} must be a valid date`);
+    }
+
+    values.add(value);
+  }
+
+  return Array.from(values).sort();
+}
+
 function requiredRecurrenceUnit(formData: FormData, name: string) {
   const value = requiredString(formData, name);
   if (!recurrenceUnits.has(value as RecurrenceUnit)) {
@@ -248,12 +283,9 @@ export async function saveComplianceItemReminders(formData: FormData) {
   const { supabase } = await requireMembership({ allowAppAdmin: true });
   const expirationRuleActive = checkboxValue(formData, 'expirationRuleActive');
   const repeatRuleActive = checkboxValue(formData, 'repeatRuleActive');
-  const expirationDaysBefore = optionalInteger(formData, 'expirationDaysBefore') ?? 14;
+  const expirationDaysBefore = integerList(formData, 'expirationDaysBefore');
+  const oneOffDates = dateList(formData, 'oneOffDate');
   const repeatEveryDays = optionalInteger(formData, 'repeatEveryDays');
-
-  if (expirationDaysBefore < 0) {
-    throw new Error('expirationDaysBefore must be zero or greater');
-  }
 
   if (repeatEveryDays !== null && repeatEveryDays <= 0) {
     throw new Error('repeatEveryDays must be greater than zero');
@@ -271,6 +303,7 @@ export async function saveComplianceItemReminders(formData: FormData) {
     expiration_days_before: expirationDaysBefore,
     repeat_rule_active: repeatRuleActive,
     repeat_every_days: repeatEveryDays,
+    one_off_dates: oneOffDates,
     additional_recipients: parseAdditionalRecipients(formData)
   });
 
