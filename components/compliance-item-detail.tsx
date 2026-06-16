@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { completeComplianceItem, updateComplianceItemCore, updateComplianceItemStatus } from '@/app/actions/items';
+import { updateComplianceItemCore, updateComplianceItemStatus } from '@/app/actions/items';
+import { CompleteItemModal } from '@/components/complete-item-modal';
 import { ReminderScheduleDrawer } from '@/components/reminder-schedule-drawer';
 import { StatusBadge } from '@/components/status-badge';
 import {
@@ -281,61 +282,16 @@ export function ComplianceItemDetail({
                   </>
                 ) : null}
                 {canCompleteItem ? (
-                  <details className="modal-details">
-                    <summary className="complete-trigger">
-                      <span>Complete</span>
-                      <small>Roll forward</small>
-                    </summary>
-                    <div className="modal-scrim" />
-                    <div className="roll-modal" role="dialog" aria-modal="true" aria-label="Complete and roll forward">
-                      <div className="drawer-head">
-                        <div>
-                          <span className="eyebrow">Complete item</span>
-                          <strong>{item.item_name}</strong>
-                        </div>
-                      </div>
-                      <form action={completeComplianceItem} className="status-form">
-                        <input type="hidden" name="itemId" value={item.id} />
-                        <input type="hidden" name="itemPathPrefix" value={itemPathPrefix} />
-                        {!canEditCore && canCreateNext ? <input type="hidden" name="createNext" value="on" /> : null}
-                        {!canEditCore && canCreateNext && nextDates.nextStartWorkingOn ? <input type="hidden" name="nextStartWorkingOn" value={nextDates.nextStartWorkingOn} /> : null}
-                        {!canEditCore && canCreateNext && nextDates.nextExpirationDate ? <input type="hidden" name="nextExpirationDate" value={nextDates.nextExpirationDate} /> : null}
-                        <div className="body">
-                          <label>
-                            Completed on
-                            <input name="completionDate" type="date" defaultValue={todayIso()} required />
-                          </label>
-                          <label>
-                            Final note
-                            <textarea name="finalNotes" rows={3} placeholder="Certificate filed, final confirmation, or document location." />
-                          </label>
-                          {canEditCore ? (
-                            <>
-                              <label className="checkbox-row">
-                                <input name="createNext" type="checkbox" defaultChecked={canCreateNext} disabled={!canCreateNext} />
-                                Create the next record
-                              </label>
-                              <label>
-                                Next start
-                                <input name="nextStartWorkingOn" type="date" defaultValue={nextDates.nextStartWorkingOn ?? ''} disabled={!canCreateNext} />
-                              </label>
-                              <label>
-                                Next expiration
-                                <input name="nextExpirationDate" type="date" defaultValue={nextDates.nextExpirationDate ?? ''} disabled={!canCreateNext} />
-                              </label>
-                            </>
-                          ) : (
-                            <p className="form-note">{canCreateNext ? 'The next recurring item will use the saved recurrence dates.' : 'No recurring item will be created because this item has no automatic recurrence.'}</p>
-                          )}
-                          <p className="carry-note">Reminder rules, vessel recipients, and instructions carry over automatically when this item rolls forward.</p>
-                        </div>
-                        <div className="drawer-foot">
-                          <Link className="secondary-link" href={itemHref}>Cancel</Link>
-                          <button type="submit">Complete item</button>
-                        </div>
-                      </form>
-                    </div>
-                  </details>
+                  <CompleteItemModal
+                    itemId={item.id}
+                    itemName={item.item_name}
+                    itemPathPrefix={itemPathPrefix}
+                    canEditCore={canEditCore}
+                    canCreateNext={canCreateNext}
+                    nextStartWorkingOn={nextDates.nextStartWorkingOn}
+                    nextExpirationDate={nextDates.nextExpirationDate}
+                    completionDateDefault={todayIso()}
+                  />
                 ) : null}
               </div>
               {canUpdateStatus ? (

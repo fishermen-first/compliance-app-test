@@ -8404,6 +8404,8 @@ svg {
   border-radius: 8px;
   background: #fff;
   color: var(--ink-soft);
+  cursor: pointer;
+  font: inherit;
   font-size: 13px;
   font-weight: 750;
   text-align: center;
