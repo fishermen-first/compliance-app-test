@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { CalendarPlus, Pencil, X } from 'lucide-react';
 import { saveComplianceItemReminders } from '@/app/actions/items';
 import { formatDate, shortDate } from '@/lib/compliance';
@@ -30,6 +30,7 @@ type ScheduleEntry = {
   title: string;
   sub: string;
   kind: 'kickoff' | 'deadline' | 'recurring' | 'oneoff';
+  leadTime?: number;
 };
 
 type ScheduleEntryWithStatus = ScheduleEntry & {
@@ -46,12 +47,7 @@ type ScheduleState = {
   oneOffDates: string[];
 };
 
-const leadTimePresets = [30, 14, 7, 3, 1];
-const repeatPresets = [
-  { label: 'Weekly', value: 7 },
-  { label: 'Every 2 weeks', value: 14 },
-  { label: 'Monthly', value: 30 }
-];
+type AddMode = 'specific' | 'deadline' | 'recurring';
 
 function addDays(value: string, days: number) {
   const date = new Date(`${value}T00:00:00`);
@@ -72,11 +68,9 @@ function isPast(value: string, today: string) {
   return value < today;
 }
 
-function joinLeadTimes(values: number[]) {
-  if (values.length === 0) return '';
-  if (values.length === 1) return `${values[0]}`;
-  if (values.length === 2) return `${values[0]} and ${values[1]}`;
-  return `${values.slice(0, -1).join(', ')} and ${values[values.length - 1]}`;
+function splitShortDate(value: string) {
+  const [month, day] = shortDate(value).split(' ');
+  return { month: month?.toUpperCase() ?? '', day: day ?? '' };
 }
 
 function buildSchedule(
@@ -90,7 +84,7 @@ function buildSchedule(
     out.push({
       iso: item.startWorkingOn,
       title: 'Start-working reminder',
-      sub: 'Work can start',
+      sub: 'Sent when office work opens',
       kind: 'kickoff'
     });
   }
@@ -102,8 +96,9 @@ function buildSchedule(
       out.push({
         iso,
         title: 'Deadline reminder',
-        sub: `${leadTime} days before ${shortDate(item.expirationDate)}`,
-        kind: 'deadline'
+        sub: `${leadTime} days before the ${shortDate(item.expirationDate)} expiration`,
+        kind: 'deadline',
+        leadTime
       });
     });
   }
@@ -115,7 +110,7 @@ function buildSchedule(
       out.push({
         iso: current,
         title: 'Recurring nudge',
-        sub: `Every ${state.repeatEveryDays} days`,
+        sub: `Every ${state.repeatEveryDays} days while the item remains open`,
         kind: 'recurring'
       });
       current = addDays(current, state.repeatEveryDays);
@@ -126,8 +121,8 @@ function buildSchedule(
   state.oneOffDates.forEach((iso) => {
     out.push({
       iso,
-      title: 'One-off reminder',
-      sub: 'Added by hand',
+      title: 'Manual reminder',
+      sub: 'Added to this cycle by hand',
       kind: 'oneoff'
     });
   });
@@ -177,31 +172,14 @@ function ScheduleToggle({ checked, onChange, label }: { checked: boolean; onChan
   );
 }
 
-function ReminderBlock({
-  title,
-  sub,
-  checked,
-  onToggle,
-  children
-}: {
-  title: string;
-  sub: string;
-  checked: boolean;
-  onToggle: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <section className={`schedule-rule-block${checked ? ' is-on' : ''}`}>
-      <div className="schedule-rule-head">
-        <ScheduleToggle checked={checked} onChange={onToggle} label={title} />
-        <div>
-          <h4>{title}</h4>
-          <p>{sub}</p>
-        </div>
-      </div>
-      {checked ? <div className="schedule-rule-body">{children}</div> : null}
-    </section>
-  );
+function ScheduleTag({ entry }: { entry: ScheduleEntryWithStatus }) {
+  const label = entry.status === 'past'
+    ? 'Past'
+    : entry.status === 'next'
+      ? 'Next up'
+      : 'Scheduled';
+
+  return <span className={`schedule-tag is-${entry.status}`}>{label}</span>;
 }
 
 export function ReminderScheduleDrawer({
@@ -231,8 +209,12 @@ export function ReminderScheduleDrawer({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [schedule, setSchedule] = useState<ScheduleState>(() => initialSchedule(reminderRules));
-  const [customLeadTime, setCustomLeadTime] = useState('');
-  const [oneOffDraft, setOneOffDraft] = useState('');
+  const [addMode, setAddMode] = useState<AddMode>('specific');
+  const [specificDateDraft, setSpecificDateDraft] = useState('');
+  const [deadlineDraft, setDeadlineDraft] = useState('7');
+  const [recurringDraft, setRecurringDraft] = useState(() => String(initialSchedule(reminderRules).repeatEveryDays));
+  const [editingOneOffDate, setEditingOneOffDate] = useState<string | null>(null);
+  const [editingLeadTime, setEditingLeadTime] = useState<number | null>(null);
   const [recipients, setRecipients] = useState<EditableRecipient[]>(() => (
     additionalRecipients.map((recipient) => ({
       name: recipient.recipient_name ?? '',
@@ -246,29 +228,61 @@ export function ReminderScheduleDrawer({
     () => buildSchedule(schedule, { startWorkingOn, expirationDate }, today),
     [expirationDate, schedule, startWorkingOn, today]
   );
-  const deadlineSends = useMemo(
-    () => sortedLeadTimes
-      .map((leadTime) => ({ leadTime, iso: expirationDate ? addDays(expirationDate, -leadTime) : null }))
-      .filter((entry): entry is { leadTime: number; iso: string } => Boolean(entry.iso)),
-    [expirationDate, sortedLeadTimes]
-  );
+  const nextReminder = scheduleRows.find((entry) => entry.status === 'next');
+  const futureReminderCount = scheduleRows.filter((entry) => !entry.past).length;
   const recurringRows = scheduleRows.filter((entry) => entry.kind === 'recurring');
+  const recurringPreviewRows = recurringRows.filter((entry) => !entry.past).slice(0, 3);
+  const ownerLabel = ownerCode ? `Owner ${ownerCode}` : 'mapped owner';
+  const recipientSummary = recipients.length ? `${ownerLabel} + ${recipients.length}` : ownerLabel;
 
-  const addLeadTime = (value: number) => {
-    if (!Number.isInteger(value) || value < 0) return;
-    setSchedule((current) => ({
-      ...current,
-      leadTimes: current.leadTimes.includes(value) ? current.leadTimes : [...current.leadTimes, value]
-    }));
+  const resetAddEdits = () => {
+    setEditingOneOffDate(null);
+    setEditingLeadTime(null);
   };
 
-  const toggleLeadTime = (value: number) => {
-    setSchedule((current) => ({
-      ...current,
-      leadTimes: current.leadTimes.includes(value)
-        ? current.leadTimes.filter((leadTime) => leadTime !== value)
-        : [...current.leadTimes, value]
-    }));
+  const selectAddMode = (mode: AddMode) => {
+    resetAddEdits();
+    setAddMode(mode);
+    if (mode === 'recurring') setRecurringDraft(String(schedule.repeatEveryDays));
+    if (mode === 'deadline') setDeadlineDraft('');
+  };
+
+  const saveSpecificDate = () => {
+    if (!specificDateDraft) return;
+    setSchedule((current) => {
+      const withoutEditedDate = editingOneOffDate
+        ? current.oneOffDates.filter((date) => date !== editingOneOffDate)
+        : current.oneOffDates;
+      const oneOffDates = withoutEditedDate.includes(specificDateDraft)
+        ? withoutEditedDate
+        : [...withoutEditedDate, specificDateDraft].sort();
+      return { ...current, oneOffDates };
+    });
+    setSpecificDateDraft('');
+    setEditingOneOffDate(null);
+  };
+
+  const saveDeadlineOffset = () => {
+    const parsed = Number.parseInt(deadlineDraft, 10);
+    if (!Number.isInteger(parsed) || parsed < 0) return;
+
+    setSchedule((current) => {
+      const withoutEditedLeadTime = editingLeadTime === null
+        ? current.leadTimes
+        : current.leadTimes.filter((leadTime) => leadTime !== editingLeadTime);
+      const leadTimes = withoutEditedLeadTime.includes(parsed)
+        ? withoutEditedLeadTime
+        : [...withoutEditedLeadTime, parsed];
+      return { ...current, expirationActive: true, leadTimes };
+    });
+    setDeadlineDraft('');
+    setEditingLeadTime(null);
+  };
+
+  const saveRecurringCadence = () => {
+    const parsed = Number.parseInt(recurringDraft, 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) return;
+    setSchedule((current) => ({ ...current, repeatActive: true, repeatEveryDays: parsed }));
   };
 
   const removeLeadTime = (value: number) => {
@@ -278,21 +292,18 @@ export function ReminderScheduleDrawer({
     }));
   };
 
-  const addCustomLeadTime = () => {
-    const parsed = Number.parseInt(customLeadTime, 10);
-    if (Number.isInteger(parsed) && parsed >= 0) addLeadTime(parsed);
-    setCustomLeadTime('');
+  const editLeadTime = (value: number) => {
+    setAddMode('deadline');
+    setDeadlineDraft(String(value));
+    setEditingLeadTime(value);
+    setEditingOneOffDate(null);
   };
 
-  const addOneOff = () => {
-    if (!oneOffDraft) return;
-    setSchedule((current) => ({
-      ...current,
-      oneOffDates: current.oneOffDates.includes(oneOffDraft)
-        ? current.oneOffDates
-        : [...current.oneOffDates, oneOffDraft].sort()
-    }));
-    setOneOffDraft('');
+  const editOneOff = (value: string) => {
+    setAddMode('specific');
+    setSpecificDateDraft(value);
+    setEditingOneOffDate(value);
+    setEditingLeadTime(null);
   };
 
   const removeOneOff = (value: string) => {
@@ -300,6 +311,10 @@ export function ReminderScheduleDrawer({
       ...current,
       oneOffDates: current.oneOffDates.filter((date) => date !== value)
     }));
+    if (editingOneOffDate === value) {
+      setEditingOneOffDate(null);
+      setSpecificDateDraft('');
+    }
   };
 
   const addRecipient = () => {
@@ -313,8 +328,82 @@ export function ReminderScheduleDrawer({
     setRecipientDraft({ name: '', email: '' });
   };
 
-  const ownerLabel = ownerCode ? `Owner ${ownerCode}` : 'the mapped owner';
-  const primaryName = itemName.split(' - ')[0] || itemName;
+  const renderAddPanel = () => {
+    if (addMode === 'deadline') {
+      return (
+        <div className="schedule-add-fields">
+          <label>
+            Days before expiration
+            <input
+              type="number"
+              min="0"
+              value={deadlineDraft}
+              placeholder="14"
+              onChange={(event) => setDeadlineDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  saveDeadlineOffset();
+                }
+              }}
+            />
+          </label>
+          <div className="schedule-field-note">
+            Counts back from {expirationDate ? formatDate(expirationDate) : 'the expiration date'}.
+          </div>
+          <button type="button" onClick={saveDeadlineOffset}>{editingLeadTime === null ? 'Add deadline reminder' : 'Update offset'}</button>
+        </div>
+      );
+    }
+
+    if (addMode === 'recurring') {
+      return (
+        <div className="schedule-add-fields">
+          <label>
+            Repeat every
+            <input
+              type="number"
+              min="1"
+              value={recurringDraft}
+              onChange={(event) => setRecurringDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  saveRecurringCadence();
+                }
+              }}
+            />
+          </label>
+          <div className="schedule-field-note">days while the item remains open.</div>
+          <button type="button" onClick={saveRecurringCadence}>{schedule.repeatActive ? 'Update cadence' : 'Start nudging'}</button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="schedule-add-fields">
+        <label>
+          Reminder date
+          <input
+            type="date"
+            min={today}
+            value={specificDateDraft}
+            onChange={(event) => setSpecificDateDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                saveSpecificDate();
+              }
+            }}
+          />
+        </label>
+        <div className="schedule-field-note">A manual reminder for this cycle only.</div>
+        <button type="button" onClick={saveSpecificDate} disabled={!specificDateDraft}>
+          {editingOneOffDate ? 'Update reminder' : 'Add reminder'}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -330,7 +419,8 @@ export function ReminderScheduleDrawer({
             <div className="drawer-head">
               <div>
                 <span className="eyebrow">Reminder schedule</span>
-                <strong>When &amp; how often the office gets emailed about this item.</strong>
+                <strong>{itemName}</strong>
+                <p>{ownerLabel} gets the default reminders. Vessel copies receive informational emails.</p>
               </div>
               <button className="drawer-icon-button" type="button" aria-label="Close reminder schedule" onClick={() => setIsOpen(false)}>
                 <X aria-hidden="true" />
@@ -356,177 +446,189 @@ export function ReminderScheduleDrawer({
               ))}
 
               <div className="body reminder-schedule-body">
-                <section className="send-preview-panel">
-                  <div className="send-preview-head">
+                <div className="schedule-summary-grid">
+                  <div>
+                    <span>Next email</span>
+                    <strong>{nextReminder ? shortDate(nextReminder.iso) : 'None'}</strong>
+                  </div>
+                  <div>
+                    <span>Future reminders</span>
+                    <strong>{futureReminderCount} scheduled</strong>
+                  </div>
+                  <div>
+                    <span>Recipients</span>
+                    <strong>{recipientSummary}</strong>
+                  </div>
+                </div>
+
+                <section className="schedule-section scheduled-reminders-section">
+                  <div className="schedule-section-head">
                     <div>
-                      <h4>What will actually send</h4>
-                      <p>{primaryName} - <b>{itemVesselName}</b> - reminders go to <b>{ownerLabel}</b>{recipients.length ? `, plus ${recipients.length} vessel ${recipients.length === 1 ? 'copy' : 'copies'}` : ''}.</p>
+                      <h4>Scheduled reminders</h4>
+                      <p>Every future email that will go out for this item.</p>
                     </div>
-                    <CalendarPlus aria-hidden="true" />
+                    {nextReminder ? <span className="schedule-tag is-next">Next up</span> : null}
                   </div>
 
                   {scheduleRows.length === 0 ? (
-                    <p className="send-preview-empty">No reminders are on, so nobody will be emailed for this item.</p>
+                    <div className="send-preview-empty">
+                      <CalendarPlus aria-hidden="true" />
+                      <span>No reminders are on, so nobody will be emailed for this item.</span>
+                    </div>
                   ) : (
-                    <div className="schedule-timeline">
-                      {scheduleRows.map((entry) => (
-                        <div className={`schedule-timeline-row${entry.past ? ' is-past' : ''}`} key={`${entry.kind}-${entry.iso}-${entry.sub}`}>
-                          <span className="schedule-date">{shortDate(entry.iso)}</span>
-                          <span className="schedule-copy">
-                            <b>{entry.title}</b>
-                            <span>{entry.sub}</span>
-                          </span>
-                          <span className="schedule-row-actions">
-                            <span className={`schedule-tag is-${entry.kind === 'oneoff' && !entry.past ? 'oneoff' : entry.status}`}>
-                              {entry.status === 'past' ? 'Past' : entry.kind === 'oneoff' ? 'One-off' : entry.status === 'next' ? 'Next up' : 'Scheduled'}
-                            </span>
-                            {entry.kind === 'oneoff' ? (
-                              <button className="schedule-remove" type="button" aria-label={`Remove one-off date ${formatDate(entry.iso)}`} onClick={() => removeOneOff(entry.iso)}>
-                                <X aria-hidden="true" />
-                              </button>
-                            ) : null}
-                          </span>
-                        </div>
-                      ))}
+                    <div className="scheduled-reminder-list">
+                      {scheduleRows.map((entry) => {
+                        const date = splitShortDate(entry.iso);
+                        return (
+                          <div className={`scheduled-reminder-row${entry.past ? ' is-past' : ''}`} key={`${entry.kind}-${entry.iso}-${entry.sub}`}>
+                            <div className="schedule-date-block">
+                              <span>{date.month}</span>
+                              <strong>{date.day}</strong>
+                            </div>
+                            <div className="scheduled-reminder-copy">
+                              <strong>{entry.title}</strong>
+                              <p>{entry.sub}</p>
+                              <div className="schedule-chip-row">
+                                <ScheduleTag entry={entry} />
+                                <span className="schedule-tag is-owner">{ownerLabel}</span>
+                                {recipients.length ? <span className="schedule-tag is-copy">{recipients.length} vessel {recipients.length === 1 ? 'copy' : 'copies'}</span> : null}
+                              </div>
+                            </div>
+                            <div className="scheduled-reminder-actions">
+                              {entry.past ? null : (
+                                <>
+                                  {entry.kind === 'deadline' && entry.leadTime !== undefined ? (
+                                    <>
+                                      <button type="button" onClick={() => editLeadTime(entry.leadTime!)}>Edit</button>
+                                      <button className="danger" type="button" onClick={() => removeLeadTime(entry.leadTime!)}>Remove</button>
+                                    </>
+                                  ) : null}
+                                  {entry.kind === 'oneoff' ? (
+                                    <>
+                                      <button type="button" onClick={() => editOneOff(entry.iso)}>Edit</button>
+                                      <button className="danger" type="button" onClick={() => removeOneOff(entry.iso)}>Remove</button>
+                                    </>
+                                  ) : null}
+                                  {entry.kind === 'recurring' ? (
+                                    <>
+                                      <button type="button" onClick={() => {
+                                        setAddMode('recurring');
+                                        setRecurringDraft(String(schedule.repeatEveryDays));
+                                        resetAddEdits();
+                                      }}>Cadence</button>
+                                      <button className="danger" type="button" onClick={() => setSchedule((current) => ({ ...current, repeatActive: false }))}>Pause</button>
+                                    </>
+                                  ) : null}
+                                  {entry.kind === 'kickoff' ? (
+                                    <button className="danger" type="button" onClick={() => setSchedule((current) => ({ ...current, startActive: false }))}>Turn off</button>
+                                  ) : null}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
-                  <div className="one-off-add-row">
-                    <span>+ Add a one-off date</span>
-                    <input type="date" min={today} value={oneOffDraft} onChange={(event) => setOneOffDraft(event.target.value)} />
-                    <button type="button" onClick={addOneOff} disabled={!oneOffDraft}>Add</button>
+                  <div className="schedule-add-panel">
+                    <div className="schedule-segmented" aria-label="Add reminder type">
+                      <button className={addMode === 'specific' ? 'is-active' : ''} type="button" onClick={() => selectAddMode('specific')}>Specific date</button>
+                      <button className={addMode === 'deadline' ? 'is-active' : ''} type="button" onClick={() => selectAddMode('deadline')}>Days before deadline</button>
+                      <button className={addMode === 'recurring' ? 'is-active' : ''} type="button" onClick={() => selectAddMode('recurring')}>Recurring nudge</button>
+                    </div>
+                    {renderAddPanel()}
                   </div>
                 </section>
 
-                <ReminderBlock
-                  title="When the item becomes due"
-                  sub={startWorkingOn ? `Fires on the start-working date: ${formatDate(startWorkingOn)}` : 'Fires on the start-working date once one is set'}
-                  checked={schedule.startActive}
-                  onToggle={() => setSchedule((current) => ({ ...current, startActive: !current.startActive }))}
-                >
-                  <p className="schedule-sentence">Email {ownerLabel} on <span>{startWorkingOn ? formatDate(startWorkingOn) : 'the start-working date'}</span> so the item lands in the work queue when office work can begin.</p>
-                </ReminderBlock>
-
-                <ReminderBlock
-                  title="Before the deadline"
-                  sub={expirationDate ? `Counts back from the expiration date: ${formatDate(expirationDate)}` : 'Counts back from the expiration date once one is set'}
-                  checked={schedule.expirationActive}
-                  onToggle={() => setSchedule((current) => ({ ...current, expirationActive: !current.expirationActive }))}
-                >
-                  <p className="schedule-sentence">
-                    {sortedLeadTimes.length
-                      ? <>Send a heads-up <span>{joinLeadTimes(sortedLeadTimes)} days</span> before the deadline.</>
-                      : 'Pick one or more lead times so reminders escalate as the deadline gets closer.'}
-                  </p>
-                  <div className="schedule-presets">
-                    {leadTimePresets.map((leadTime) => (
-                      <button className={`schedule-preset${schedule.leadTimes.includes(leadTime) ? ' is-on' : ''}`} type="button" key={leadTime} onClick={() => toggleLeadTime(leadTime)}>
-                        {leadTime} {leadTime === 1 ? 'day' : 'days'}
-                      </button>
-                    ))}
-                    <span className="schedule-custom-pill">
-                      <span>Custom</span>
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="#"
-                        value={customLeadTime}
-                        onChange={(event) => setCustomLeadTime(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault();
-                            addCustomLeadTime();
-                          }
-                        }}
-                      />
-                      <button type="button" onClick={addCustomLeadTime}>Add</button>
-                    </span>
-                  </div>
-                  {deadlineSends.length ? (
-                    <div className="schedule-date-chips">
-                      {deadlineSends.map(({ leadTime, iso }) => (
-                        <span className={`schedule-date-chip${isPast(iso, today) ? ' is-past' : ''}`} key={leadTime}>
-                          <b>{leadTime}d before</b>
-                          {shortDate(iso)}
-                          <button type="button" aria-label={`Remove ${leadTime} day reminder`} onClick={() => removeLeadTime(leadTime)}>
-                            <X aria-hidden="true" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </ReminderBlock>
-
-                <ReminderBlock
-                  title="Keep nudging until it's done"
-                  sub="Repeats on a cadence while the item is open"
-                  checked={schedule.repeatActive}
-                  onToggle={() => setSchedule((current) => ({ ...current, repeatActive: !current.repeatActive }))}
-                >
-                  <p className="schedule-sentence">Re-send every <span>{schedule.repeatEveryDays} days</span> after work opens, until you mark the item <b>submitted</b>.</p>
-                  <div className="schedule-presets">
-                    {repeatPresets.map((preset) => (
-                      <button
-                        className={`schedule-preset${schedule.repeatEveryDays === preset.value ? ' is-on' : ''}`}
-                        type="button"
-                        key={preset.value}
-                        onClick={() => setSchedule((current) => ({ ...current, repeatEveryDays: preset.value }))}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                    <span className={`schedule-custom-pill${repeatPresets.some((preset) => preset.value === schedule.repeatEveryDays) ? '' : ' is-on'}`}>
-                      <span>Every</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={schedule.repeatEveryDays}
-                        onChange={(event) => {
-                          const parsed = Number.parseInt(event.target.value || '1', 10);
-                          setSchedule((current) => ({ ...current, repeatEveryDays: Math.max(1, Number.isInteger(parsed) ? parsed : 1) }));
-                        }}
-                      />
-                      <span>days</span>
-                    </span>
-                  </div>
-                  {recurringRows.length ? (
-                    <div className="schedule-date-chips">
-                      {recurringRows.slice(0, 5).map((entry) => (
-                        <span className={`schedule-date-chip${entry.status === 'next' ? ' is-next' : entry.past ? ' is-past' : ''}`} key={`${entry.kind}-${entry.iso}`}>
-                          {shortDate(entry.iso)}
-                        </span>
-                      ))}
-                      {recurringRows.length > 5 ? <span className="schedule-date-chip">+{recurringRows.length - 5} more</span> : null}
-                    </div>
-                  ) : (
-                    <p className="schedule-muted">No nudges land before the deadline at this cadence.</p>
-                  )}
-                </ReminderBlock>
-
-                <section className="schedule-rule-block is-on">
-                  <div className="schedule-rule-head">
-                    <div className="schedule-rule-spacer" />
+                <section className="schedule-section">
+                  <div className="schedule-section-head">
                     <div>
-                      <h4>Also copy the vessel</h4>
-                      <p>Informational email copies. No login required.</p>
+                      <h4>Rules that create reminders</h4>
+                      <p>These generate the scheduled list above.</p>
                     </div>
                   </div>
-                  <div className="schedule-rule-body">
-                    {recipients.length ? (
-                      <div className="schedule-recipient-chips">
-                        {recipients.map((recipient) => (
-                          <span className="schedule-recipient-chip" key={recipient.email}>
-                            <b>{recipient.name || 'Vessel copy'}</b>
-                            <span>{recipient.email}</span>
-                            <button type="button" aria-label={`Remove ${recipient.email}`} onClick={() => setRecipients((current) => current.filter((entry) => entry.email !== recipient.email))}>
-                              <X aria-hidden="true" />
-                            </button>
-                          </span>
-                        ))}
+                  <div className="schedule-rule-list">
+                    <div className="schedule-rule-row">
+                      <ScheduleToggle
+                        checked={schedule.startActive}
+                        label="Start-working reminder"
+                        onChange={() => setSchedule((current) => ({ ...current, startActive: !current.startActive }))}
+                      />
+                      <div>
+                        <strong>Start-working reminder</strong>
+                        <p>{startWorkingOn ? `Sends on ${formatDate(startWorkingOn)}.` : 'Sends once a start-working date is set.'}</p>
                       </div>
-                    ) : (
-                      <p className="schedule-muted">Just the office contact for now.</p>
-                    )}
+                    </div>
+
+                    <div className="schedule-rule-row">
+                      <ScheduleToggle
+                        checked={schedule.expirationActive}
+                        label="Deadline reminders"
+                        onChange={() => setSchedule((current) => ({ ...current, expirationActive: !current.expirationActive }))}
+                      />
+                      <div>
+                        <strong>Deadline reminders</strong>
+                        <p>{expirationDate ? `Sends before the ${formatDate(expirationDate)} expiration.` : 'Sends before the expiration date once one is set.'}</p>
+                        <div className="schedule-chip-row">
+                          {sortedLeadTimes.length ? sortedLeadTimes.map((leadTime) => (
+                            <button className="schedule-offset-chip" type="button" key={leadTime} onClick={() => editLeadTime(leadTime)}>
+                              {leadTime}d
+                            </button>
+                          )) : <span className="schedule-tag is-scheduled">No offsets</span>}
+                          <button className="schedule-offset-chip" type="button" onClick={() => selectAddMode('deadline')}>+ Offset</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="schedule-rule-row">
+                      <ScheduleToggle
+                        checked={schedule.repeatActive}
+                        label="Recurring nudges"
+                        onChange={() => setSchedule((current) => ({ ...current, repeatActive: !current.repeatActive }))}
+                      />
+                      <div>
+                        <strong>Recurring nudge</strong>
+                        <p>Repeats every {schedule.repeatEveryDays} days while the item is open.</p>
+                        <div className="schedule-chip-row">
+                          {recurringPreviewRows.length ? recurringPreviewRows.map((entry) => (
+                            <span className={`schedule-tag is-${entry.status}`} key={entry.iso}>{shortDate(entry.iso)}</span>
+                          )) : <span className="schedule-tag is-scheduled">No future nudges</span>}
+                          <button className="schedule-offset-chip" type="button" onClick={() => {
+                            setAddMode('recurring');
+                            setRecurringDraft(String(schedule.repeatEveryDays));
+                            resetAddEdits();
+                          }}>Cadence</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="schedule-section">
+                  <div className="schedule-section-head">
+                    <div>
+                      <h4>Recipients</h4>
+                      <p>Applies to every scheduled reminder unless a row is changed later.</p>
+                    </div>
+                  </div>
+                  <div className="schedule-recipient-list">
+                    <div className="schedule-recipient-row">
+                      <div>
+                        <strong>{ownerLabel}</strong>
+                        <span>Default office recipient from owner-code mapping</span>
+                      </div>
+                      <span className="schedule-tag is-owner">Default</span>
+                    </div>
+                    {recipients.map((recipient) => (
+                      <div className="schedule-recipient-row" key={recipient.email}>
+                        <div>
+                          <strong>{recipient.name || 'Vessel copy'}</strong>
+                          <span>{recipient.email}</span>
+                        </div>
+                        <button type="button" onClick={() => setRecipients((current) => current.filter((entry) => entry.email !== recipient.email))}>Remove</button>
+                      </div>
+                    ))}
                     <div className="schedule-recipient-add">
                       <input
                         type="text"
@@ -539,20 +641,26 @@ export function ReminderScheduleDrawer({
                         placeholder="email@company.com"
                         value={recipientDraft.email}
                         onChange={(event) => setRecipientDraft((current) => ({ ...current, email: event.target.value }))}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            addRecipient();
+                          }
+                        }}
                       />
-                      <button type="button" onClick={addRecipient}>Add</button>
+                      <button type="button" onClick={addRecipient}>Add copy</button>
                     </div>
                   </div>
                 </section>
 
                 <label className="schedule-instructions">
                   Email instructions
-                  <textarea name="instructions" rows={4} defaultValue={instructions ?? ''} placeholder="Standing instructions included in reminder emails." />
+                  <textarea name="instructions" rows={5} defaultValue={instructions ?? ''} placeholder="Standing instructions included in reminder emails." />
                 </label>
               </div>
 
               <div className="drawer-foot reminder-schedule-foot">
-                <span>Stacked deadline reminders carry forward. One-offs stay with this cycle.</span>
+                <span>{futureReminderCount} future {futureReminderCount === 1 ? 'reminder' : 'reminders'} scheduled. Deadline and recurring rules carry forward to the next cycle.</span>
                 <div>
                   <button className="schedule-cancel-button" type="button" onClick={() => setIsOpen(false)}>Cancel</button>
                   <button className="schedule-save-button" type="submit">Save schedule</button>
