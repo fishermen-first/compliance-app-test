@@ -8629,6 +8629,7 @@ button.secondary-link {
 
 .schedule-summary-grid {
   display: grid;
+  flex: 0 0 auto;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
@@ -8660,6 +8661,7 @@ button.secondary-link {
 
 .schedule-section {
   display: block;
+  flex: 0 0 auto;
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -9032,6 +9034,7 @@ button.secondary-link {
 
 .schedule-instructions {
   display: grid;
+  flex: 0 0 auto;
   gap: 8px;
   color: var(--ink);
   font-size: 13px;
