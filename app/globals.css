@@ -8891,8 +8891,8 @@ button.secondary-link {
 
 .schedule-add-fields {
   display: grid;
-  grid-template-columns: minmax(150px, 0.8fr) minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: minmax(150px, 180px) minmax(0, 1fr);
+  gap: 10px 14px;
   align-items: end;
 }
 
@@ -8923,7 +8923,15 @@ button.secondary-link {
   outline: 2px solid rgba(18, 120, 109, 0.16);
 }
 
-.schedule-add-fields button,
+.schedule-add-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.schedule-add-actions button,
 .schedule-recipient-add button {
   min-height: 42px;
   padding: 0 13px;
@@ -8935,14 +8943,23 @@ button.secondary-link {
   font-weight: 850;
 }
 
+.schedule-add-actions .schedule-secondary-action {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink-soft);
+}
+
 .schedule-add-fields button:disabled {
   background: var(--line-strong);
   cursor: default;
 }
 
 .schedule-field-note {
-  align-self: center;
+  align-self: end;
   margin: 0;
+  max-width: 320px;
+  padding-bottom: 6px;
+  line-height: 1.35;
 }
 
 .schedule-rule-list,

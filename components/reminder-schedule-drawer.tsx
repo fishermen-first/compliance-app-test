@@ -240,6 +240,19 @@ export function ReminderScheduleDrawer({
     setEditingLeadTime(null);
   };
 
+  const cancelAddEdit = () => {
+    if (addMode === 'specific') {
+      setSpecificDateDraft('');
+      setEditingOneOffDate(null);
+      return;
+    }
+
+    if (addMode === 'deadline') {
+      setDeadlineDraft('');
+      setEditingLeadTime(null);
+    }
+  };
+
   const selectAddMode = (mode: AddMode) => {
     resetAddEdits();
     setAddMode(mode);
@@ -351,7 +364,12 @@ export function ReminderScheduleDrawer({
           <div className="schedule-field-note">
             Counts back from {expirationDate ? formatDate(expirationDate) : 'the expiration date'}.
           </div>
-          <button type="button" onClick={saveDeadlineOffset}>{editingLeadTime === null ? 'Add deadline reminder' : 'Update offset'}</button>
+          <div className="schedule-add-actions">
+            {editingLeadTime !== null ? (
+              <button className="schedule-secondary-action" type="button" onClick={cancelAddEdit}>Cancel edit</button>
+            ) : null}
+            <button type="button" onClick={saveDeadlineOffset}>{editingLeadTime === null ? 'Add deadline reminder' : 'Update offset'}</button>
+          </div>
         </div>
       );
     }
@@ -375,7 +393,9 @@ export function ReminderScheduleDrawer({
             />
           </label>
           <div className="schedule-field-note">days while the item remains open.</div>
-          <button type="button" onClick={saveRecurringCadence}>{schedule.repeatActive ? 'Update cadence' : 'Start nudging'}</button>
+          <div className="schedule-add-actions">
+            <button type="button" onClick={saveRecurringCadence}>{schedule.repeatActive ? 'Update cadence' : 'Start nudging'}</button>
+          </div>
         </div>
       );
     }
@@ -398,9 +418,14 @@ export function ReminderScheduleDrawer({
           />
         </label>
         <div className="schedule-field-note">A manual reminder for this cycle only.</div>
-        <button type="button" onClick={saveSpecificDate} disabled={!specificDateDraft}>
-          {editingOneOffDate ? 'Update reminder' : 'Add reminder'}
-        </button>
+        <div className="schedule-add-actions">
+          {editingOneOffDate ? (
+            <button className="schedule-secondary-action" type="button" onClick={cancelAddEdit}>Cancel edit</button>
+          ) : null}
+          <button type="button" onClick={saveSpecificDate} disabled={!specificDateDraft}>
+            {editingOneOffDate ? 'Update reminder' : 'Add reminder'}
+          </button>
+        </div>
       </div>
     );
   };
