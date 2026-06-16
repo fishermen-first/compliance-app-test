@@ -427,7 +427,7 @@ export function ReminderScheduleDrawer({
               </button>
             </div>
 
-            <form action={saveComplianceItemReminders} className="status-form reminder-schedule-form">
+            <form action={saveComplianceItemReminders} className="reminder-schedule-form">
               <input type="hidden" name="itemId" value={itemId} />
               <input type="hidden" name="itemPathPrefix" value={itemPathPrefix} />
               {schedule.startActive ? <input type="hidden" name="startRuleActive" value="on" /> : null}

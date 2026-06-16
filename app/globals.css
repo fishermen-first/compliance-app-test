@@ -8618,10 +8618,11 @@ button.secondary-link {
   overflow: hidden;
 }
 
-.edit-drawer .reminder-schedule-body {
-  display: grid;
+.edit-drawer .body.reminder-schedule-body {
+  display: flex;
+  flex-direction: column;
   gap: 14px;
-  align-content: start;
+  align-content: stretch;
   overflow-y: auto;
   padding: 20px 28px 24px;
 }
@@ -8658,6 +8659,8 @@ button.secondary-link {
 }
 
 .schedule-section {
+  display: block;
+  min-height: 0;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -8966,7 +8969,7 @@ button.secondary-link {
   font-weight: 850;
 }
 
-.status-form .schedule-toggle {
+.reminder-schedule-form .schedule-toggle {
   position: relative;
   width: 42px;
   height: 24px;
@@ -8978,7 +8981,7 @@ button.secondary-link {
   padding: 0;
 }
 
-.status-form .schedule-toggle span {
+.reminder-schedule-form .schedule-toggle span {
   position: absolute;
   top: 3px;
   left: 3px;
@@ -8990,11 +8993,11 @@ button.secondary-link {
   transition: left 0.15s ease;
 }
 
-.status-form .schedule-toggle.is-on {
+.reminder-schedule-form .schedule-toggle.is-on {
   background: var(--teal);
 }
 
-.status-form .schedule-toggle.is-on span {
+.reminder-schedule-form .schedule-toggle.is-on span {
   left: 21px;
 }
 
@@ -9036,7 +9039,15 @@ button.secondary-link {
 }
 
 .schedule-instructions textarea {
+  width: 100%;
   min-height: 120px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  padding: 12px;
+  font: inherit;
+  resize: vertical;
 }
 
 .reminder-schedule-foot {
@@ -9056,8 +9067,8 @@ button.secondary-link {
   gap: 8px;
 }
 
-.status-form .schedule-cancel-button,
-.status-form .schedule-save-button {
+.reminder-schedule-form .schedule-cancel-button,
+.reminder-schedule-form .schedule-save-button {
   min-height: 44px;
   padding: 0 16px;
   border-radius: 8px;
@@ -9065,13 +9076,13 @@ button.secondary-link {
   font-weight: 850;
 }
 
-.status-form .schedule-cancel-button {
+.reminder-schedule-form .schedule-cancel-button {
   border: 1px solid var(--line);
   background: #fff;
   color: var(--ink-soft);
 }
 
-.status-form .schedule-save-button {
+.reminder-schedule-form .schedule-save-button {
   border: 0;
   background: var(--teal);
   color: #fff;
@@ -9303,8 +9314,8 @@ button.secondary-link {
   }
 
   .reminder-schedule-foot > div,
-  .status-form .schedule-cancel-button,
-  .status-form .schedule-save-button {
+  .reminder-schedule-form .schedule-cancel-button,
+  .reminder-schedule-form .schedule-save-button {
     width: 100%;
   }
 
