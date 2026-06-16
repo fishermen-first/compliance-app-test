@@ -2,9 +2,11 @@ alter table public.compliance_item_reminder_rules
   add column if not exists send_on date;
 
 drop index if exists public.compliance_item_reminder_rules_item_trigger_idx;
+drop index if exists public.compliance_item_reminder_rules_item_trigger_days_idx;
 
 create unique index if not exists compliance_item_reminder_rules_item_trigger_days_idx
-  on public.compliance_item_reminder_rules(item_id, trigger_type, coalesce(days_before, -1));
+  on public.compliance_item_reminder_rules(item_id, trigger_type, coalesce(days_before, -1))
+  where trigger_type <> 'on_specific_date';
 
 alter table public.compliance_item_reminder_rules
   drop constraint if exists compliance_item_reminder_rules_trigger_type_check;
@@ -237,7 +239,9 @@ begin
     null,
     coalesce(start_rule_active, false)
   )
-  on conflict (item_id, trigger_type, (coalesce(days_before, -1))) do update set
+  on conflict (item_id, trigger_type, (coalesce(days_before, -1)))
+  where trigger_type <> 'on_specific_date'
+  do update set
     label = excluded.label,
     repeat_every_days = excluded.repeat_every_days,
     active = excluded.active;
@@ -255,7 +259,9 @@ begin
     repeat_every_days,
     coalesce(repeat_rule_active, false)
   )
-  on conflict (item_id, trigger_type, (coalesce(days_before, -1))) do update set
+  on conflict (item_id, trigger_type, (coalesce(days_before, -1)))
+  where trigger_type <> 'on_specific_date'
+  do update set
     label = excluded.label,
     repeat_every_days = excluded.repeat_every_days,
     active = excluded.active;
