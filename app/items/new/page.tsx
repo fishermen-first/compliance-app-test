@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createComplianceItem } from '@/app/actions/items';
+import { NewItemNotesDisclosure, NewItemSchedulePreview } from '@/components/new-item-form-client';
 import { canCreateComplianceItems } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
@@ -17,6 +18,43 @@ const complianceAreas = [
 ];
 
 const frequencyLabels = ['Annually', 'Quarterly', 'Biennially', 'Triennially', 'Twice a year', 'Every 5 Years', 'Every 10 Years', 'Unannounced', 'New Permit', 'NA', 'Custom'];
+const agencyTypes = ['USCG', 'NOAA', 'EPA', 'State', 'Class Society', 'Internal'];
+const newItemFormId = 'new-item-form';
+
+type Relation<T> = T | T[] | null | undefined;
+
+type ProfileRelation = {
+  full_name: string | null;
+  email: string | null;
+};
+
+type OwnerCodeRow = {
+  code: string;
+  display_name: string | null;
+  user_id: string | null;
+  pending_email: string | null;
+  profiles?: Relation<ProfileRelation>;
+};
+
+function relation<T>(value: Relation<T>) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function isSeedJunkOwnerCode(code: string) {
+  return /[/>\-\s]/.test(code);
+}
+
+function ownerCodeLabel(owner: OwnerCodeRow) {
+  const profile = relation(owner.profiles);
+  const resolvedName = owner.display_name ?? profile?.full_name ?? profile?.email;
+  return resolvedName ? `${owner.code} — ${resolvedName}` : owner.code;
+}
+
+function ownerOptions(ownerCodes: OwnerCodeRow[]) {
+  const allCodes = ownerCodes.filter((owner) => owner.code.trim());
+  const cleanCodes = allCodes.filter((owner) => !isSeedJunkOwnerCode(owner.code));
+  return cleanCodes.length > 0 ? cleanCodes : allCodes;
+}
 
 export default async function NewItemPage() {
   const supabase = createClient();
@@ -40,91 +78,144 @@ export default async function NewItemPage() {
     .eq('active', true)
     .order('name');
 
+  const { data: ownerCodes } = await supabase
+    .from('company_owner_codes')
+    .select('code, display_name, user_id, pending_email, profiles!company_owner_codes_user_id_fkey(full_name, email)')
+    .eq('company_id', membership.company_id)
+    .order('code');
+
+  const owners = ownerOptions((ownerCodes ?? []) as OwnerCodeRow[]);
+
   return (
-    <main className="form-page">
-      <section className="form-panel event-form-panel">
-        <div className="setup-brand-row"><span className="brand-mark">FF</span><span>FF Compliance</span></div>
-        <p className="eyebrow">New item</p>
-        <h1>Add a compliance item.</h1>
-        <p>Create a renewal, report, permit, audit, inspection, or internal compliance reminder.</p>
+    <main className="form-page new-item-page">
+      <section className="new-item-shell" aria-labelledby="new-item-heading">
+        <nav className="new-item-breadcrumb" aria-label="Breadcrumb">
+          <Link href="/items">Items</Link>
+          <span aria-hidden="true">/</span>
+          <span>New item</span>
+        </nav>
 
-        <form action={createComplianceItem} className="event-form-grid">
-          <label className="wide-field">
-            Item name
-            <input name="itemName" placeholder="USCG Certificate of Documentation" required />
-          </label>
+        <header className="new-item-header">
+          <div className="setup-brand-row"><span className="brand-mark">FF</span><span>FF Compliance</span></div>
+          <p className="eyebrow">New item</p>
+          <h1 id="new-item-heading">Add a compliance item</h1>
+          <p>Create a renewal, report, permit, audit, inspection, or internal compliance reminder. Only the name is required.</p>
+        </header>
 
-          <label>
-            Owner
-            <input name="ownerRaw" placeholder="SN, ES, MA, SN-->ES" />
-          </label>
+        <form id={newItemFormId} data-new-item-form="true" action={createComplianceItem} className="new-item-form">
+          <section className="new-item-card" aria-labelledby="new-item-identity">
+            <div className="new-item-section-head">
+              <span>1</span>
+              <h2 id="new-item-identity">Identity</h2>
+            </div>
 
-          <label>
-            Owner for filters
-            <input name="ownerCurrent" placeholder="SN" />
-          </label>
+            <div className="new-item-grid new-item-grid-three">
+              <label className="new-item-field new-item-full new-item-name-field">
+                <span className="new-item-label">Item name <span className="new-item-required" aria-hidden="true">*</span></span>
+                <input className="new-item-name-input" name="itemName" placeholder="USCG Certificate of Documentation" required />
+              </label>
 
-          <label>
-            Vessel
-            <select name="vesselId" defaultValue="">
-              <option value="">Company-wide</option>
-              {(vessels ?? []).map((vessel) => <option value={vessel.id} key={vessel.id}>{vessel.name}</option>)}
-            </select>
-          </label>
+              <label className="new-item-field">
+                <span className="new-item-label">Agency / Type</span>
+                <input name="agencyType" list="agency-type-options" placeholder="USCG" />
+              </label>
 
-          <label>
-            Item number
-            <input name="itemNumber" placeholder="Certificate or permit number" />
-          </label>
+              <label className="new-item-field">
+                <span className="new-item-label">Item number</span>
+                <input name="itemNumber" placeholder="Certificate or permit number" />
+              </label>
 
-          <label>
-            Agency / Type
-            <input name="agencyType" placeholder="USCG, NOAA, EPA" />
-          </label>
+              <label className="new-item-field">
+                <span className="new-item-label">Compliance area</span>
+                <select name="complianceArea" defaultValue="Vessel Compliance">
+                  {complianceAreas.map((area) => <option value={area} key={area}>{area}</option>)}
+                </select>
+              </label>
+            </div>
+          </section>
 
-          <label>
-            Compliance area
-            <select name="complianceArea" defaultValue="Vessel Compliance">
-              {complianceAreas.map((area) => <option value={area} key={area}>{area}</option>)}
-            </select>
-          </label>
+          <section className="new-item-card" aria-labelledby="new-item-assignment">
+            <div className="new-item-section-head">
+              <span>2</span>
+              <h2 id="new-item-assignment">Assignment</h2>
+            </div>
 
-          <label>
-            Frequency
-            <select name="frequencyLabel" defaultValue="Annually">
-              {frequencyLabels.map((frequency) => <option value={frequency} key={frequency}>{frequency}</option>)}
-            </select>
-          </label>
+            <div className="new-item-grid new-item-grid-two">
+              <label className="new-item-field">
+                <span className="new-item-label">Vessel</span>
+                <select name="vesselId" defaultValue="">
+                  <option value="">Company-wide</option>
+                  {(vessels ?? []).map((vessel) => <option value={vessel.id} key={vessel.id}>{vessel.name}</option>)}
+                </select>
+              </label>
 
-          <label>
-            Start working on
-            <input name="startWorkingOn" type="date" />
-          </label>
+              <label className="new-item-field">
+                <span className="new-item-label">Owner</span>
+                <select name="ownerCurrent" defaultValue="">
+                  <option value="">Unassigned</option>
+                  {owners.map((owner) => <option value={owner.code} key={owner.code}>{ownerCodeLabel(owner)}</option>)}
+                </select>
+              </label>
+            </div>
+          </section>
 
-          <label>
-            Expiration date
-            <input name="expirationDate" type="date" />
-          </label>
+          <section className="new-item-card new-item-schedule-card" aria-labelledby="new-item-schedule">
+            <div className="new-item-section-head">
+              <span>3</span>
+              <h2 id="new-item-schedule">Schedule</h2>
+            </div>
 
-          <label className="wide-field">
-            Status notes
-            <input name="statusNotes" placeholder="Waiting on check from accounting, submitted online, etc." />
-          </label>
+            <div className="new-item-grid new-item-grid-three">
+              <label className="new-item-field">
+                <span className="new-item-label">Frequency</span>
+                <select name="frequencyLabel" defaultValue="Annually">
+                  {frequencyLabels.map((frequency) => <option value={frequency} key={frequency}>{frequency}</option>)}
+                </select>
+              </label>
 
-          <label className="wide-field">
-            Instructions
-            <textarea name="instructions" placeholder="Standing reminder instructions to carry forward." rows={4} />
-          </label>
+              <label className="new-item-field">
+                <span className="new-item-label">Start working on</span>
+                <input name="startWorkingOn" type="date" />
+              </label>
 
-          <label className="wide-field">
-            SharePoint link
-            <input name="sharepointUrl" type="url" placeholder="https://..." />
-          </label>
+              <label className="new-item-field">
+                <span className="new-item-label">Expiration / due date</span>
+                <input name="expirationDate" type="date" />
+              </label>
+            </div>
 
-          <div className="form-actions wide-field">
-            <Link className="secondary-link" href="/items">Cancel</Link>
-            <button type="submit">Create item</button>
+            <NewItemSchedulePreview formId={newItemFormId} />
+            <p className="new-item-schedule-note">Default cadence is <strong>14, 7, and 3 days before</strong> the due date. You can refine lead times, one-off dates, and recipients from the item&rsquo;s <span>Reminder schedule</span> after creating it.</p>
+          </section>
+
+          <NewItemNotesDisclosure>
+            <label className="new-item-field">
+              <span className="new-item-label">Status notes</span>
+              <input name="statusNotes" placeholder="Waiting on check from accounting, submitted online, etc." />
+            </label>
+
+            <label className="new-item-field">
+              <span className="new-item-label">Standing instructions <small>Carried forward each cycle</small></span>
+              <textarea name="instructions" placeholder="What to do when this comes due: where to file, who to contact, portal steps..." rows={4} />
+            </label>
+
+            <label className="new-item-field">
+              <span className="new-item-label">SharePoint link</span>
+              <input name="sharepointUrl" type="url" placeholder="https://..." />
+            </label>
+          </NewItemNotesDisclosure>
+
+          <div className="new-item-form-footer">
+            <p>Only Item name is required. Reminder details can be refined after creating.</p>
+            <div>
+              <Link className="secondary-link" href="/items">Cancel</Link>
+              <button type="submit">Create item</button>
+            </div>
           </div>
+
+          <datalist id="agency-type-options">
+            {agencyTypes.map((agency) => <option value={agency} key={agency} />)}
+          </datalist>
         </form>
       </section>
     </main>

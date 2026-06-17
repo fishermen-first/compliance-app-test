@@ -104,9 +104,9 @@ export function EditItemDetailsDrawer({
                     </label>
                   </div>
                   <label>
-                    Owner code (from workbook)
-                    <input name="ownerRaw" defaultValue={item.owner_raw ?? ''} placeholder="SN, ES, MA" />
-                    <span className="form-note">Preserve the workbook owner code exactly, including compound codes.</span>
+                    Original workbook owner code
+                    <input name="ownerRaw" defaultValue={item.owner_raw ?? ''} placeholder="Leave blank unless correcting imported data" />
+                    <span className="form-note">Use the Owner dropdown for routing. This field is only for preserving imported workbook codes when needed.</span>
                   </label>
                 </section>
                 <section className="fsec">
