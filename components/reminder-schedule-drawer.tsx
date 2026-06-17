@@ -234,6 +234,8 @@ export function ReminderScheduleDrawer({
   const recurringPreviewRows = recurringRows.filter((entry) => !entry.past).slice(0, 3);
   const ownerLabel = ownerCode ? `Owner ${ownerCode}` : 'mapped owner';
   const recipientSummary = recipients.length ? `${ownerLabel} + ${recipients.length}` : ownerLabel;
+  const editingKind = editingLeadTime !== null ? 'deadline' : editingOneOffDate ? 'manual' : null;
+  const editingLabel = editingKind === 'deadline' ? 'Deadline reminder' : editingKind === 'manual' ? 'Manual reminder' : '';
 
   const resetAddEdits = () => {
     setEditingOneOffDate(null);
@@ -241,16 +243,10 @@ export function ReminderScheduleDrawer({
   };
 
   const cancelAddEdit = () => {
-    if (addMode === 'specific') {
-      setSpecificDateDraft('');
-      setEditingOneOffDate(null);
-      return;
-    }
-
-    if (addMode === 'deadline') {
-      setDeadlineDraft('');
-      setEditingLeadTime(null);
-    }
+    setEditingOneOffDate(null);
+    setEditingLeadTime(null);
+    setSpecificDateDraft('');
+    setDeadlineDraft('');
   };
 
   const selectAddMode = (mode: AddMode) => {
@@ -365,9 +361,6 @@ export function ReminderScheduleDrawer({
             Counts back from {expirationDate ? formatDate(expirationDate) : 'the expiration date'}.
           </div>
           <div className="schedule-add-actions">
-            {editingLeadTime !== null ? (
-              <button className="schedule-secondary-action" type="button" onClick={cancelAddEdit}>Cancel edit</button>
-            ) : null}
             <button type="button" onClick={saveDeadlineOffset}>{editingLeadTime === null ? 'Add deadline reminder' : 'Update offset'}</button>
           </div>
         </div>
@@ -419,9 +412,6 @@ export function ReminderScheduleDrawer({
         </label>
         <div className="schedule-field-note">A manual reminder for this cycle only.</div>
         <div className="schedule-add-actions">
-          {editingOneOffDate ? (
-            <button className="schedule-secondary-action" type="button" onClick={cancelAddEdit}>Cancel edit</button>
-          ) : null}
           <button type="button" onClick={saveSpecificDate} disabled={!specificDateDraft}>
             {editingOneOffDate ? 'Update reminder' : 'Add reminder'}
           </button>
@@ -557,11 +547,21 @@ export function ReminderScheduleDrawer({
                   )}
 
                   <div className="schedule-add-panel">
-                    <div className="schedule-segmented" aria-label="Add reminder type">
-                      <button className={addMode === 'specific' ? 'is-active' : ''} type="button" onClick={() => selectAddMode('specific')}>Specific date</button>
-                      <button className={addMode === 'deadline' ? 'is-active' : ''} type="button" onClick={() => selectAddMode('deadline')}>Days before deadline</button>
-                      <button className={addMode === 'recurring' ? 'is-active' : ''} type="button" onClick={() => selectAddMode('recurring')}>Recurring nudge</button>
-                    </div>
+                    {editingKind ? (
+                      <div className="schedule-edit-banner">
+                        <div>
+                          <span>Editing</span>
+                          <strong>{editingLabel}</strong>
+                        </div>
+                        <button className="schedule-secondary-action" type="button" onClick={cancelAddEdit}>Cancel edit</button>
+                      </div>
+                    ) : (
+                      <div className="schedule-segmented" aria-label="Add reminder type">
+                        <button className={addMode === 'specific' ? 'is-active' : ''} type="button" onClick={() => selectAddMode('specific')}>Specific date</button>
+                        <button className={addMode === 'deadline' ? 'is-active' : ''} type="button" onClick={() => selectAddMode('deadline')}>Days before deadline</button>
+                        <button className={addMode === 'recurring' ? 'is-active' : ''} type="button" onClick={() => selectAddMode('recurring')}>Recurring nudge</button>
+                      </div>
+                    )}
                     {renderAddPanel()}
                   </div>
                 </section>
