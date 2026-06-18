@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { createComplianceItem } from '@/app/actions/items';
 import { NewItemNotesDisclosure, NewItemSchedulePreview } from '@/components/new-item-form-client';
 import { canCreateComplianceItems } from '@/lib/roles';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
 const complianceAreas = [
@@ -140,6 +141,7 @@ export default async function NewItemPage() {
 
   if (!membership || !canCreateComplianceItems(membership.role)) redirect('/');
 
+  const admin = createAdminClient();
   const [{ data: vessels }, { data: ownerCodes }, { data: memberships }, { data: invitations }] = await Promise.all([
     supabase
       .from('vessels')
@@ -147,17 +149,17 @@ export default async function NewItemPage() {
       .eq('company_id', membership.company_id)
       .eq('active', true)
       .order('name'),
-    supabase
+    admin
       .from('company_owner_codes')
       .select('code, display_name, user_id, pending_email, profiles!company_owner_codes_user_id_fkey(full_name, email)')
       .eq('company_id', membership.company_id)
       .order('code'),
-    supabase
+    admin
       .from('company_memberships')
       .select('user_id, profiles(email, full_name)')
       .eq('company_id', membership.company_id)
       .order('created_at', { ascending: true }),
-    supabase
+    admin
       .from('company_invitations')
       .select('email, display_name, accepted_at')
       .eq('company_id', membership.company_id)
