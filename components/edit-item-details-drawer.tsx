@@ -30,6 +30,8 @@ export function EditItemDetailsDrawer({
 }: EditItemDetailsDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
 
+  const ownerLabel = (owner: OwnerOption) => owner.display_name ? `${owner.display_name} (${owner.code})` : owner.code;
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -92,7 +94,7 @@ export function EditItemDetailsDrawer({
                       Owner
                       <select name="ownerCurrent" defaultValue={item.owner_current ?? ''}>
                         <option value="">Unassigned</option>
-                        {ownerOptions.map((owner) => <option value={owner.code} key={owner.code}>{owner.display_name ? `${owner.code} - ${owner.display_name}` : owner.code}</option>)}
+                        {ownerOptions.map((owner) => <option value={owner.code} key={owner.code}>{ownerLabel(owner)}</option>)}
                       </select>
                     </label>
                     <label>

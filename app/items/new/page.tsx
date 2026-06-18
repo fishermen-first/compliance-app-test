@@ -36,24 +36,93 @@ type OwnerCodeRow = {
   profiles?: Relation<ProfileRelation>;
 };
 
+type MembershipRow = {
+  user_id: string;
+  profiles?: Relation<ProfileRelation>;
+};
+
+type InvitationRow = {
+  email: string | null;
+  display_name: string | null;
+  accepted_at: string | null;
+};
+
+type OwnerSelectOption = {
+  code: string;
+  label: string;
+};
+
 function relation<T>(value: Relation<T>) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function normalizedEmail(email?: string | null) {
+  return email?.trim().toLowerCase() ?? '';
 }
 
 function isSeedJunkOwnerCode(code: string) {
   return /[/>\-\s]/.test(code);
 }
 
-function ownerCodeLabel(owner: OwnerCodeRow) {
+function ownerFallbackName(owner: OwnerCodeRow) {
   const profile = relation(owner.profiles);
-  const resolvedName = owner.display_name ?? profile?.full_name ?? profile?.email;
-  return resolvedName ? `${owner.code} — ${resolvedName}` : owner.code;
+  return owner.display_name ?? profile?.full_name ?? profile?.email ?? owner.pending_email;
 }
 
-function ownerOptions(ownerCodes: OwnerCodeRow[]) {
+function assignableOwnerCodes(ownerCodes: OwnerCodeRow[]) {
   const allCodes = ownerCodes.filter((owner) => owner.code.trim());
   const cleanCodes = allCodes.filter((owner) => !isSeedJunkOwnerCode(owner.code));
   return cleanCodes.length > 0 ? cleanCodes : allCodes;
+}
+
+function ownerOptions(ownerCodes: OwnerCodeRow[], memberships: MembershipRow[], invitations: InvitationRow[]) {
+  const codes = assignableOwnerCodes(ownerCodes);
+  const usedCodes = new Set<string>();
+  const options: OwnerSelectOption[] = [];
+
+  const addOption = (owner: OwnerCodeRow, personLabel: string) => {
+    if (usedCodes.has(owner.code)) return;
+    usedCodes.add(owner.code);
+    options.push({
+      code: owner.code,
+      label: `${personLabel} (${owner.code})`
+    });
+  };
+
+  memberships.forEach((membership) => {
+    const profile = relation(membership.profiles);
+    const email = normalizedEmail(profile?.email);
+    const personLabel = profile?.full_name ?? profile?.email;
+    if (!personLabel) return;
+
+    codes
+      .filter((owner) => owner.user_id === membership.user_id || (email && normalizedEmail(owner.pending_email) === email))
+      .forEach((owner) => addOption(owner, personLabel));
+  });
+
+  invitations
+    .filter((invite) => !invite.accepted_at)
+    .forEach((invite) => {
+      const email = normalizedEmail(invite.email);
+      const personLabel = invite.display_name ?? invite.email;
+      if (!email || !personLabel) return;
+
+      codes
+        .filter((owner) => normalizedEmail(owner.pending_email) === email)
+        .forEach((owner) => addOption(owner, personLabel));
+    });
+
+  codes.forEach((owner) => {
+    if (usedCodes.has(owner.code)) return;
+
+    const ownerName = ownerFallbackName(owner);
+    options.push({
+      code: owner.code,
+      label: ownerName ? `${ownerName} (${owner.code})` : owner.code
+    });
+  });
+
+  return options.sort((a, b) => a.label.localeCompare(b.label));
 }
 
 export default async function NewItemPage() {
@@ -71,20 +140,35 @@ export default async function NewItemPage() {
 
   if (!membership || !canCreateComplianceItems(membership.role)) redirect('/');
 
-  const { data: vessels } = await supabase
-    .from('vessels')
-    .select('id, name')
-    .eq('company_id', membership.company_id)
-    .eq('active', true)
-    .order('name');
+  const [{ data: vessels }, { data: ownerCodes }, { data: memberships }, { data: invitations }] = await Promise.all([
+    supabase
+      .from('vessels')
+      .select('id, name')
+      .eq('company_id', membership.company_id)
+      .eq('active', true)
+      .order('name'),
+    supabase
+      .from('company_owner_codes')
+      .select('code, display_name, user_id, pending_email, profiles!company_owner_codes_user_id_fkey(full_name, email)')
+      .eq('company_id', membership.company_id)
+      .order('code'),
+    supabase
+      .from('company_memberships')
+      .select('user_id, profiles(email, full_name)')
+      .eq('company_id', membership.company_id)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('company_invitations')
+      .select('email, display_name, accepted_at')
+      .eq('company_id', membership.company_id)
+      .order('created_at', { ascending: true })
+  ]);
 
-  const { data: ownerCodes } = await supabase
-    .from('company_owner_codes')
-    .select('code, display_name, user_id, pending_email, profiles!company_owner_codes_user_id_fkey(full_name, email)')
-    .eq('company_id', membership.company_id)
-    .order('code');
-
-  const owners = ownerOptions((ownerCodes ?? []) as OwnerCodeRow[]);
+  const owners = ownerOptions(
+    (ownerCodes ?? []) as OwnerCodeRow[],
+    (memberships ?? []) as unknown as MembershipRow[],
+    (invitations ?? []) as InvitationRow[]
+  );
 
   return (
     <main className="form-page new-item-page">
@@ -153,7 +237,7 @@ export default async function NewItemPage() {
                 <span className="new-item-label">Owner</span>
                 <select name="ownerCurrent" defaultValue="">
                   <option value="">Unassigned</option>
-                  {owners.map((owner) => <option value={owner.code} key={owner.code}>{ownerCodeLabel(owner)}</option>)}
+                  {owners.map((owner) => <option value={owner.code} key={owner.code}>{owner.label}</option>)}
                 </select>
               </label>
             </div>
