@@ -69,6 +69,37 @@ function dateList(formData: FormData, name: string) {
   return Array.from(values).sort();
 }
 
+function stringList(formData: FormData, name: string) {
+  const values: string[] = [];
+  const seen = new Set<string>();
+
+  for (const entry of formData.getAll(name)) {
+    const value = String(entry ?? '').trim();
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    values.push(value);
+  }
+
+  return values;
+}
+
+function ownerCodeList(formData: FormData) {
+  const values: string[] = [];
+  const seen = new Set<string>();
+
+  const add = (value: string | null) => {
+    if (!value || seen.has(value)) return;
+    seen.add(value);
+    values.push(value);
+  };
+
+  add(optionalString(formData, 'ownerCurrent'));
+  stringList(formData, 'ownerCoOwnerCodes').forEach(add);
+  stringList(formData, 'ownerCodes').forEach(add);
+
+  return values;
+}
+
 function requiredRecurrenceUnit(formData: FormData, name: string) {
   const value = requiredString(formData, name);
   if (!recurrenceUnits.has(value as RecurrenceUnit)) {
@@ -173,12 +204,15 @@ export async function createComplianceItem(formData: FormData) {
   const ownerRaw = optionalString(formData, 'ownerRaw');
   const frequencyLabel = optionalString(formData, 'frequencyLabel');
   const recurrence = inferRecurrence(frequencyLabel);
+  const owners = ownerCodeList(formData);
+  const primaryOwner = owners[0] ?? optionalString(formData, 'ownerCurrent') ?? parseOwnerCurrent(ownerRaw);
 
   const { data: itemId, error } = await supabase.rpc('create_compliance_item', {
     target_company_id: targetCompanyId,
     target_vessel_id: optionalString(formData, 'vesselId'),
     item_owner_raw: ownerRaw,
-    item_owner_current: optionalString(formData, 'ownerCurrent') ?? parseOwnerCurrent(ownerRaw),
+    item_owner_current: primaryOwner,
+    item_owner_codes: owners.length ? owners : primaryOwner ? [primaryOwner] : [],
     item_name: requiredString(formData, 'itemName'),
     item_number: optionalString(formData, 'itemNumber'),
     item_agency_type: optionalString(formData, 'agencyType'),
@@ -203,12 +237,15 @@ export async function createComplianceItem(formData: FormData) {
 export async function updateComplianceItemCore(formData: FormData) {
   const itemId = requiredString(formData, 'itemId');
   const { supabase } = await requireMembership({ allowAppAdmin: true });
+  const ownerCodes = ownerCodeList(formData);
+  const primaryOwner = ownerCodes[0] ?? optionalString(formData, 'ownerCurrent') ?? parseOwnerCurrent(optionalString(formData, 'ownerRaw'));
 
   const { error } = await supabase.rpc('update_compliance_item_core', {
     target_item_id: itemId,
     next_vessel_id: optionalString(formData, 'vesselId'),
     next_owner_raw: optionalString(formData, 'ownerRaw'),
-    next_owner_current: optionalString(formData, 'ownerCurrent') ?? parseOwnerCurrent(optionalString(formData, 'ownerRaw')),
+    next_owner_current: primaryOwner,
+    next_owner_codes: ownerCodes.length ? ownerCodes : primaryOwner ? [primaryOwner] : [],
     next_item_name: requiredString(formData, 'itemName'),
     next_item_number: optionalString(formData, 'itemNumber'),
     next_agency_type: optionalString(formData, 'agencyType'),
@@ -274,36 +311,61 @@ export async function completeComplianceItem(formData: FormData) {
   revalidatePath(`/items/${itemId}`);
   revalidatePath(itemDetailPath(formData, itemId));
 
-  if (newItemId) redirect(itemDetailPath(formData, newItemId));
+  if (newItemId) {
+    redirect(`${itemDetailPath(formData, itemId)}?completed=1&nextItem=${encodeURIComponent(newItemId)}`);
+  }
+
   redirect(itemDetailPath(formData, itemId));
 }
 
 export async function saveComplianceItemReminders(formData: FormData) {
   const itemId = requiredString(formData, 'itemId');
   const { supabase } = await requireMembership({ allowAppAdmin: true });
-  const expirationRuleActive = checkboxValue(formData, 'expirationRuleActive');
-  const repeatRuleActive = checkboxValue(formData, 'repeatRuleActive');
-  const expirationDaysBefore = integerList(formData, 'expirationDaysBefore');
-  const oneOffDates = dateList(formData, 'oneOffDate');
-  const repeatEveryDays = optionalInteger(formData, 'repeatEveryDays');
+  const ownerExpirationRuleActive = checkboxValue(formData, 'ownerExpirationRuleActive') || checkboxValue(formData, 'expirationRuleActive');
+  const ownerRepeatRuleActive = checkboxValue(formData, 'ownerRepeatRuleActive') || checkboxValue(formData, 'repeatRuleActive');
+  const ownerExpirationDaysBefore = integerList(formData, 'ownerExpirationDaysBefore');
+  const fallbackExpirationDaysBefore = integerList(formData, 'expirationDaysBefore');
+  const ownerOneOffDates = dateList(formData, 'ownerOneOffDate');
+  const fallbackOneOffDates = dateList(formData, 'oneOffDate');
+  const ownerRepeatEveryDays = optionalInteger(formData, 'ownerRepeatEveryDays') ?? optionalInteger(formData, 'repeatEveryDays');
+  const externalExpirationRuleActive = checkboxValue(formData, 'externalExpirationRuleActive');
+  const externalRepeatRuleActive = checkboxValue(formData, 'externalRepeatRuleActive');
+  const externalExpirationDaysBefore = integerList(formData, 'externalExpirationDaysBefore');
+  const externalOneOffDates = dateList(formData, 'externalOneOffDate');
+  const externalRepeatEveryDays = optionalInteger(formData, 'externalRepeatEveryDays');
 
-  if (repeatEveryDays !== null && repeatEveryDays <= 0) {
-    throw new Error('repeatEveryDays must be greater than zero');
+  [
+    ['ownerRepeatEveryDays', ownerRepeatEveryDays],
+    ['externalRepeatEveryDays', externalRepeatEveryDays]
+  ].forEach(([name, value]) => {
+    if (value !== null && Number(value) <= 0) {
+      throw new Error(`${name} must be greater than zero`);
+    }
+  });
+
+  if (ownerRepeatRuleActive && (!ownerRepeatEveryDays || ownerRepeatEveryDays <= 0)) {
+    throw new Error('ownerRepeatEveryDays is required when owner repeat reminders are active');
   }
 
-  if (repeatRuleActive && (!repeatEveryDays || repeatEveryDays <= 0)) {
-    throw new Error('repeatEveryDays is required when repeat reminders are active');
+  if (externalRepeatRuleActive && (!externalRepeatEveryDays || externalRepeatEveryDays <= 0)) {
+    throw new Error('externalRepeatEveryDays is required when external repeat reminders are active');
   }
 
   const { error } = await supabase.rpc('save_compliance_item_reminders', {
     target_item_id: itemId,
     item_instructions: optionalString(formData, 'instructions'),
-    start_rule_active: checkboxValue(formData, 'startRuleActive'),
-    expiration_rule_active: expirationRuleActive,
-    expiration_days_before: expirationDaysBefore,
-    repeat_rule_active: repeatRuleActive,
-    repeat_every_days: repeatEveryDays,
-    one_off_dates: oneOffDates,
+    owner_start_rule_active: checkboxValue(formData, 'ownerStartRuleActive') || checkboxValue(formData, 'startRuleActive'),
+    owner_expiration_rule_active: ownerExpirationRuleActive,
+    owner_expiration_days_before: ownerExpirationDaysBefore.length ? ownerExpirationDaysBefore : fallbackExpirationDaysBefore,
+    owner_repeat_rule_active: ownerRepeatRuleActive,
+    owner_repeat_every_days: ownerRepeatEveryDays,
+    owner_one_off_dates: ownerOneOffDates.length ? ownerOneOffDates : fallbackOneOffDates,
+    external_start_rule_active: checkboxValue(formData, 'externalStartRuleActive'),
+    external_expiration_rule_active: externalExpirationRuleActive,
+    external_expiration_days_before: externalExpirationDaysBefore,
+    external_repeat_rule_active: externalRepeatRuleActive,
+    external_repeat_every_days: externalRepeatEveryDays,
+    external_one_off_dates: externalOneOffDates,
     additional_recipients: parseAdditionalRecipients(formData)
   });
 

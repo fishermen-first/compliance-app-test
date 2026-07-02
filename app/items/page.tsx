@@ -3,7 +3,7 @@ import { type ReactNode } from 'react';
 import { Columns3, Plus } from 'lucide-react';
 import { AppSidebar } from '@/components/app-sidebar';
 import { StatusBadge } from '@/components/status-badge';
-import { type ComplianceItem, displayState, displayStateParam, formatDate, itemIsOverdue } from '@/lib/compliance';
+import { type ComplianceItem, displayState, displayStateParam, formatDate, itemHasOwnerCode, itemOwnerCodes, itemOwnersLabel, itemIsOverdue } from '@/lib/compliance';
 import { getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer-data';
 import { accessRoleLabel, canCreateComplianceItems } from '@/lib/roles';
 
@@ -73,7 +73,7 @@ function itemsHref(searchParams: ItemsPageProps['searchParams'], updates: Record
 }
 
 function sortValue(item: ComplianceItem, sort: SortKey) {
-  if (sort === 'owner') return item.owner_current ?? '';
+  if (sort === 'owner') return itemOwnersLabel(item);
   if (sort === 'vessel') return itemVessel(item);
   if (sort === 'item') return item.item_name;
   if (sort === 'agency') return item.agency_type ?? '';
@@ -151,7 +151,7 @@ function ItemCell({ item, column }: { item: ComplianceItem; column: ColumnKey })
     );
   }
   if (column === 'vessel') return <td>{itemVessel(item)}</td>;
-  if (column === 'owner') return <td><span className="own-chip">{item.owner_current ?? '-'}</span></td>;
+  if (column === 'owner') return <td><span className="own-chip">{itemOwnersLabel(item)}</span></td>;
   if (column === 'agency') return <td>{item.agency_type ?? '-'}</td>;
   if (column === 'frequency') return <td>{item.frequency_label ?? '-'}</td>;
   if (column === 'start') return <td>{formatDate(item.start_working_on)}</td>;
@@ -165,7 +165,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const { membership, company, profile, user } = await getCustomerContext();
   const allItems = await getCustomerItems(membership.company_id);
   const canCreateItems = canCreateComplianceItems(membership.role);
-  const owners = Array.from(new Set(allItems.map((item) => item.owner_current).filter(Boolean) as string[])).sort();
+  const owners = Array.from(new Set(allItems.flatMap(itemOwnerCodes))).sort();
   const vessels = Array.from(new Set(allItems.map(itemVessel))).sort();
   const sort = sortKeys.has(searchParams?.sort as SortKey) ? searchParams?.sort as SortKey : 'start';
   const dir = searchParams?.dir === 'desc' ? 'desc' : 'asc';
@@ -180,7 +180,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
     }
     if (searchParams?.status === 'overdue' && !itemIsOverdue(item)) return false;
     if (searchParams?.status && searchParams.status !== 'overdue' && searchParams.status !== item.status && searchParams.status !== displayStateParam(item)) return false;
-    if (searchParams?.owner && item.owner_current !== searchParams.owner) return false;
+    if (searchParams?.owner && !itemHasOwnerCode(item, searchParams.owner)) return false;
     if (searchParams?.vessel && itemVessel(item) !== searchParams.vessel) return false;
     return true;
   }), sort, dir);

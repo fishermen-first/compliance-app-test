@@ -1,18 +1,19 @@
 import { notFound } from 'next/navigation';
 import { AppSidebar } from '@/components/app-sidebar';
 import { ComplianceItemDetail } from '@/components/compliance-item-detail';
+import { itemHasAnyOwnerCode } from '@/lib/compliance';
 import { getCompanyOwnerCodes, getCustomerContext, mapComplianceItem } from '@/lib/customer-data';
 import { accessRoleLabel } from '@/lib/roles';
 
-type ItemDetailPageProps = { params: { id: string } };
+type ItemDetailPageProps = { params: { id: string }; searchParams?: { completed?: string; nextItem?: string } };
 
-export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
+export default async function ItemDetailPage({ params, searchParams }: ItemDetailPageProps) {
   const { supabase, membership, company, profile, user } = await getCustomerContext();
 
   const [{ data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }, { data: reminderLogs }, { data: vessels }, ownerCodes] = await Promise.all([
     supabase
       .from('compliance_items')
-      .select('*, vessels(name)')
+      .select('*, vessels(name), compliance_item_owner_codes(owner_code, is_primary)')
       .eq('company_id', membership.company_id)
       .eq('id', params.id)
       .maybeSingle(),
@@ -24,7 +25,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
       .order('changed_at', { ascending: false }),
     supabase
       .from('compliance_item_reminder_rules')
-      .select('label, trigger_type, days_before, repeat_every_days, send_on, active')
+      .select('label, trigger_type, days_before, repeat_every_days, send_on, audience, active')
       .eq('company_id', membership.company_id)
       .eq('item_id', params.id)
       .order('created_at', { ascending: true }),
@@ -54,14 +55,14 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
 
   const item = mapComplianceItem(rawItem);
   const isOwner = membership.role === 'owner';
-  const isCreator = item.created_by === user.id;
+  const mappedOwnerCodes = ownerCodes.filter((owner) => owner.is_assigned_to_current_user).map((owner) => owner.code);
   const isAssignedOfficeUser = (
     membership.role === 'office_user'
-    && Boolean(item.owner_current)
-    && ownerCodes.some((owner) => owner.code === item.owner_current && owner.is_assigned_to_current_user)
+    && itemHasAnyOwnerCode(item, mappedOwnerCodes)
   );
-  const canManageItem = isOwner || isAssignedOfficeUser || isCreator;
-  const canEditCore = isOwner || isCreator;
+  const canManageItem = isOwner || isAssignedOfficeUser;
+  const canEditCore = canManageItem;
+  const rolledForwardHref = searchParams?.completed === '1' && searchParams.nextItem ? `/items/${searchParams.nextItem}` : undefined;
 
   return (
     <div className="app-shell">
@@ -85,6 +86,7 @@ export default async function ItemDetailPage({ params }: ItemDetailPageProps) {
           canCompleteItem={canManageItem}
           canEditCore={canEditCore}
           canManageReminders={canEditCore}
+          rolledForwardHref={rolledForwardHref}
           backHref="/"
           backLabel="Back to work queue"
           itemPathPrefix="/items"

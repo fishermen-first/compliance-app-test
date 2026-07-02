@@ -59,7 +59,7 @@ export default async function RemindersPage() {
           <div>
             <p className="eyebrow">Reminders</p>
             <h1>Email reminder queue</h1>
-            <p>Queue due owner/additional-recipient reminders, then send scheduled emails through Resend.</p>
+            <p>Queue due owner and external-copy reminders, then send scheduled emails through Resend.</p>
           </div>
           {canManageReminders ? (
             <div className="header-action-row">

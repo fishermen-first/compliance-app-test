@@ -9,6 +9,7 @@ export type ComplianceItem = {
   vessel_name?: string | null;
   owner_raw: string | null;
   owner_current: string | null;
+  owner_codes?: string[];
   item_name: string;
   item_number: string | null;
   agency_type: string | null;
@@ -28,6 +29,27 @@ export type ComplianceItem = {
   source_row_number: number | null;
   previous_item_id?: string | null;
 };
+
+export function itemOwnerCodes(item: Pick<ComplianceItem, 'owner_codes' | 'owner_current' | 'owner_raw'>) {
+  const codes = item.owner_codes?.filter(Boolean) ?? [];
+  if (codes.length > 0) return Array.from(new Set(codes));
+  return [item.owner_current ?? item.owner_raw].filter(Boolean) as string[];
+}
+
+export function itemOwnersLabel(item: Pick<ComplianceItem, 'owner_codes' | 'owner_current' | 'owner_raw'>) {
+  const owners = itemOwnerCodes(item);
+  return owners.length > 0 ? owners.join(', ') : 'Unassigned';
+}
+
+export function itemHasOwnerCode(item: Pick<ComplianceItem, 'owner_codes' | 'owner_current' | 'owner_raw'>, ownerCode: string) {
+  return itemOwnerCodes(item).includes(ownerCode);
+}
+
+export function itemHasAnyOwnerCode(item: Pick<ComplianceItem, 'owner_codes' | 'owner_current' | 'owner_raw'>, ownerCodes: string[]) {
+  if (ownerCodes.length === 0) return false;
+  const itemCodes = itemOwnerCodes(item);
+  return ownerCodes.some((ownerCode) => itemCodes.includes(ownerCode));
+}
 
 export const storedStatusLabels: Record<ComplianceItemStatus, string> = {
   not_started: 'Not due yet',

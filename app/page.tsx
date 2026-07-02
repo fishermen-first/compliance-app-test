@@ -3,7 +3,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { Dashboard, type DashboardFilters } from '@/components/dashboard';
 import { NoAccessScreen } from '@/components/no-access-screen';
 import { WorkspaceBlockedScreen } from '@/components/workspace-blocked-screen';
-import { displayState, itemIsOverdue } from '@/lib/compliance';
+import { displayState, itemHasAnyOwnerCode, itemOwnerCodes, itemIsOverdue } from '@/lib/compliance';
 import { getCompanyOwnerCodes, getCustomerItems } from '@/lib/customer-data';
 import { accessRoleLabel, canCreateComplianceItems, isCustomerOwnerRole } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
@@ -77,7 +77,7 @@ export default async function Home({ searchParams }: HomeProps) {
   const requestedOwnerCode = requestedOwner && requestedOwner !== 'all' ? decodeURIComponent(requestedOwner) : null;
   const validOwnerCodes = new Set([
     ...ownerCodes.map((owner) => owner.code),
-    ...items.map((item) => item.owner_current).filter(Boolean) as string[]
+    ...items.flatMap(itemOwnerCodes)
   ]);
   const requestedOwnerAllowed = Boolean(
     requestedOwnerCode
@@ -101,7 +101,7 @@ export default async function Home({ searchParams }: HomeProps) {
     : mappedOwnerCodes;
   const sidebarDueCount = items.filter((item) => {
     if (['complete', 'discontinued'].includes(item.status)) return false;
-    if (!showAllOwners && selectedOwnerCodes.length > 0 && (!item.owner_current || !selectedOwnerCodes.includes(item.owner_current))) return false;
+    if (!showAllOwners && selectedOwnerCodes.length > 0 && !itemHasAnyOwnerCode(item, selectedOwnerCodes)) return false;
     if (!showAllOwners && selectedOwnerCodes.length === 0) return false;
     return displayState(item) === 'Due' || itemIsOverdue(item);
   }).length;

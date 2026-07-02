@@ -27,7 +27,7 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
     supabase.from('companies').select('id, name, timezone').eq('id', companyId).maybeSingle(),
     supabase
       .from('compliance_items')
-      .select('*, vessels(name)')
+      .select('*, vessels(name), compliance_item_owner_codes(owner_code, is_primary)')
       .eq('company_id', companyId)
       .eq('id', itemId)
       .maybeSingle(),
@@ -39,7 +39,7 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
       .order('changed_at', { ascending: false }),
     supabase
       .from('compliance_item_reminder_rules')
-      .select('label, trigger_type, days_before, repeat_every_days, send_on, active')
+      .select('label, trigger_type, days_before, repeat_every_days, send_on, audience, active')
       .eq('company_id', companyId)
       .eq('item_id', itemId)
       .order('created_at', { ascending: true }),

@@ -23,7 +23,7 @@ type ClaimedReminder = {
 };
 
 type ReminderContext = {
-  recipientKind: 'office' | 'vessel';
+  recipientKind: 'office' | 'external';
   ownerName: string;
   ownerEmail: string | null;
 };
@@ -72,7 +72,7 @@ async function reminderContext(admin: ReturnType<typeof createAdminClient>, remi
   const ownerName = (ownerCode as any)?.display_name ?? profile?.full_name ?? reminder.owner_current ?? 'Office';
 
   return {
-    recipientKind: additionalRecipient?.recipient_type === 'additional' ? 'vessel' : 'office',
+    recipientKind: ['additional', 'external'].includes(additionalRecipient?.recipient_type ?? '') ? 'external' : 'office',
     ownerName,
     ownerEmail: profile?.email ?? null
   };
@@ -92,7 +92,7 @@ function buildReminder(reminder: ClaimedReminder, context: ReminderContext) {
     reminder.instructions?.trim() ? `Instructions: ${reminder.instructions}` : null,
     context.recipientKind === 'office'
       ? `Open in FF Compliance: ${reminderUrl(reminder.item_id)}`
-      : `You're receiving this because ${context.ownerName} added you to vessel reminders. No login or reply is needed - the office tracks completion.`
+      : `You're receiving this because ${context.ownerName} added you to external compliance reminders. No login or reply is needed - the office tracks completion.`
   ].filter(Boolean).join('\n');
 
   const instructionsHtml = reminder.instructions?.trim()
@@ -100,7 +100,7 @@ function buildReminder(reminder: ClaimedReminder, context: ReminderContext) {
     : '';
   const ctaHtml = context.recipientKind === 'office'
     ? `<a href="${escapeHtml(reminderUrl(reminder.item_id))}" style="display:inline-block;margin-top:18px;padding:10px 14px;border-radius:8px;background:#12786d;color:#ffffff;text-decoration:none;font-weight:700;">Open in FF Compliance</a>`
-    : `<p style="margin:18px 0 0;color:#6d7773;font-size:13px;">You're receiving this because ${escapeHtml(context.ownerName)} added you to vessel reminders. No login or reply is needed - the office tracks completion.</p>`;
+    : `<p style="margin:18px 0 0;color:#6d7773;font-size:13px;">You're receiving this because ${escapeHtml(context.ownerName)} added you to external compliance reminders. No login or reply is needed - the office tracks completion.</p>`;
   const html = `
     <div style="margin:0;padding:0;background:#f4f3ee;color:#18211f;font-family:Arial,sans-serif;">
       <div style="max-width:640px;margin:0 auto;padding:28px 18px;">

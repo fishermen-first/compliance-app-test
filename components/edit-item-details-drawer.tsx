@@ -29,6 +29,7 @@ export function EditItemDetailsDrawer({
   ownerOptions
 }: EditItemDetailsDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const selectedOwnerCodes = new Set(item.owner_codes?.length ? item.owner_codes : item.owner_current ? [item.owner_current] : []);
 
   const ownerLabel = (owner: OwnerOption) => owner.display_name ? `${owner.display_name} (${owner.code})` : owner.code;
 
@@ -91,7 +92,7 @@ export function EditItemDetailsDrawer({
                   <h4>Who and where</h4>
                   <div className="f2">
                     <label>
-                      Owner
+                      Primary owner
                       <select name="ownerCurrent" defaultValue={item.owner_current ?? ''}>
                         <option value="">Unassigned</option>
                         {ownerOptions.map((owner) => <option value={owner.code} key={owner.code}>{ownerLabel(owner)}</option>)}
@@ -110,6 +111,23 @@ export function EditItemDetailsDrawer({
                     <input name="ownerRaw" defaultValue={item.owner_raw ?? ''} placeholder="Leave blank unless correcting imported data" />
                     <span className="form-note">Use the Owner dropdown for routing. This field is only for preserving imported workbook codes when needed.</span>
                   </label>
+                  <div className="owner-checkbox-list">
+                    <span>Co-owners</span>
+                    <div>
+                      {ownerOptions.map((owner) => (
+                        <label className="owner-check" key={owner.code}>
+                          <input
+                            name="ownerCoOwnerCodes"
+                            type="checkbox"
+                            value={owner.code}
+                            defaultChecked={selectedOwnerCodes.has(owner.code) && owner.code !== item.owner_current}
+                          />
+                          <span>{ownerLabel(owner)}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <small>Co-owners can edit, complete, and manage reminders for this item.</small>
+                  </div>
                 </section>
                 <section className="fsec">
                   <h4>Schedule</h4>
@@ -144,13 +162,13 @@ export function EditItemDetailsDrawer({
                   </label>
                 </section>
                 <section className="fsec">
-                  <h4>Email and documents</h4>
+                  <h4>Notes and documents</h4>
                   <label>
                     Status notes
                     <textarea name="statusNotes" rows={3} defaultValue={item.status_notes ?? ''} />
                   </label>
                   <label>
-                    Instructions pasted into reminder emails
+                    Standing instructions
                     <textarea name="instructions" rows={4} defaultValue={item.instructions ?? ''} />
                   </label>
                   <label>

@@ -85,7 +85,7 @@ export function NewItemSchedulePreview({ formId }: NewItemSchedulePreviewProps) 
       <span className="new-item-preview-mark" aria-hidden="true">3</span>
       <div>
         <h3>3 reminders will be scheduled</h3>
-        <p>{frequencyLabel} item due {formatPreviewDate(dueDate)}. The selected owner is emailed at each lead time, stopping once submitted.</p>
+        <p>{frequencyLabel} item due {formatPreviewDate(dueDate)}. The selected owner codes are emailed at each lead time, stopping once submitted.</p>
         <div className="new-item-preview-dates">
           {reminderDates.map((reminder) => (
             <span className="new-item-preview-date" key={reminder.days}>

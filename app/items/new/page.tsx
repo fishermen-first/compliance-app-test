@@ -61,19 +61,13 @@ function normalizedEmail(email?: string | null) {
   return email?.trim().toLowerCase() ?? '';
 }
 
-function isSeedJunkOwnerCode(code: string) {
-  return /[/>\-\s]/.test(code);
-}
-
 function ownerFallbackName(owner: OwnerCodeRow) {
   const profile = relation(owner.profiles);
   return owner.display_name ?? profile?.full_name ?? profile?.email ?? owner.pending_email;
 }
 
 function assignableOwnerCodes(ownerCodes: OwnerCodeRow[]) {
-  const allCodes = ownerCodes.filter((owner) => owner.code.trim());
-  const cleanCodes = allCodes.filter((owner) => !isSeedJunkOwnerCode(owner.code));
-  return cleanCodes.length > 0 ? cleanCodes : allCodes;
+  return ownerCodes.filter((owner) => owner.code.trim());
 }
 
 function ownerOptions(ownerCodes: OwnerCodeRow[], memberships: MembershipRow[], invitations: InvitationRow[]) {
@@ -243,6 +237,20 @@ export default async function NewItemPage() {
                 </select>
               </label>
             </div>
+
+            {owners.length > 1 ? (
+              <div className="new-item-owner-grid" aria-label="Co-owners">
+                <span className="new-item-label">Co-owners <small>Optional</small></span>
+                <div>
+                  {owners.map((owner) => (
+                    <label className="owner-check" key={owner.code}>
+                      <input name="ownerCoOwnerCodes" type="checkbox" value={owner.code} />
+                      <span>{owner.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </section>
 
           <section className="new-item-card new-item-schedule-card" aria-labelledby="new-item-schedule">

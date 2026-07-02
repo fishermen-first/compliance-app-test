@@ -8,6 +8,8 @@ import {
   displayState,
   displayStateParam,
   formatDate,
+  itemHasAnyOwnerCode,
+  itemOwnersLabel,
   isWorkQueueItem,
   itemIsOverdue,
   shortDate
@@ -91,8 +93,8 @@ function selectedColumns(value?: string) {
 function ownerSplit(items: ComplianceItem[]) {
   const counts = new Map<string, number>();
   items.forEach((item) => {
-    const owner = item.owner_current ?? 'Unassigned';
-    counts.set(owner, (counts.get(owner) ?? 0) + 1);
+    const owners = itemOwnersLabel(item);
+    counts.set(owners, (counts.get(owners) ?? 0) + 1);
   });
   return Array.from(counts.entries())
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
@@ -104,7 +106,7 @@ function ownerSplit(items: ComplianceItem[]) {
 function sortValue(item: ComplianceItem, sort: SortKey) {
   if (sort === 'item') return item.item_name;
   if (sort === 'vessel') return itemVessel(item);
-  if (sort === 'owner') return item.owner_current ?? '';
+  if (sort === 'owner') return itemOwnersLabel(item);
   if (sort === 'agency') return item.agency_type ?? '';
   if (sort === 'start') return item.start_working_on ?? '9999-12-31';
   if (sort === 'expiration') return item.expiration_date ?? '9999-12-31';
@@ -189,7 +191,7 @@ function QueueCell({ item, column, isMine }: { item: ComplianceItem; column: Col
   if (column === 'vessel') {
     return <td><span>{itemVessel(item)}</span><small className="subline">{item.vessel_id ? 'Vessel' : 'Office'}</small></td>;
   }
-  if (column === 'owner') return <td><span className={`own-chip${isMine ? ' is-me' : ''}`}>{item.owner_current ?? '-'}</span></td>;
+  if (column === 'owner') return <td><span className={`own-chip${isMine ? ' is-me' : ''}`}>{itemOwnersLabel(item)}</span></td>;
   if (column === 'agency') return <td>{item.agency_type ?? '-'}</td>;
   if (column === 'start') return <td>{shortDate(item.start_working_on)}</td>;
   if (column === 'expiration') return <td>{shortDate(item.expiration_date)}</td>;
@@ -227,7 +229,7 @@ export function Dashboard({
   const scopedItems = showAllOwners
     ? openItems
     : selectedOwnerCodes.length > 0
-      ? openItems.filter((item) => item.owner_current && selectedOwnerCodes.includes(item.owner_current))
+      ? openItems.filter((item) => itemHasAnyOwnerCode(item, selectedOwnerCodes))
       : [];
   const sort = sortKeys.has(filters.sort as SortKey) ? filters.sort as SortKey : 'start';
   const dir = filters.dir === 'desc' ? 'desc' : 'asc';
@@ -340,7 +342,7 @@ export function Dashboard({
           <strong>{submittedItems.length}</strong>
           <p>Waiting on an agency, auditor, certifier, or confirmation.</p>
         </article>
-        <article className="stat-card hot">
+        <article className={`stat-card${overdueItems.length > 0 ? ' hot' : ' calm'}`}>
           <span>Overdue</span>
           <strong>{overdueItems.length}</strong>
           <p>Past expiration while still open.</p>
@@ -415,7 +417,7 @@ export function Dashboard({
               ) : queueItems.map((item) => (
                 <tr key={item.id}>
                   {visibleColumns.map((column) => (
-                    <QueueCell column={column} isMine={Boolean(item.owner_current && selectedOwnerCodes.includes(item.owner_current))} item={item} key={column} />
+                    <QueueCell column={column} isMine={itemHasAnyOwnerCode(item, selectedOwnerCodes)} item={item} key={column} />
                   ))}
                 </tr>
               ))}
@@ -425,7 +427,7 @@ export function Dashboard({
                   {soonItems.map((item) => (
                     <tr key={`soon-${item.id}`}>
                       {visibleColumns.map((column) => (
-                        <QueueCell column={column} isMine={Boolean(item.owner_current && selectedOwnerCodes.includes(item.owner_current))} item={item} key={column} />
+                        <QueueCell column={column} isMine={itemHasAnyOwnerCode(item, selectedOwnerCodes)} item={item} key={column} />
                       ))}
                     </tr>
                   ))}

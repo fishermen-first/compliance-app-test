@@ -873,9 +873,52 @@ export type Database = {
           },
         ]
       }
+      compliance_item_owner_codes: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          is_primary: boolean
+          item_id: string
+          owner_code: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          item_id: string
+          owner_code: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          item_id?: string
+          owner_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_item_owner_codes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_item_owner_codes_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       compliance_item_reminder_rules: {
         Row: {
           active: boolean
+          audience: string
           company_id: string
           created_at: string
           days_before: number | null
@@ -888,6 +931,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          audience?: string
           company_id: string
           created_at?: string
           days_before?: number | null
@@ -900,6 +944,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          audience?: string
           company_id?: string
           created_at?: string
           days_before?: number | null
@@ -1443,6 +1488,20 @@ export type Database = {
         Args: { require_admin: boolean; target_company_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      _replace_compliance_item_reminder_rules: {
+        Args: {
+          expiration_days_before: number[]
+          expiration_rule_active: boolean
+          one_off_dates: string[]
+          reminder_audience: string
+          repeat_every_days: number
+          repeat_rule_active: boolean
+          start_rule_active: boolean
+          target_company_id: string
+          target_item_id: string
+        }
+        Returns: undefined
+      }
       _settings_can_manage_role: {
         Args: {
           actor_role: Database["public"]["Enums"]["app_role"]
@@ -1522,27 +1581,50 @@ export type Database = {
         }
         Returns: string
       }
-      create_compliance_item: {
-        Args: {
-          item_agency_type?: string
-          item_compliance_area?: string
-          item_expiration_date?: string
-          item_frequency_label?: string
-          item_instructions?: string
-          item_name?: string
-          item_number?: string
-          item_owner_current?: string
-          item_owner_raw?: string
-          item_recurrence_interval?: number
-          item_recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"]
-          item_sharepoint_url?: string
-          item_start_working_on?: string
-          item_status_notes?: string
-          target_company_id: string
-          target_vessel_id?: string
-        }
-        Returns: string
-      }
+      create_compliance_item:
+        | {
+            Args: {
+              item_agency_type?: string
+              item_compliance_area?: string
+              item_expiration_date?: string
+              item_frequency_label?: string
+              item_instructions?: string
+              item_name?: string
+              item_number?: string
+              item_owner_current?: string
+              item_owner_raw?: string
+              item_recurrence_interval?: number
+              item_recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"]
+              item_sharepoint_url?: string
+              item_start_working_on?: string
+              item_status_notes?: string
+              target_company_id: string
+              target_vessel_id?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              item_agency_type?: string
+              item_compliance_area?: string
+              item_expiration_date?: string
+              item_frequency_label?: string
+              item_instructions?: string
+              item_name?: string
+              item_number?: string
+              item_owner_codes?: string[]
+              item_owner_current?: string
+              item_owner_raw?: string
+              item_recurrence_interval?: number
+              item_recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"]
+              item_sharepoint_url?: string
+              item_start_working_on?: string
+              item_status_notes?: string
+              target_company_id: string
+              target_vessel_id?: string
+            }
+            Returns: string
+          }
       create_default_reminder_rules: {
         Args: { target_item_id: string }
         Returns: undefined
@@ -1593,16 +1675,26 @@ export type Database = {
         Args: { target_company_id: string }
         Returns: boolean
       }
+      normalize_owner_code_list: {
+        Args: { fallback_owner_code?: string; owner_codes: string[] }
+        Returns: string[]
+      }
       save_compliance_item_reminders: {
         Args: {
           additional_recipients: Json
-          expiration_days_before: number[]
-          expiration_rule_active: boolean
+          external_expiration_days_before: number[]
+          external_expiration_rule_active: boolean
+          external_one_off_dates: string[]
+          external_repeat_every_days: number
+          external_repeat_rule_active: boolean
+          external_start_rule_active: boolean
           item_instructions: string
-          one_off_dates: string[]
-          repeat_every_days: number
-          repeat_rule_active: boolean
-          start_rule_active: boolean
+          owner_expiration_days_before: number[]
+          owner_expiration_rule_active: boolean
+          owner_one_off_dates: string[]
+          owner_repeat_every_days: number
+          owner_repeat_rule_active: boolean
+          owner_start_rule_active: boolean
           target_item_id: string
         }
         Returns: undefined
@@ -1683,27 +1775,54 @@ export type Database = {
         }
         Returns: undefined
       }
-      update_compliance_item_core: {
-        Args: {
-          next_agency_type?: string
-          next_compliance_area?: string
-          next_expiration_date?: string
-          next_frequency_label?: string
-          next_instructions?: string
-          next_item_name?: string
-          next_item_number?: string
-          next_owner_current?: string
-          next_owner_raw?: string
-          next_recurrence_interval?: number
-          next_recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"]
-          next_sharepoint_url?: string
-          next_start_working_on?: string
-          next_status_notes?: string
-          next_vessel_id?: string
-          target_item_id: string
-        }
-        Returns: undefined
+      sync_compliance_item_owner_codes: {
+        Args: { selected_owner_codes?: string[]; target_item_id: string }
+        Returns: string
       }
+      update_compliance_item_core:
+        | {
+            Args: {
+              next_agency_type?: string
+              next_compliance_area?: string
+              next_expiration_date?: string
+              next_frequency_label?: string
+              next_instructions?: string
+              next_item_name?: string
+              next_item_number?: string
+              next_owner_current?: string
+              next_owner_raw?: string
+              next_recurrence_interval?: number
+              next_recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"]
+              next_sharepoint_url?: string
+              next_start_working_on?: string
+              next_status_notes?: string
+              next_vessel_id?: string
+              target_item_id: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              next_agency_type?: string
+              next_compliance_area?: string
+              next_expiration_date?: string
+              next_frequency_label?: string
+              next_instructions?: string
+              next_item_name?: string
+              next_item_number?: string
+              next_owner_codes?: string[]
+              next_owner_current?: string
+              next_owner_raw?: string
+              next_recurrence_interval?: number
+              next_recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"]
+              next_sharepoint_url?: string
+              next_start_working_on?: string
+              next_status_notes?: string
+              next_vessel_id?: string
+              target_item_id: string
+            }
+            Returns: undefined
+          }
       update_compliance_item_status: {
         Args: {
           next_notes?: string

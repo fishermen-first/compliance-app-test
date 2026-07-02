@@ -11,6 +11,7 @@ type ReminderRule = {
   days_before: number | null;
   repeat_every_days: number | null;
   send_on: string | null;
+  audience?: string | null;
   active: boolean;
 };
 
@@ -144,20 +145,22 @@ function buildSchedule(
   });
 }
 
-function initialSchedule(reminderRules: ReminderRule[]): ScheduleState {
-  const startRule = reminderRules.find((rule) => rule.trigger_type === 'on_start_date');
-  const deadlineRules = reminderRules.filter((rule) => rule.trigger_type === 'days_before_expiration');
-  const repeatRule = reminderRules.find((rule) => rule.trigger_type === 'repeat_after_start');
+function initialSchedule(reminderRules: ReminderRule[], audience: 'owner' | 'external' = 'owner'): ScheduleState {
+  const rules = reminderRules.filter((rule) => (rule.audience ?? 'owner') === audience);
+  const defaultActive = audience === 'owner';
+  const startRule = rules.find((rule) => rule.trigger_type === 'on_start_date');
+  const deadlineRules = rules.filter((rule) => rule.trigger_type === 'days_before_expiration');
+  const repeatRule = rules.find((rule) => rule.trigger_type === 'repeat_after_start');
   const storedLeadTimes = uniqueNumbers(deadlineRules.map((rule) => rule.days_before));
 
   return {
-    startActive: startRule?.active ?? true,
-    expirationActive: deadlineRules.length === 0 ? true : deadlineRules.some((rule) => rule.active),
+    startActive: startRule?.active ?? defaultActive,
+    expirationActive: deadlineRules.length === 0 ? defaultActive : deadlineRules.some((rule) => rule.active),
     leadTimes: storedLeadTimes.length ? storedLeadTimes : [14],
     repeatActive: repeatRule?.active ?? false,
     repeatEveryDays: repeatRule?.repeat_every_days && repeatRule.repeat_every_days > 0 ? repeatRule.repeat_every_days : 14,
     oneOffDates: uniqueDates(
-      reminderRules
+      rules
         .filter((rule) => rule.trigger_type === 'on_specific_date' && rule.active)
         .map((rule) => rule.send_on)
     )
@@ -208,11 +211,15 @@ export function ReminderScheduleDrawer({
   today: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [schedule, setSchedule] = useState<ScheduleState>(() => initialSchedule(reminderRules));
+  const [schedule, setSchedule] = useState<ScheduleState>(() => initialSchedule(reminderRules, 'owner'));
+  const [externalSchedule, setExternalSchedule] = useState<ScheduleState>(() => initialSchedule(reminderRules, 'external'));
   const [addMode, setAddMode] = useState<AddMode>('specific');
   const [specificDateDraft, setSpecificDateDraft] = useState('');
   const [deadlineDraft, setDeadlineDraft] = useState('7');
-  const [recurringDraft, setRecurringDraft] = useState(() => String(initialSchedule(reminderRules).repeatEveryDays));
+  const [recurringDraft, setRecurringDraft] = useState(() => String(initialSchedule(reminderRules, 'owner').repeatEveryDays));
+  const [externalDeadlineDraft, setExternalDeadlineDraft] = useState('14');
+  const [externalSpecificDateDraft, setExternalSpecificDateDraft] = useState('');
+  const [externalRecurringDraft, setExternalRecurringDraft] = useState(() => String(initialSchedule(reminderRules, 'external').repeatEveryDays));
   const [editingOneOffDate, setEditingOneOffDate] = useState<string | null>(null);
   const [editingLeadTime, setEditingLeadTime] = useState<number | null>(null);
   const [recipients, setRecipients] = useState<EditableRecipient[]>(() => (
@@ -224,16 +231,22 @@ export function ReminderScheduleDrawer({
   const [recipientDraft, setRecipientDraft] = useState<EditableRecipient>({ name: '', email: '' });
 
   const sortedLeadTimes = useMemo(() => [...schedule.leadTimes].sort((a, b) => b - a), [schedule.leadTimes]);
+  const sortedExternalLeadTimes = useMemo(() => [...externalSchedule.leadTimes].sort((a, b) => b - a), [externalSchedule.leadTimes]);
   const scheduleRows = useMemo(
     () => buildSchedule(schedule, { startWorkingOn, expirationDate }, today),
     [expirationDate, schedule, startWorkingOn, today]
   );
-  const nextReminder = scheduleRows.find((entry) => entry.status === 'next');
-  const futureReminderCount = scheduleRows.filter((entry) => !entry.past).length;
+  const externalScheduleRows = useMemo(
+    () => buildSchedule(externalSchedule, { startWorkingOn, expirationDate }, today),
+    [expirationDate, externalSchedule, startWorkingOn, today]
+  );
+  const allScheduleRows = useMemo(() => [...scheduleRows, ...externalScheduleRows].sort((a, b) => a.iso.localeCompare(b.iso)), [externalScheduleRows, scheduleRows]);
+  const nextReminder = allScheduleRows.find((entry) => !entry.past);
+  const futureReminderCount = allScheduleRows.filter((entry) => !entry.past).length;
   const recurringRows = scheduleRows.filter((entry) => entry.kind === 'recurring');
   const recurringPreviewRows = recurringRows.filter((entry) => !entry.past).slice(0, 3);
   const ownerLabel = ownerCode ? `Owner ${ownerCode}` : 'mapped owner';
-  const recipientSummary = recipients.length ? `${ownerLabel} + ${recipients.length}` : ownerLabel;
+  const recipientSummary = recipients.length ? `${ownerLabel} + ${recipients.length} external` : ownerLabel;
   const editingKind = editingLeadTime !== null ? 'deadline' : editingOneOffDate ? 'manual' : null;
   const editingLabel = editingKind === 'deadline' ? 'Deadline reminder' : editingKind === 'manual' ? 'Manual reminder' : '';
 
@@ -335,6 +348,34 @@ export function ReminderScheduleDrawer({
         : [...current, { name: recipientDraft.name.trim(), email }]
     ));
     setRecipientDraft({ name: '', email: '' });
+  };
+
+  const addExternalDeadline = () => {
+    const parsed = Number.parseInt(externalDeadlineDraft, 10);
+    if (!Number.isInteger(parsed) || parsed < 0) return;
+    setExternalSchedule((current) => ({
+      ...current,
+      expirationActive: true,
+      leadTimes: current.leadTimes.includes(parsed) ? current.leadTimes : [...current.leadTimes, parsed]
+    }));
+    setExternalDeadlineDraft('');
+  };
+
+  const addExternalOneOff = () => {
+    if (!externalSpecificDateDraft) return;
+    setExternalSchedule((current) => ({
+      ...current,
+      oneOffDates: current.oneOffDates.includes(externalSpecificDateDraft)
+        ? current.oneOffDates
+        : [...current.oneOffDates, externalSpecificDateDraft].sort()
+    }));
+    setExternalSpecificDateDraft('');
+  };
+
+  const saveExternalRecurring = () => {
+    const parsed = Number.parseInt(externalRecurringDraft, 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) return;
+    setExternalSchedule((current) => ({ ...current, repeatActive: true, repeatEveryDays: parsed }));
   };
 
   const renderAddPanel = () => {
@@ -445,14 +486,22 @@ export function ReminderScheduleDrawer({
             <form action={saveComplianceItemReminders} className="reminder-schedule-form">
               <input type="hidden" name="itemId" value={itemId} />
               <input type="hidden" name="itemPathPrefix" value={itemPathPrefix} />
-              {schedule.startActive ? <input type="hidden" name="startRuleActive" value="on" /> : null}
-              {schedule.expirationActive ? <input type="hidden" name="expirationRuleActive" value="on" /> : null}
+              {schedule.startActive ? <input type="hidden" name="ownerStartRuleActive" value="on" /> : null}
+              {schedule.expirationActive ? <input type="hidden" name="ownerExpirationRuleActive" value="on" /> : null}
               {schedule.expirationActive ? sortedLeadTimes.map((leadTime) => (
-                <input type="hidden" name="expirationDaysBefore" value={leadTime} key={leadTime} />
+                <input type="hidden" name="ownerExpirationDaysBefore" value={leadTime} key={leadTime} />
               )) : null}
-              {schedule.repeatActive ? <input type="hidden" name="repeatRuleActive" value="on" /> : null}
-              <input type="hidden" name="repeatEveryDays" value={schedule.repeatEveryDays} />
-              {schedule.oneOffDates.map((date) => <input type="hidden" name="oneOffDate" value={date} key={date} />)}
+              {schedule.repeatActive ? <input type="hidden" name="ownerRepeatRuleActive" value="on" /> : null}
+              <input type="hidden" name="ownerRepeatEveryDays" value={schedule.repeatEveryDays} />
+              {schedule.oneOffDates.map((date) => <input type="hidden" name="ownerOneOffDate" value={date} key={date} />)}
+              {externalSchedule.startActive ? <input type="hidden" name="externalStartRuleActive" value="on" /> : null}
+              {externalSchedule.expirationActive ? <input type="hidden" name="externalExpirationRuleActive" value="on" /> : null}
+              {externalSchedule.expirationActive ? sortedExternalLeadTimes.map((leadTime) => (
+                <input type="hidden" name="externalExpirationDaysBefore" value={leadTime} key={leadTime} />
+              )) : null}
+              {externalSchedule.repeatActive ? <input type="hidden" name="externalRepeatRuleActive" value="on" /> : null}
+              <input type="hidden" name="externalRepeatEveryDays" value={externalSchedule.repeatEveryDays} />
+              {externalSchedule.oneOffDates.map((date) => <input type="hidden" name="externalOneOffDate" value={date} key={date} />)}
               {recipients.map((recipient) => (
                 <span key={recipient.email}>
                   <input type="hidden" name="additionalRecipientName" value={recipient.name} />
@@ -570,7 +619,7 @@ export function ReminderScheduleDrawer({
                   <div className="schedule-section-head">
                     <div>
                       <h4>Rules that create reminders</h4>
-                      <p>These generate the scheduled list above.</p>
+                      <p>These generate owner reminders in the scheduled list above.</p>
                     </div>
                   </div>
                   <div className="schedule-rule-list">
@@ -633,22 +682,132 @@ export function ReminderScheduleDrawer({
                 <section className="schedule-section">
                   <div className="schedule-section-head">
                     <div>
-                      <h4>Recipients</h4>
-                      <p>Applies to every scheduled reminder unless a row is changed later.</p>
+                      <h4>External copy reminders</h4>
+                      <p>These send no-login emails to external recipients, with a copy sent to the mapped owner.</p>
+                    </div>
+                    <span className={`schedule-tag ${externalScheduleRows.some((entry) => !entry.past) ? 'is-next' : 'is-scheduled'}`}>
+                      {externalScheduleRows.filter((entry) => !entry.past).length} future
+                    </span>
+                  </div>
+                  <div className="schedule-rule-list">
+                    <div className="schedule-rule-row">
+                      <ScheduleToggle
+                        checked={externalSchedule.startActive}
+                        label="External start-working reminder"
+                        onChange={() => setExternalSchedule((current) => ({ ...current, startActive: !current.startActive }))}
+                      />
+                      <div>
+                        <strong>External start-working reminder</strong>
+                        <p>{startWorkingOn ? `Sends on ${formatDate(startWorkingOn)}.` : 'Sends once a start-working date is set.'}</p>
+                      </div>
+                    </div>
+
+                    <div className="schedule-rule-row">
+                      <ScheduleToggle
+                        checked={externalSchedule.expirationActive}
+                        label="External deadline reminders"
+                        onChange={() => setExternalSchedule((current) => ({ ...current, expirationActive: !current.expirationActive }))}
+                      />
+                      <div>
+                        <strong>External deadline reminders</strong>
+                        <p>{expirationDate ? `Sends before the ${formatDate(expirationDate)} expiration.` : 'Sends before the expiration date once one is set.'}</p>
+                        <div className="schedule-chip-row">
+                          {sortedExternalLeadTimes.length ? sortedExternalLeadTimes.map((leadTime) => (
+                            <button
+                              className="schedule-offset-chip"
+                              type="button"
+                              key={leadTime}
+                              onClick={() => setExternalSchedule((current) => ({ ...current, leadTimes: current.leadTimes.filter((value) => value !== leadTime) }))}
+                            >
+                              {leadTime}d ×
+                            </button>
+                          )) : <span className="schedule-tag is-scheduled">No offsets</span>}
+                        </div>
+                        <div className="schedule-inline-add">
+                          <input
+                            aria-label="External days before expiration"
+                            type="number"
+                            min="0"
+                            placeholder="14"
+                            value={externalDeadlineDraft}
+                            onChange={(event) => setExternalDeadlineDraft(event.target.value)}
+                          />
+                          <button type="button" onClick={addExternalDeadline}>Add offset</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="schedule-rule-row">
+                      <ScheduleToggle
+                        checked={externalSchedule.repeatActive}
+                        label="External recurring nudges"
+                        onChange={() => setExternalSchedule((current) => ({ ...current, repeatActive: !current.repeatActive }))}
+                      />
+                      <div>
+                        <strong>External recurring nudge</strong>
+                        <p>Repeats every {externalSchedule.repeatEveryDays} days while the item is open.</p>
+                        <div className="schedule-inline-add">
+                          <input
+                            aria-label="External repeat cadence"
+                            type="number"
+                            min="1"
+                            value={externalRecurringDraft}
+                            onChange={(event) => setExternalRecurringDraft(event.target.value)}
+                          />
+                          <button type="button" onClick={saveExternalRecurring}>Set cadence</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="schedule-oneoff-inline">
+                    <label>
+                      One-off external reminder
+                      <input
+                        type="date"
+                        min={today}
+                        value={externalSpecificDateDraft}
+                        onChange={(event) => setExternalSpecificDateDraft(event.target.value)}
+                      />
+                    </label>
+                    <button type="button" onClick={addExternalOneOff} disabled={!externalSpecificDateDraft}>Add date</button>
+                  </div>
+
+                  {externalSchedule.oneOffDates.length ? (
+                    <div className="schedule-chip-row">
+                      {externalSchedule.oneOffDates.map((date) => (
+                        <button
+                          className="schedule-offset-chip"
+                          type="button"
+                          key={date}
+                          onClick={() => setExternalSchedule((current) => ({ ...current, oneOffDates: current.oneOffDates.filter((value) => value !== date) }))}
+                        >
+                          {shortDate(date)} ×
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+
+                <section className="schedule-section">
+                  <div className="schedule-section-head">
+                    <div>
+                      <h4>External recipients</h4>
+                      <p>These recipients get informational emails without login links. The owner gets a copy.</p>
                     </div>
                   </div>
                   <div className="schedule-recipient-list">
                     <div className="schedule-recipient-row">
                       <div>
                         <strong>{ownerLabel}</strong>
-                        <span>Default office recipient from owner-code mapping</span>
+                        <span>Owner receives owner reminders and copies of external reminders</span>
                       </div>
-                      <span className="schedule-tag is-owner">Default</span>
+                      <span className="schedule-tag is-owner">Owner</span>
                     </div>
                     {recipients.map((recipient) => (
                       <div className="schedule-recipient-row" key={recipient.email}>
                         <div>
-                          <strong>{recipient.name || 'Vessel copy'}</strong>
+                          <strong>{recipient.name || 'External recipient'}</strong>
                           <span>{recipient.email}</span>
                         </div>
                         <button type="button" onClick={() => setRecipients((current) => current.filter((entry) => entry.email !== recipient.email))}>Remove</button>
@@ -663,7 +822,7 @@ export function ReminderScheduleDrawer({
                       />
                       <input
                         type="email"
-                        placeholder="email@company.com"
+                        placeholder="email@external.com"
                         value={recipientDraft.email}
                         onChange={(event) => setRecipientDraft((current) => ({ ...current, email: event.target.value }))}
                         onKeyDown={(event) => {
@@ -673,7 +832,7 @@ export function ReminderScheduleDrawer({
                           }
                         }}
                       />
-                      <button type="button" onClick={addRecipient}>Add copy</button>
+                      <button type="button" onClick={addRecipient}>Add external</button>
                     </div>
                   </div>
                 </section>
@@ -685,7 +844,7 @@ export function ReminderScheduleDrawer({
               </div>
 
               <div className="drawer-foot reminder-schedule-foot">
-                <span>{futureReminderCount} future {futureReminderCount === 1 ? 'reminder' : 'reminders'} scheduled. Deadline and recurring rules carry forward to the next cycle.</span>
+                <span>{futureReminderCount} future {futureReminderCount === 1 ? 'reminder' : 'reminders'} scheduled. Owner and external deadline/recurring rules carry forward.</span>
                 <div>
                   <button className="schedule-cancel-button" type="button" onClick={() => setIsOpen(false)}>Cancel</button>
                   <button className="schedule-save-button" type="submit">Save schedule</button>

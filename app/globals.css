@@ -1865,6 +1865,42 @@ button.secondary-link {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.new-item-owner-grid,
+.owner-checkbox-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.new-item-owner-grid > div,
+.owner-checkbox-list > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.owner-check {
+  display: inline-flex;
+  min-height: 36px;
+  max-width: 100%;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfaf3;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.owner-check span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .new-item-full {
   grid-column: 1 / -1;
 }
@@ -8422,6 +8458,11 @@ button.secondary-link {
   background: #fff3f4;
 }
 
+.snapshot .stat-card.calm {
+  border-color: rgba(18, 120, 109, 0.18);
+  background: #f7fbf7;
+}
+
 .stat-card span {
   color: var(--muted);
   font-size: 10.5px;
@@ -8439,6 +8480,10 @@ button.secondary-link {
 
 .stat-card.hot strong {
   color: var(--rose-badge);
+}
+
+.stat-card.calm strong {
+  color: var(--teal-dark);
 }
 
 .stat-card p {
@@ -9349,7 +9394,9 @@ button.secondary-link {
 }
 
 .schedule-add-fields input,
-.schedule-recipient-add input {
+.schedule-recipient-add input,
+.schedule-inline-add input,
+.schedule-oneoff-inline input {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--line);
@@ -9362,7 +9409,9 @@ button.secondary-link {
 }
 
 .schedule-add-fields input:focus,
-.schedule-recipient-add input:focus {
+.schedule-recipient-add input:focus,
+.schedule-inline-add input:focus,
+.schedule-oneoff-inline input:focus {
   border-color: var(--teal);
   outline: 2px solid rgba(18, 120, 109, 0.16);
 }
@@ -9376,7 +9425,9 @@ button.secondary-link {
 }
 
 .schedule-add-actions button,
-.schedule-recipient-add button {
+.schedule-recipient-add button,
+.schedule-inline-add button,
+.schedule-oneoff-inline button {
   min-height: 42px;
   padding: 0 13px;
   border: 0;
@@ -9401,6 +9452,27 @@ button.secondary-link {
 .schedule-add-fields button:disabled {
   background: var(--line-strong);
   cursor: default;
+}
+
+.schedule-inline-add,
+.schedule-oneoff-inline {
+  display: grid;
+  grid-template-columns: minmax(110px, 170px) auto;
+  gap: 8px;
+  align-items: end;
+  margin-top: 10px;
+}
+
+.schedule-oneoff-inline {
+  padding: 0 14px 12px;
+}
+
+.schedule-oneoff-inline label {
+  display: grid;
+  gap: 5px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 850;
 }
 
 .schedule-field-note {

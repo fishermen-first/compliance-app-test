@@ -9,6 +9,8 @@ import {
   daysUntil,
   displayState,
   formatDate,
+  itemOwnerCodes,
+  itemOwnersLabel,
   proposedNextDates,
   storedStatusLabels,
   todayIso
@@ -21,6 +23,7 @@ type ReminderRule = {
   days_before: number | null;
   repeat_every_days: number | null;
   send_on: string | null;
+  audience?: string | null;
   active: boolean;
 };
 
@@ -71,8 +74,8 @@ function actorLabel(entry: HistoryEntry) {
   return profile?.full_name ?? profile?.email ?? 'Unknown user';
 }
 
-function ruleFor(rules: ReminderRule[], triggerType: string) {
-  return rules.find((rule) => rule.trigger_type === triggerType);
+function ruleFor(rules: ReminderRule[], triggerType: string, audience = 'owner') {
+  return rules.find((rule) => rule.trigger_type === triggerType && (rule.audience ?? 'owner') === audience);
 }
 
 function addDays(value: string, days: number) {
@@ -157,7 +160,7 @@ function workflowIndex(item: ComplianceItem) {
 function ownerOptionsWithCurrent(ownerOptions: OwnerOption[], item: ComplianceItem) {
   const map = new Map<string, OwnerOption>();
   ownerOptions.forEach((owner) => map.set(owner.code, owner));
-  [item.owner_current, item.owner_raw].forEach((code) => {
+  [...itemOwnerCodes(item), item.owner_current, item.owner_raw].forEach((code) => {
     if (code && !map.has(code)) map.set(code, { code });
   });
   return Array.from(map.values()).sort((a, b) => a.code.localeCompare(b.code));
@@ -175,6 +178,7 @@ export function ComplianceItemDetail({
   canCompleteItem,
   canEditCore,
   canManageReminders,
+  rolledForwardHref,
   backHref,
   backLabel,
   itemPathPrefix
@@ -190,20 +194,25 @@ export function ComplianceItemDetail({
   canCompleteItem: boolean;
   canEditCore: boolean;
   canManageReminders: boolean;
+  rolledForwardHref?: string;
   backHref: string;
   backLabel: string;
   itemPathPrefix: string;
 }) {
   const nextDates = proposedNextDates(item);
   const canCreateNext = Boolean(nextDates.nextExpirationDate);
+  const canCompleteNow = canCompleteItem && !['complete', 'discontinued'].includes(item.status);
+  const ownerReminderRules = reminderRules.filter((rule) => (rule.audience ?? 'owner') === 'owner');
+  const externalReminderRules = reminderRules.filter((rule) => rule.audience === 'external');
   const startRule = ruleFor(reminderRules, 'on_start_date');
-  const expirationRules = reminderRules.filter((rule) => rule.trigger_type === 'days_before_expiration');
+  const expirationRules = ownerReminderRules.filter((rule) => rule.trigger_type === 'days_before_expiration');
   const activeExpirationLeadTimes = uniqueNumbers(expirationRules.filter((rule) => rule.active).map((rule) => rule.days_before));
   const repeatRule = ruleFor(reminderRules, 'repeat_after_start');
-  const oneOffDates = uniqueDates(reminderRules
+  const oneOffDates = uniqueDates(ownerReminderRules
     .filter((rule) => rule.trigger_type === 'on_specific_date' && rule.active)
     .map((rule) => rule.send_on));
-  const additionalRecipients = recipients.filter((recipient) => recipient.recipient_type === 'additional');
+  const externalRecipients = recipients.filter((recipient) => ['additional', 'external'].includes(recipient.recipient_type));
+  const activeExternalRules = externalReminderRules.filter((rule) => rule.active);
   const latestReminder = reminderLogs[0];
   const nextReminder = nextExpectedReminder(item, reminderRules);
   const currentStep = workflowIndex(item);
@@ -225,7 +234,7 @@ export function ComplianceItemDetail({
           <h1>{item.item_name}</h1>
           <div className="item-meta-line">
             <span>{itemVessel(item)}</span>
-            <span className="own-chip">{item.owner_current ?? item.owner_raw ?? 'Unassigned'}</span>
+            <span className="own-chip">{itemOwnersLabel(item)}</span>
             <span>{item.agency_type ?? 'No agency'}</span>
             <span>{item.frequency_label ?? 'No frequency'}</span>
           </div>
@@ -236,10 +245,18 @@ export function ComplianceItemDetail({
         </div>
       </div>
 
-      {!canUpdateStatus && !canCompleteItem && !canEditCore ? (
+      {!canUpdateStatus && !canCompleteNow && !canEditCore ? (
         <section className="owner-notice-panel setup-warning-panel item-access-notice">
           <strong>Read only</strong>
           <span>Your login is not mapped to this item owner code. A workspace owner can update it or map your owner code.</span>
+        </section>
+      ) : null}
+
+      {rolledForwardHref ? (
+        <section className="owner-notice-panel item-access-notice">
+          <strong>Completed</strong>
+          <span>This record was marked complete and the next cycle was created.</span>
+          <Link href={rolledForwardHref}>Open next record</Link>
         </section>
       ) : null}
 
@@ -254,7 +271,7 @@ export function ComplianceItemDetail({
 
       <div className="detail-layout">
         <div className="primary-detail-column">
-          {(canUpdateStatus || canCompleteItem) ? (
+          {(canUpdateStatus || canCompleteNow) ? (
             <article className="detail-card act-card">
               <div>
                 <p className="eyebrow">Update status</p>
@@ -281,7 +298,7 @@ export function ComplianceItemDetail({
                     </label>
                   </>
                 ) : null}
-                {canCompleteItem ? (
+                {canCompleteNow ? (
                   <CompleteItemModal
                     itemId={item.id}
                     itemName={item.item_name}
@@ -321,13 +338,14 @@ export function ComplianceItemDetail({
             </div>
             <dl className="definition-grid">
               <div><dt>Vessel</dt><dd>{itemVessel(item)}</dd></div>
-              <div><dt>Owner</dt><dd>{item.owner_current ?? 'Unassigned'}</dd></div>
+              <div><dt>Owner</dt><dd>{itemOwnersLabel(item)}</dd></div>
               <div><dt>Agency</dt><dd>{item.agency_type ?? '-'}</dd></div>
               <div><dt>Item #</dt><dd>{item.item_number ?? '-'}</dd></div>
               <div><dt>Frequency</dt><dd>{item.frequency_label ?? '-'}</dd></div>
               <div><dt>Dates</dt><dd>{formatDate(item.start_working_on)} to {formatDate(item.expiration_date)}</dd></div>
               <div><dt>Compliance area</dt><dd>{item.compliance_area ?? 'Other'}</dd></div>
               <div><dt>SharePoint</dt><dd>{item.sharepoint_url ? <a href={item.sharepoint_url}>Open document</a> : '-'}</dd></div>
+              <div><dt>Standing instructions</dt><dd>{item.instructions || '-'}</dd></div>
             </dl>
           </article>
         </div>
@@ -339,7 +357,8 @@ export function ComplianceItemDetail({
               <li><strong>Start-working reminder</strong><span className="send-pill">{startRule?.active ? 'Active' : 'Off'}</span></li>
               <li><strong>Before-expiration reminder</strong><span>{activeExpirationLeadTimes.length ? `${joinLeadTimes(activeExpirationLeadTimes)} days before` : 'Off'}</span></li>
               <li><strong>One-off dates</strong><span>{oneOffDates.length ? oneOffDates.map((date) => formatDate(date)).join(', ') : 'None'}</span></li>
-              <li><strong>Vessel-copy recipients</strong><span>{additionalRecipients.length}</span></li>
+              <li><strong>External-copy recipients</strong><span>{externalRecipients.length}</span></li>
+              <li><strong>External reminder rules</strong><span>{activeExternalRules.length ? 'Active' : 'Off'}</span></li>
               <li><strong>Next scheduled</strong><span>{nextReminder ? formatDate(nextReminder) : 'None'}</span></li>
               <li><strong>Latest send</strong><span>{latestReminder ? `${statusOptionLabel(latestReminder.status)} - ${formatTimestamp(latestReminder.sent_at ?? latestReminder.scheduled_for)}` : 'None logged'}</span></li>
             </ul>
@@ -350,12 +369,12 @@ export function ComplianceItemDetail({
                 itemName={item.item_name}
                 itemPathPrefix={itemPathPrefix}
                 itemVesselName={itemVessel(item)}
-                ownerCode={item.owner_current ?? item.owner_raw}
+                ownerCode={itemOwnersLabel(item)}
                 startWorkingOn={item.start_working_on}
                 expirationDate={item.expiration_date}
                 instructions={item.instructions}
                 reminderRules={reminderRules}
-                additionalRecipients={additionalRecipients}
+                additionalRecipients={externalRecipients}
                 today={todayIso()}
               />
             ) : null}

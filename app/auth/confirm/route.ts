@@ -24,6 +24,7 @@ export async function GET(request: Request) {
     });
 
     if (!error) {
+      await supabase.rpc('accept_company_invite', {});
       return NextResponse.redirect(new URL(next, requestUrl.origin));
     }
   }

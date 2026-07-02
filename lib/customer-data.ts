@@ -3,6 +3,12 @@ import { type ComplianceItem } from '@/lib/compliance';
 import { createClient } from '@/lib/supabase/server';
 
 export function mapComplianceItem(row: any): ComplianceItem {
+  const ownerCodeRows = (row.compliance_item_owner_codes ?? []) as Array<{ owner_code: string | null; is_primary: boolean | null }>;
+  const ownerCodes = ownerCodeRows
+    .filter((owner) => owner.owner_code)
+    .sort((a, b) => Number(Boolean(b.is_primary)) - Number(Boolean(a.is_primary)) || String(a.owner_code).localeCompare(String(b.owner_code)))
+    .map((owner) => owner.owner_code as string);
+
   return {
     id: row.id,
     company_id: row.company_id,
@@ -10,6 +16,7 @@ export function mapComplianceItem(row: any): ComplianceItem {
     vessel_name: row.vessels?.name ?? null,
     owner_raw: row.owner_raw,
     owner_current: row.owner_current,
+    owner_codes: ownerCodes.length ? Array.from(new Set(ownerCodes)) : row.owner_current ? [row.owner_current] : [],
     item_name: row.item_name,
     item_number: row.item_number,
     agency_type: row.agency_type,
@@ -96,7 +103,7 @@ export async function getCustomerItems(companyId: string) {
   const supabase = createClient();
   const { data: rawItems } = await supabase
     .from('compliance_items')
-    .select('*, vessels(name)')
+    .select('*, vessels(name), compliance_item_owner_codes(owner_code, is_primary)')
     .eq('company_id', companyId)
     .order('start_working_on', { ascending: true, nullsFirst: false })
     .order('expiration_date', { ascending: true, nullsFirst: false });
