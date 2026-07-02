@@ -15,3 +15,16 @@ pnpm-debug.log*
 *.csv
 tmp/
 .vercel
+
+# Local prototypes, handoffs, and generated artifacts
+/Compliance App - Interview Guide.pdf
+/*.html
+/*.jsx
+/*.css
+/handoff*/
+/new-item-redesign/
+/reminder-feature-asbuilt/
+/outputs/
+/supabase/.temp/
+/docs/client-walkthrough-script.md
+/docs/settings-ux-cleanup-plan.md
