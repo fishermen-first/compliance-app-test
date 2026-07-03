@@ -95,9 +95,9 @@ test('parser treats explicit quarterly periods as annual quarter-specific record
 });
 
 test('phase 1 migration keeps legacy RPC and adds dry-run/apply surfaces', () => {
-  const legacy = read('supabase/migrations/202605100200_import_workbook_records.sql');
-  const migration = read('supabase/migrations/202605130001_import_data_model_v2_phase1.sql');
-  const periodMigration = read('supabase/migrations/202607030001_quarter_period_labels.sql');
+  const legacy = read('supabase/migrations/20260510150035_import_workbook_records.sql');
+  const migration = read('supabase/migrations/20260513000100_import_data_model_v2_phase1.sql');
+  const periodMigration = read('supabase/migrations/20260703000100_quarter_period_labels.sql');
 
   assert.match(legacy, /create or replace function public\.import_compliance_workbook_records/);
   assert.doesNotMatch(migration, /drop function .*import_compliance_workbook_records/i);
