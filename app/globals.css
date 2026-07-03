@@ -9153,6 +9153,11 @@ button.secondary-link {
   line-height: 1.4;
 }
 
+.schedule-rule-row .schedule-help-text {
+  color: #7d8783;
+  font-weight: 650;
+}
+
 .scheduled-reminder-list {
   display: grid;
 }

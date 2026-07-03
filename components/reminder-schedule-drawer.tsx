@@ -644,13 +644,14 @@ export function ReminderScheduleDrawer({
                       <div>
                         <strong>Deadline reminders</strong>
                         <p>{expirationDate ? `Sends before the ${formatDate(expirationDate)} expiration.` : 'Sends before the expiration date once one is set.'}</p>
+                        <p className="schedule-help-text">Use days before expiration, such as 14 for two weeks before the deadline.</p>
                         <div className="schedule-chip-row">
                           {sortedLeadTimes.length ? sortedLeadTimes.map((leadTime) => (
                             <button className="schedule-offset-chip" type="button" key={leadTime} onClick={() => editLeadTime(leadTime)}>
                               {leadTime}d
                             </button>
                           )) : <span className="schedule-tag is-scheduled">No offsets</span>}
-                          <button className="schedule-offset-chip" type="button" onClick={() => selectAddMode('deadline')}>+ Offset</button>
+                          <button className="schedule-offset-chip" type="button" onClick={() => selectAddMode('deadline')}>Add reminder timing</button>
                         </div>
                       </div>
                     </div>
@@ -711,6 +712,7 @@ export function ReminderScheduleDrawer({
                       <div>
                         <strong>External deadline reminders</strong>
                         <p>{expirationDate ? `Sends before the ${formatDate(expirationDate)} expiration.` : 'Sends before the expiration date once one is set.'}</p>
+                        <p className="schedule-help-text">Use days before expiration, such as 14 for two weeks before the deadline.</p>
                         <div className="schedule-chip-row">
                           {sortedExternalLeadTimes.length ? sortedExternalLeadTimes.map((leadTime) => (
                             <button
@@ -732,7 +734,7 @@ export function ReminderScheduleDrawer({
                             value={externalDeadlineDraft}
                             onChange={(event) => setExternalDeadlineDraft(event.target.value)}
                           />
-                          <button type="button" onClick={addExternalDeadline}>Add offset</button>
+                          <button type="button" onClick={addExternalDeadline}>Add reminder timing</button>
                         </div>
                       </div>
                     </div>
