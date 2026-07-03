@@ -9454,7 +9454,9 @@ button.secondary-link {
   font-weight: 850;
 }
 
-.schedule-add-fields button:disabled {
+.schedule-add-fields button:disabled,
+.schedule-inline-add button:disabled,
+.schedule-oneoff-inline button:disabled {
   background: var(--line-strong);
   cursor: default;
 }

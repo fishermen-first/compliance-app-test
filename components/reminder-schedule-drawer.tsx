@@ -226,10 +226,16 @@ export function ReminderScheduleDrawer({
   const [addMode, setAddMode] = useState<AddMode>('specific');
   const [specificDateDraft, setSpecificDateDraft] = useState('');
   const [deadlineDraft, setDeadlineDraft] = useState('');
-  const [recurringDraft, setRecurringDraft] = useState(() => String(initialSchedule(reminderRules, 'owner').repeatEveryDays));
+  const [recurringDraft, setRecurringDraft] = useState(() => {
+    const ownerSchedule = initialSchedule(reminderRules, 'owner');
+    return ownerSchedule.repeatActive ? String(ownerSchedule.repeatEveryDays) : '';
+  });
   const [externalDeadlineDraft, setExternalDeadlineDraft] = useState('');
   const [externalSpecificDateDraft, setExternalSpecificDateDraft] = useState('');
-  const [externalRecurringDraft, setExternalRecurringDraft] = useState(() => String(initialSchedule(reminderRules, 'external').repeatEveryDays));
+  const [externalRecurringDraft, setExternalRecurringDraft] = useState(() => {
+    const initialExternalSchedule = initialSchedule(reminderRules, 'external');
+    return initialExternalSchedule.repeatActive ? String(initialExternalSchedule.repeatEveryDays) : '';
+  });
   const [editingOneOffDate, setEditingOneOffDate] = useState<string | null>(null);
   const [editingLeadTime, setEditingLeadTime] = useState<number | null>(null);
   const [recipients, setRecipients] = useState<EditableRecipient[]>(() => (
@@ -259,8 +265,10 @@ export function ReminderScheduleDrawer({
   const recipientSummary = recipients.length ? `${ownerLabel} + ${recipients.length} external` : ownerLabel;
   const editingKind = editingLeadTime !== null ? 'deadline' : editingOneOffDate ? 'manual' : null;
   const editingLabel = editingKind === 'deadline' ? 'Deadline reminder' : editingKind === 'manual' ? 'Manual reminder' : '';
-  const ownerRecurringDaysPreview = positiveIntegerDraft(recurringDraft) ?? schedule.repeatEveryDays;
-  const externalRecurringDaysPreview = positiveIntegerDraft(externalRecurringDraft) ?? externalSchedule.repeatEveryDays;
+  const ownerRecurringDraftDays = positiveIntegerDraft(recurringDraft);
+  const ownerRecurringDaysPreview = ownerRecurringDraftDays ?? schedule.repeatEveryDays;
+  const externalRecurringDraftDays = positiveIntegerDraft(externalRecurringDraft);
+  const externalRecurringDaysPreview = externalRecurringDraftDays ?? externalSchedule.repeatEveryDays;
 
   const resetAddEdits = () => {
     setEditingOneOffDate(null);
@@ -277,7 +285,7 @@ export function ReminderScheduleDrawer({
   const selectAddMode = (mode: AddMode) => {
     resetAddEdits();
     setAddMode(mode);
-    if (mode === 'recurring') setRecurringDraft(String(schedule.repeatEveryDays));
+    if (mode === 'recurring') setRecurringDraft(schedule.repeatActive ? String(schedule.repeatEveryDays) : '');
     if (mode === 'deadline') setDeadlineDraft('');
   };
 
@@ -442,7 +450,7 @@ export function ReminderScheduleDrawer({
           </label>
           <div className="schedule-field-note">days while the item remains open.</div>
           <div className="schedule-add-actions">
-            <button type="button" onClick={saveRecurringCadence}>{schedule.repeatActive ? 'Update cadence' : 'Start nudging'}</button>
+            <button type="button" onClick={saveRecurringCadence} disabled={!recurringDraft.trim()}>{schedule.repeatActive ? 'Update cadence' : 'Start nudging'}</button>
           </div>
         </div>
       );
@@ -665,7 +673,25 @@ export function ReminderScheduleDrawer({
                               {leadTime}d
                             </button>
                           )) : <span className="schedule-tag is-scheduled">No reminder timing</span>}
-                          <button className="schedule-offset-chip" type="button" onClick={() => selectAddMode('deadline')}>Add reminder timing</button>
+                        </div>
+                        <div className="schedule-inline-add">
+                          <input
+                            aria-label="Owner days before expiration"
+                            type="number"
+                            min="0"
+                            placeholder="Days before"
+                            value={deadlineDraft}
+                            onChange={(event) => setDeadlineDraft(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') {
+                                event.preventDefault();
+                                saveDeadlineOffset();
+                              }
+                            }}
+                          />
+                          <button type="button" onClick={saveDeadlineOffset} disabled={!deadlineDraft.trim()}>
+                            {editingLeadTime === null ? 'Add reminder timing' : 'Update reminder timing'}
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -678,16 +704,36 @@ export function ReminderScheduleDrawer({
                       />
                       <div>
                         <strong>Recurring nudge</strong>
-                        <p>Repeats every {ownerRecurringDaysPreview} days while the item is open.</p>
+                        <p>
+                          {schedule.repeatActive
+                            ? `Repeats every ${ownerRecurringDaysPreview} days while the item is open.`
+                            : ownerRecurringDraftDays
+                              ? `Will repeat every ${ownerRecurringDraftDays} days when turned on.`
+                              : 'Enter the number of days between recurring nudges.'}
+                        </p>
                         <div className="schedule-chip-row">
                           {recurringPreviewRows.length ? recurringPreviewRows.map((entry) => (
                             <span className={`schedule-tag is-${entry.status}`} key={entry.iso}>{shortDate(entry.iso)}</span>
                           )) : <span className="schedule-tag is-scheduled">No future nudges</span>}
-                          <button className="schedule-offset-chip" type="button" onClick={() => {
-                            setAddMode('recurring');
-                            setRecurringDraft(String(schedule.repeatEveryDays));
-                            resetAddEdits();
-                          }}>Cadence</button>
+                        </div>
+                        <div className="schedule-inline-add">
+                          <input
+                            aria-label="Owner repeat cadence"
+                            type="number"
+                            min="1"
+                            placeholder="Days between"
+                            value={recurringDraft}
+                            onChange={(event) => setRecurringDraft(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') {
+                                event.preventDefault();
+                                saveRecurringCadence();
+                              }
+                            }}
+                          />
+                          <button type="button" onClick={saveRecurringCadence} disabled={!recurringDraft.trim()}>
+                            {schedule.repeatActive ? 'Update cadence' : 'Set cadence'}
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -761,16 +807,25 @@ export function ReminderScheduleDrawer({
                       />
                       <div>
                         <strong>External recurring nudge</strong>
-                        <p>Repeats every {externalRecurringDaysPreview} days while the item is open.</p>
+                        <p>
+                          {externalSchedule.repeatActive
+                            ? `Repeats every ${externalRecurringDaysPreview} days while the item is open.`
+                            : externalRecurringDraftDays
+                              ? `Will repeat every ${externalRecurringDraftDays} days when turned on.`
+                              : 'Enter the number of days between recurring nudges.'}
+                        </p>
                         <div className="schedule-inline-add">
                           <input
                             aria-label="External repeat cadence"
                             type="number"
                             min="1"
+                            placeholder="Days between"
                             value={externalRecurringDraft}
                             onChange={(event) => setExternalRecurringDraft(event.target.value)}
                           />
-                          <button type="button" onClick={saveExternalRecurring}>Set cadence</button>
+                          <button type="button" onClick={saveExternalRecurring} disabled={!externalRecurringDraft.trim()}>
+                            {externalSchedule.repeatActive ? 'Update cadence' : 'Set cadence'}
+                          </button>
                         </div>
                       </div>
                     </div>
