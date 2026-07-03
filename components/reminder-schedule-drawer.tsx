@@ -151,12 +151,14 @@ function initialSchedule(reminderRules: ReminderRule[], audience: 'owner' | 'ext
   const startRule = rules.find((rule) => rule.trigger_type === 'on_start_date');
   const deadlineRules = rules.filter((rule) => rule.trigger_type === 'days_before_expiration');
   const repeatRule = rules.find((rule) => rule.trigger_type === 'repeat_after_start');
-  const storedLeadTimes = uniqueNumbers(deadlineRules.map((rule) => rule.days_before));
+  const activeDeadlineRules = deadlineRules.filter((rule) => rule.active);
+  const storedLeadTimes = uniqueNumbers(activeDeadlineRules.map((rule) => rule.days_before));
+  const fallbackLeadTimes = audience === 'owner' && deadlineRules.length === 0 ? [14] : [];
 
   return {
     startActive: startRule?.active ?? defaultActive,
     expirationActive: deadlineRules.length === 0 ? defaultActive : deadlineRules.some((rule) => rule.active),
-    leadTimes: storedLeadTimes.length ? storedLeadTimes : [14],
+    leadTimes: storedLeadTimes.length ? storedLeadTimes : fallbackLeadTimes,
     repeatActive: repeatRule?.active ?? false,
     repeatEveryDays: repeatRule?.repeat_every_days && repeatRule.repeat_every_days > 0 ? repeatRule.repeat_every_days : 14,
     oneOffDates: uniqueDates(
@@ -215,9 +217,9 @@ export function ReminderScheduleDrawer({
   const [externalSchedule, setExternalSchedule] = useState<ScheduleState>(() => initialSchedule(reminderRules, 'external'));
   const [addMode, setAddMode] = useState<AddMode>('specific');
   const [specificDateDraft, setSpecificDateDraft] = useState('');
-  const [deadlineDraft, setDeadlineDraft] = useState('7');
+  const [deadlineDraft, setDeadlineDraft] = useState('');
   const [recurringDraft, setRecurringDraft] = useState(() => String(initialSchedule(reminderRules, 'owner').repeatEveryDays));
-  const [externalDeadlineDraft, setExternalDeadlineDraft] = useState('14');
+  const [externalDeadlineDraft, setExternalDeadlineDraft] = useState('');
   const [externalSpecificDateDraft, setExternalSpecificDateDraft] = useState('');
   const [externalRecurringDraft, setExternalRecurringDraft] = useState(() => String(initialSchedule(reminderRules, 'external').repeatEveryDays));
   const [editingOneOffDate, setEditingOneOffDate] = useState<string | null>(null);
@@ -388,7 +390,7 @@ export function ReminderScheduleDrawer({
               type="number"
               min="0"
               value={deadlineDraft}
-              placeholder="14"
+              placeholder="Days before"
               onChange={(event) => setDeadlineDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
@@ -402,7 +404,9 @@ export function ReminderScheduleDrawer({
             Counts back from {expirationDate ? formatDate(expirationDate) : 'the expiration date'}.
           </div>
           <div className="schedule-add-actions">
-            <button type="button" onClick={saveDeadlineOffset}>{editingLeadTime === null ? 'Add deadline reminder' : 'Update offset'}</button>
+            <button type="button" onClick={saveDeadlineOffset} disabled={!deadlineDraft.trim()}>
+              {editingLeadTime === null ? 'Add deadline reminder' : 'Update reminder timing'}
+            </button>
           </div>
         </div>
       );
@@ -644,13 +648,13 @@ export function ReminderScheduleDrawer({
                       <div>
                         <strong>Deadline reminders</strong>
                         <p>{expirationDate ? `Sends before the ${formatDate(expirationDate)} expiration.` : 'Sends before the expiration date once one is set.'}</p>
-                        <p className="schedule-help-text">Use days before expiration, such as 14 for two weeks before the deadline.</p>
+                        <p className="schedule-help-text">Enter how many days before expiration the reminder should send.</p>
                         <div className="schedule-chip-row">
                           {sortedLeadTimes.length ? sortedLeadTimes.map((leadTime) => (
                             <button className="schedule-offset-chip" type="button" key={leadTime} onClick={() => editLeadTime(leadTime)}>
                               {leadTime}d
                             </button>
-                          )) : <span className="schedule-tag is-scheduled">No offsets</span>}
+                          )) : <span className="schedule-tag is-scheduled">No reminder timing</span>}
                           <button className="schedule-offset-chip" type="button" onClick={() => selectAddMode('deadline')}>Add reminder timing</button>
                         </div>
                       </div>
@@ -712,7 +716,7 @@ export function ReminderScheduleDrawer({
                       <div>
                         <strong>External deadline reminders</strong>
                         <p>{expirationDate ? `Sends before the ${formatDate(expirationDate)} expiration.` : 'Sends before the expiration date once one is set.'}</p>
-                        <p className="schedule-help-text">Use days before expiration, such as 14 for two weeks before the deadline.</p>
+                        <p className="schedule-help-text">Enter how many days before expiration the reminder should send.</p>
                         <div className="schedule-chip-row">
                           {sortedExternalLeadTimes.length ? sortedExternalLeadTimes.map((leadTime) => (
                             <button
@@ -723,18 +727,18 @@ export function ReminderScheduleDrawer({
                             >
                               {leadTime}d ×
                             </button>
-                          )) : <span className="schedule-tag is-scheduled">No offsets</span>}
+                          )) : <span className="schedule-tag is-scheduled">No reminder timing</span>}
                         </div>
                         <div className="schedule-inline-add">
                           <input
                             aria-label="External days before expiration"
                             type="number"
                             min="0"
-                            placeholder="14"
+                            placeholder="Days before"
                             value={externalDeadlineDraft}
                             onChange={(event) => setExternalDeadlineDraft(event.target.value)}
                           />
-                          <button type="button" onClick={addExternalDeadline}>Add reminder timing</button>
+                          <button type="button" onClick={addExternalDeadline} disabled={!externalDeadlineDraft.trim()}>Add reminder timing</button>
                         </div>
                       </div>
                     </div>
