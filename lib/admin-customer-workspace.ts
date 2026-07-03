@@ -39,6 +39,7 @@ type ItemRow = {
   vessel_id: string | null;
   owner_current: string | null;
   item_name: string;
+  period_label: string | null;
   status: ComplianceItemStatus;
   recurrence_unit: RecurrenceUnit;
   start_working_on: string | null;
@@ -175,6 +176,8 @@ export type AdminCustomerWorkspace = {
       vesselCount: number;
       manualRecurrenceCount: number;
       missingDateCount: number;
+      periodLabelCount: number;
+      periodLabels: string[];
     };
     sampleItems: ItemRow[];
   };
@@ -438,7 +441,7 @@ export async function getAdminCustomerWorkspace(customerId: string): Promise<Adm
     admin.from('company_invitations').select('company_id, email, accepted_at'),
     admin
       .from('compliance_items')
-      .select('id, vessel_id, owner_current, item_name, status, recurrence_unit, start_working_on, expiration_date, source_sheet, source_row_number, updated_at')
+      .select('id, vessel_id, owner_current, item_name, period_label, status, recurrence_unit, start_working_on, expiration_date, source_sheet, source_row_number, updated_at')
       .eq('company_id', customerId)
       .order('source_row_number', { ascending: true, nullsFirst: false }),
     admin
@@ -592,6 +595,7 @@ export async function getAdminCustomerWorkspace(customerId: string): Promise<Adm
   const auditRows = (auditResult.data ?? []) as AuditRow[];
   const inviteFailures = ((inviteAuditResult.data ?? []) as AuditRow[]).flatMap(inviteFailuresFromAudit);
   const activeUsers = users.filter((user) => user.kind === 'membership' && user.status === 'active');
+  const periodLabels = Array.from(new Set(items.map((item) => item.period_label).filter(Boolean) as string[])).sort();
 
   return {
     customer,
@@ -612,7 +616,9 @@ export async function getAdminCustomerWorkspace(customerId: string): Promise<Adm
         companyWideCount: items.filter((item) => !item.vessel_id).length,
         vesselCount: customer.vesselCount,
         manualRecurrenceCount: items.filter((item) => item.recurrence_unit === 'manual' || item.recurrence_unit === 'none').length,
-        missingDateCount: items.filter((item) => !item.start_working_on || !item.expiration_date).length
+        missingDateCount: items.filter((item) => !item.start_working_on || !item.expiration_date).length,
+        periodLabelCount: items.filter((item) => item.period_label).length,
+        periodLabels
       },
       sampleItems: items.slice(0, 8)
     },

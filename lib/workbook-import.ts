@@ -5,6 +5,7 @@ import type { Database } from '@/lib/database.types';
 type ComplianceItemStatus = Database['public']['Enums']['compliance_item_status'];
 type RecurrenceUnit = Database['public']['Enums']['recurrence_unit'];
 type DetectedWorkbookFormat = 'legacy_due_dates' | 'ff_template_v1';
+export type PeriodLabel = 'Q1' | 'Q2' | 'Q3' | 'Q4';
 
 export type ImportedComplianceRecord = {
   sourceRowNumber: number;
@@ -18,6 +19,7 @@ export type ImportedComplianceRecord = {
     ownerCode: string | null;
     itemNumber: string | null;
     agencyType: string | null;
+    periodLabel: string | null;
   };
   ownerRaw: string | null;
   ownerCurrent: string | null;
@@ -28,6 +30,7 @@ export type ImportedComplianceRecord = {
   agencyType: string | null;
   complianceArea: string;
   frequencyLabel: string | null;
+  periodLabel: PeriodLabel | null;
   recurrenceUnit: RecurrenceUnit;
   recurrenceInterval: number | null;
   expirationDate: string | null;
@@ -55,7 +58,7 @@ export class WorkbookImportError extends Error {
   }
 }
 
-const parserVersion = 'import-v2-phase1-2026-05-13';
+const parserVersion = 'import-v2-quarter-periods-2026-07-03';
 
 const legacyHeaders = [
   'ownerRaw',
@@ -101,6 +104,7 @@ const templateRequiredColumns = [
 ] as const;
 
 const companyWideNames = new Set(['asmg', 'ashco', 'company', 'office', '']);
+const optionalPeriodColumns = ['period', 'cycle', 'quarter'] as const;
 
 const statusMap: Record<string, ComplianceItemStatus> = {
   '': 'not_started',
@@ -150,6 +154,11 @@ function templateColumnMap(row: unknown[]) {
   return new Map(entries);
 }
 
+function valueForAnyColumn(row: unknown[], columns: Map<string, number>, names: readonly string[]) {
+  const column = names.find((name) => columns.has(name));
+  return column ? row[columns.get(column) ?? -1] ?? null : null;
+}
+
 function isTemplateHeader(row: unknown[]) {
   const columns = templateColumnMap(row);
   return templateRequiredColumns.every((column) => columns.has(column));
@@ -176,14 +185,20 @@ function rowJsonFromKeys(keys: readonly string[], values: unknown[]) {
   return Object.fromEntries(keys.map((key, index) => [key, clean(values[index] ?? null)]));
 }
 
-function sourceFingerprint(candidate: ImportedComplianceRecord['matchCandidate']) {
-  return sha256({
+export function sourceFingerprint(candidate: ImportedComplianceRecord['matchCandidate']) {
+  const fingerprint: Record<string, string | null> = {
     itemName: candidate.itemName,
     vesselOrScope: candidate.vesselOrScope,
     ownerCode: candidate.ownerCode,
     itemNumber: candidate.itemNumber,
     agencyType: candidate.agencyType
-  });
+  };
+
+  if (candidate.periodLabel) {
+    fingerprint.periodLabel = candidate.periodLabel;
+  }
+
+  return sha256(fingerprint);
 }
 
 function excelDateToIso(value: unknown) {
@@ -222,10 +237,57 @@ function parseOwnerCurrent(ownerRaw: string | null) {
   return value || null;
 }
 
-function inferRecurrence(frequency: string | null): { unit: RecurrenceUnit; interval: number | null } {
+export function normalizePeriodLabel(value: string | null): PeriodLabel | null {
+  const label = (value ?? '').trim().toLowerCase();
+  if (!label) return null;
+
+  const match = label.match(/^(?:q|qtr\.?|quarter)?\s*([1-4])$/);
+  return match ? `Q${match[1]}` as PeriodLabel : null;
+}
+
+export function periodLabelFromItemName(itemName: string): PeriodLabel | null {
+  const label = itemName.trim();
+  const match =
+    label.match(/\bq([1-4])\b/i) ??
+    label.match(/\bqtr\.?\s*([1-4])\b/i) ??
+    label.match(/\bquarter\s*([1-4])\b/i);
+
+  return match ? `Q${match[1]}` as PeriodLabel : null;
+}
+
+export function resolvePeriodLabel(
+  rawPeriod: string | null,
+  itemName: string,
+  rowNumber: number,
+  warnings: WorkbookImportSummary['warnings']
+) {
+  const explicit = clean(rawPeriod);
+  const itemNamePeriod = periodLabelFromItemName(itemName);
+
+  if (!explicit) return itemNamePeriod;
+
+  const explicitPeriod = normalizePeriodLabel(explicit);
+  if (!explicitPeriod) {
+    warnings.push({ row: rowNumber, issue: 'Invalid period label; expected Q1, Q2, Q3, or Q4', value: explicit });
+    return null;
+  }
+
+  if (itemNamePeriod && itemNamePeriod !== explicitPeriod) {
+    warnings.push({
+      row: rowNumber,
+      issue: 'Period column conflicts with item name quarter marker; using Period column value',
+      value: `${explicitPeriod} vs ${itemNamePeriod}`
+    });
+  }
+
+  return explicitPeriod;
+}
+
+export function inferRecurrence(frequency: string | null, periodLabel: PeriodLabel | null = null): { unit: RecurrenceUnit; interval: number | null } {
   const label = (frequency ?? '').trim().toLowerCase();
   if (!label || label === 'na' || label === 'n/a') return { unit: 'none', interval: null };
   if (label.includes('unannounced') || label.includes('new permit')) return { unit: 'manual', interval: null };
+  if (label.includes('quarter') && periodLabel) return { unit: 'years', interval: 1 };
   if (label.includes('quarter')) return { unit: 'months', interval: 3 };
   if (label.includes('twice')) return { unit: 'months', interval: 6 };
   if (label.includes('bienn')) return { unit: 'years', interval: 2 };
@@ -320,14 +382,16 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
       const vesselOrScope = clean(valueFor('vessel_or_scope'));
       const agencyType = clean(valueFor('regulatory_party'));
       const frequencyLabel = clean(valueFor('frequency'));
-      const recurrence = inferRecurrence(frequencyLabel);
+      const periodLabel = resolvePeriodLabel(clean(valueForAnyColumn(row, columns, optionalPeriodColumns)), itemName, rowNumber, warnings);
+      const recurrence = inferRecurrence(frequencyLabel, periodLabel);
       const itemNumber = clean(valueFor('item_number'));
       const matchCandidate = {
         itemName: normalizeMatchValue(itemName),
         vesselOrScope: normalizeMatchValue(vesselOrScope),
         ownerCode: normalizeMatchValue(ownerRaw),
         itemNumber: normalizeMatchValue(itemNumber),
-        agencyType: normalizeMatchValue(agencyType)
+        agencyType: normalizeMatchValue(agencyType),
+        periodLabel
       };
 
       records.push({
@@ -346,6 +410,7 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
         agencyType,
         complianceArea: clean(valueFor('compliance_domain')) ?? inferArea(agencyType, itemName),
         frequencyLabel,
+        periodLabel,
         recurrenceUnit: recurrence.unit,
         recurrenceInterval: recurrence.interval,
         expirationDate: importDate(valueFor('due_or_expiration_date'), rowNumber, 'due or expiration date', warnings),
@@ -356,6 +421,12 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
       });
     });
   } else {
+    const legacyPeriodIndex = (() => {
+      const header = rows[legacyHeaderIndex] ?? [];
+      const nextHeader = normalizeHeaderLabel(header[legacyHeaders.length] ?? null);
+      return optionalPeriodColumns.includes(nextHeader as typeof optionalPeriodColumns[number]) ? legacyHeaders.length : -1;
+    })();
+
     rows.slice(legacyHeaderIndex + 1).forEach((row, index) => {
     const rowNumber = legacyHeaderIndex + index + 2;
     const values = legacyHeaders.map((_, valueIndex) => row[valueIndex] ?? null);
@@ -363,6 +434,9 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
 
     const raw = Object.fromEntries(legacyHeaders.map((header, headerIndex) => [header, values[headerIndex]]));
     const sourceRowJson = rowJsonFromKeys(legacyHeaders, values);
+    if (legacyPeriodIndex !== -1) {
+      sourceRowJson.periodLabel = clean(row[legacyPeriodIndex] ?? null);
+    }
     const itemName = clean(raw.itemName);
     if (!itemName) {
       warnings.push({ row: rowNumber, issue: 'Skipped row with no item name' });
@@ -370,7 +444,8 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
     }
 
     const frequencyLabel = clean(raw.frequencyLabel);
-    const recurrence = inferRecurrence(frequencyLabel);
+    const periodLabel = resolvePeriodLabel(legacyPeriodIndex === -1 ? null : clean(row[legacyPeriodIndex] ?? null), itemName, rowNumber, warnings);
+    const recurrence = inferRecurrence(frequencyLabel, periodLabel);
     const ownerRaw = clean(raw.ownerRaw);
     const agencyType = clean(raw.agencyType);
     const vessel = clean(raw.vessel);
@@ -380,7 +455,8 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
       vesselOrScope: normalizeMatchValue(vessel),
       ownerCode: normalizeMatchValue(ownerRaw),
       itemNumber: normalizeMatchValue(itemNumber),
-      agencyType: normalizeMatchValue(agencyType)
+      agencyType: normalizeMatchValue(agencyType),
+      periodLabel
     };
 
     records.push({
@@ -399,6 +475,7 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
       agencyType,
       complianceArea: inferArea(agencyType, itemName),
       frequencyLabel,
+      periodLabel,
       recurrenceUnit: recurrence.unit,
       recurrenceInterval: recurrence.interval,
       expirationDate: importDate(raw.expirationDate, rowNumber, 'expiration', warnings),

@@ -227,6 +227,7 @@ function ImportReview({ workspace }: { workspace: AdminCustomerWorkspace }) {
           <Metric label="Issues" value={importReview.metrics.issueCount || importReview.issues.length} detail={latest ? `${importReview.metrics.skippedCount} rows held for review` : 'Dry run to classify issues'} />
           <Metric label="Company-wide" value={importReview.metrics.companyWideCount} detail="Items without a vessel assignment" />
           <Metric label="Vessels found" value={importReview.metrics.vesselCount} detail="Active vessels in workspace" />
+          <Metric label="Quarter periods" value={importReview.metrics.periodLabelCount} detail={importReview.metrics.periodLabels.length ? importReview.metrics.periodLabels.join(', ') : 'No Q1-Q4 labels imported'} />
         </div>
 
         <div className="cd-section-grid">
@@ -239,7 +240,7 @@ function ImportReview({ workspace }: { workspace: AdminCustomerWorkspace }) {
               <div className="cd-audit-timeline">
                 <div className="cd-audit-item"><strong>{latest.workbook_name ?? 'Workbook file'}</strong><span>{latest.record_count} records · {latest.owner_code_count} owner codes · {latest.warning_count} warnings</span></div>
                 <div className="cd-audit-item"><strong>Run created</strong><span>{formatDate(latest.created_at)} · {latest.detected_format ?? 'legacy format'} · {latest.parser_version ?? 'legacy parser'}</span></div>
-                <div className="cd-audit-item"><strong>Re-import behavior</strong><span>v2 matches by template key, prior source fingerprint, or conservative natural key. Row number is weak evidence only.</span></div>
+                <div className="cd-audit-item"><strong>Re-import behavior</strong><span>v2 matches by template key plus period, prior source fingerprint, or conservative natural key. Row number is weak evidence only.</span></div>
               </div>
             ) : (
               <p className="muted">This workspace has imported data from before import v2. Upload a workbook to create a dry-run review before any apply.</p>

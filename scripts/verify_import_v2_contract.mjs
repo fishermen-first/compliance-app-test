@@ -1,13 +1,44 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import vm from 'node:vm';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const require = createRequire(import.meta.url);
 
 function read(path) {
   return readFileSync(join(root, path), 'utf8');
+}
+
+function plain(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function loadWorkbookImportModule() {
+  const ts = require('typescript');
+  const source = read('lib/workbook-import.ts');
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020
+    }
+  }).outputText;
+  const module = { exports: {} };
+
+  vm.runInNewContext(compiled, {
+    Buffer,
+    exports: module.exports,
+    module,
+    require: (id) => {
+      if (id === '@/lib/database.types') return {};
+      return require(id);
+    }
+  });
+
+  return module.exports;
 }
 
 test('parser emits v2 evidence and rejects reordered legacy headers', () => {
@@ -17,13 +48,56 @@ test('parser emits v2 evidence and rejects reordered legacy headers', () => {
   assert.match(parser, /sourceRowHash/);
   assert.match(parser, /sourceFingerprint/);
   assert.match(parser, /matchCandidate/);
+  assert.match(parser, /periodLabel/);
+  assert.match(parser, /optionalPeriodColumns/);
   assert.match(parser, /assertLegacyHeaderOrder/);
   assert.match(parser, /WorkbookImportError/);
+});
+
+test('parser treats explicit quarterly periods as annual quarter-specific records', () => {
+  const {
+    inferRecurrence,
+    normalizePeriodLabel,
+    periodLabelFromItemName,
+    resolvePeriodLabel,
+    sourceFingerprint
+  } = loadWorkbookImportModule();
+
+  assert.equal(normalizePeriodLabel('Q1'), 'Q1');
+  assert.equal(normalizePeriodLabel('Quarter 3'), 'Q3');
+  assert.equal(periodLabelFromItemName('Newsletter - Q2'), 'Q2');
+  assert.equal(periodLabelFromItemName('Newsletter Quarter 4'), 'Q4');
+
+  assert.deepEqual(plain(inferRecurrence('Quarterly', 'Q1')), { unit: 'years', interval: 1 });
+  assert.deepEqual(plain(inferRecurrence('Quarterly', null)), { unit: 'months', interval: 3 });
+  assert.deepEqual(plain(inferRecurrence('Annual', 'Q1')), { unit: 'years', interval: 1 });
+
+  const warnings = [];
+  assert.equal(resolvePeriodLabel('Q1', 'Newsletter Q2', 12, warnings), 'Q1');
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0].issue, /conflicts/);
+
+  const baseCandidate = {
+    itemName: 'newsletter',
+    vesselOrScope: 'office',
+    ownerCode: 'es',
+    itemNumber: null,
+    agencyType: 'internal',
+    periodLabel: null
+  };
+  const baseFingerprint = sourceFingerprint(baseCandidate);
+  const q1Fingerprint = sourceFingerprint({ ...baseCandidate, periodLabel: 'Q1' });
+  const q2Fingerprint = sourceFingerprint({ ...baseCandidate, periodLabel: 'Q2' });
+
+  assert.equal(sourceFingerprint({ ...baseCandidate, periodLabel: null }), baseFingerprint);
+  assert.notEqual(q1Fingerprint, baseFingerprint);
+  assert.notEqual(q1Fingerprint, q2Fingerprint);
 });
 
 test('phase 1 migration keeps legacy RPC and adds dry-run/apply surfaces', () => {
   const legacy = read('supabase/migrations/202605100200_import_workbook_records.sql');
   const migration = read('supabase/migrations/202605130001_import_data_model_v2_phase1.sql');
+  const periodMigration = read('supabase/migrations/202607030001_quarter_period_labels.sql');
 
   assert.match(legacy, /create or replace function public\.import_compliance_workbook_records/);
   assert.doesNotMatch(migration, /drop function .*import_compliance_workbook_records/i);
@@ -34,6 +108,12 @@ test('phase 1 migration keeps legacy RPC and adds dry-run/apply surfaces', () =>
   assert.match(migration, /create or replace function public\.apply_compliance_workbook_import/);
   assert.match(migration, /source_fingerprint/);
   assert.match(migration, /last_non_import_activity_at/);
+  assert.match(periodMigration, /period_label/);
+  assert.match(periodMigration, /source_period_label/);
+  assert.match(periodMigration, /normalized_period_label/);
+  assert.match(periodMigration, /source\.normalized_period_label is not distinct from normalized_period_label/);
+  assert.match(periodMigration, /item\.period_label is not distinct from normalized_period_label/);
+  assert.match(periodMigration, /item_record\.period_label/);
 });
 
 test('server action dry-runs before apply and no longer upserts item dependencies during upload', () => {
@@ -41,6 +121,7 @@ test('server action dry-runs before apply and no longer upserts item dependencie
 
   assert.match(action, /dry_run_compliance_workbook_import/);
   assert.match(action, /apply_compliance_workbook_import/);
+  assert.match(action, /periodLabel: record\.periodLabel/);
   assert.doesNotMatch(action, /from\('vessels'\)\.upsert/);
   assert.doesNotMatch(action, /from\('company_owner_codes'\)\.upsert/);
   assert.doesNotMatch(action, /import_compliance_workbook_records/);

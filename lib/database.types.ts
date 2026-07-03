@@ -616,6 +616,7 @@ export type Database = {
           normalized_item_name: string | null
           normalized_item_number: string | null
           normalized_owner_code: string | null
+          normalized_period_label: string | null
           normalized_vessel_or_scope: string | null
           parsed_record: Json
           proposed_action: string
@@ -627,6 +628,7 @@ export type Database = {
           source_item_name: string | null
           source_item_number: string | null
           source_owner_code: string | null
+          source_period_label: string | null
           source_recurrence_interval: number | null
           source_recurrence_unit:
             | Database["public"]["Enums"]["recurrence_unit"]
@@ -651,6 +653,7 @@ export type Database = {
           normalized_item_name?: string | null
           normalized_item_number?: string | null
           normalized_owner_code?: string | null
+          normalized_period_label?: string | null
           normalized_vessel_or_scope?: string | null
           parsed_record?: Json
           proposed_action?: string
@@ -662,6 +665,7 @@ export type Database = {
           source_item_name?: string | null
           source_item_number?: string | null
           source_owner_code?: string | null
+          source_period_label?: string | null
           source_recurrence_interval?: number | null
           source_recurrence_unit?:
             | Database["public"]["Enums"]["recurrence_unit"]
@@ -686,6 +690,7 @@ export type Database = {
           normalized_item_name?: string | null
           normalized_item_number?: string | null
           normalized_owner_code?: string | null
+          normalized_period_label?: string | null
           normalized_vessel_or_scope?: string | null
           parsed_record?: Json
           proposed_action?: string
@@ -697,6 +702,7 @@ export type Database = {
           source_item_name?: string | null
           source_item_number?: string | null
           source_owner_code?: string | null
+          source_period_label?: string | null
           source_recurrence_interval?: number | null
           source_recurrence_unit?:
             | Database["public"]["Enums"]["recurrence_unit"]
@@ -747,8 +753,10 @@ export type Database = {
           normalized_item_name: string | null
           normalized_item_number: string | null
           normalized_owner_code: string | null
+          normalized_period_label: string | null
           normalized_vessel_or_scope: string | null
           source_fingerprint: string
+          source_period_label: string | null
           source_row_hash: string | null
           source_row_json: Json
           source_row_number: number | null
@@ -768,8 +776,10 @@ export type Database = {
           normalized_item_name?: string | null
           normalized_item_number?: string | null
           normalized_owner_code?: string | null
+          normalized_period_label?: string | null
           normalized_vessel_or_scope?: string | null
           source_fingerprint: string
+          source_period_label?: string | null
           source_row_hash?: string | null
           source_row_json?: Json
           source_row_number?: number | null
@@ -789,8 +799,10 @@ export type Database = {
           normalized_item_name?: string | null
           normalized_item_number?: string | null
           normalized_owner_code?: string | null
+          normalized_period_label?: string | null
           normalized_vessel_or_scope?: string | null
           source_fingerprint?: string
+          source_period_label?: string | null
           source_row_hash?: string | null
           source_row_json?: Json
           source_row_number?: number | null
@@ -1054,6 +1066,7 @@ export type Database = {
           last_non_import_activity_at: string | null
           owner_current: string | null
           owner_raw: string | null
+          period_label: string | null
           previous_item_id: string | null
           recurrence_interval: number | null
           recurrence_unit: Database["public"]["Enums"]["recurrence_unit"]
@@ -1065,6 +1078,7 @@ export type Database = {
           source_item_name: string | null
           source_item_number: string | null
           source_owner_code: string | null
+          source_period_label: string | null
           source_recurrence_interval: number | null
           source_recurrence_unit:
             | Database["public"]["Enums"]["recurrence_unit"]
@@ -1102,6 +1116,7 @@ export type Database = {
           last_non_import_activity_at?: string | null
           owner_current?: string | null
           owner_raw?: string | null
+          period_label?: string | null
           previous_item_id?: string | null
           recurrence_interval?: number | null
           recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"]
@@ -1113,6 +1128,7 @@ export type Database = {
           source_item_name?: string | null
           source_item_number?: string | null
           source_owner_code?: string | null
+          source_period_label?: string | null
           source_recurrence_interval?: number | null
           source_recurrence_unit?:
             | Database["public"]["Enums"]["recurrence_unit"]
@@ -1150,6 +1166,7 @@ export type Database = {
           last_non_import_activity_at?: string | null
           owner_current?: string | null
           owner_raw?: string | null
+          period_label?: string | null
           previous_item_id?: string | null
           recurrence_interval?: number | null
           recurrence_unit?: Database["public"]["Enums"]["recurrence_unit"]
@@ -1161,6 +1178,7 @@ export type Database = {
           source_item_name?: string | null
           source_item_number?: string | null
           source_owner_code?: string | null
+          source_period_label?: string | null
           source_recurrence_interval?: number | null
           source_recurrence_unit?:
             | Database["public"]["Enums"]["recurrence_unit"]

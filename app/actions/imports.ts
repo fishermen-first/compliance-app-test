@@ -119,6 +119,7 @@ export async function importComplianceWorkbook(formData: FormData) {
     agencyType: record.agencyType,
     complianceArea: record.complianceArea,
     frequencyLabel: record.frequencyLabel,
+    periodLabel: record.periodLabel,
     recurrenceUnit: record.recurrenceUnit,
     recurrenceInterval: record.recurrenceInterval,
     startWorkingOn: record.startWorkingOn,
