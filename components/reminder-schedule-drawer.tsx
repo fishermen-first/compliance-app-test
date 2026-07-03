@@ -259,8 +259,6 @@ export function ReminderScheduleDrawer({
   const allScheduleRows = useMemo(() => [...scheduleRows, ...externalScheduleRows].sort((a, b) => a.iso.localeCompare(b.iso)), [externalScheduleRows, scheduleRows]);
   const nextReminder = allScheduleRows.find((entry) => !entry.past);
   const futureReminderCount = allScheduleRows.filter((entry) => !entry.past).length;
-  const recurringRows = scheduleRows.filter((entry) => entry.kind === 'recurring');
-  const recurringPreviewRows = recurringRows.filter((entry) => !entry.past).slice(0, 3);
   const ownerLabel = ownerCode ? `Owner ${ownerCode}` : 'mapped owner';
   const recipientSummary = recipients.length ? `${ownerLabel} + ${recipients.length} external` : ownerLabel;
   const editingKind = editingLeadTime !== null ? 'deadline' : editingOneOffDate ? 'manual' : null;
@@ -269,6 +267,17 @@ export function ReminderScheduleDrawer({
   const ownerRecurringDaysPreview = ownerRecurringDraftDays ?? schedule.repeatEveryDays;
   const externalRecurringDraftDays = positiveIntegerDraft(externalRecurringDraft);
   const externalRecurringDaysPreview = externalRecurringDraftDays ?? externalSchedule.repeatEveryDays;
+  const recurringPreviewRows = useMemo(() => {
+    const previewSchedule = {
+      ...schedule,
+      repeatActive: schedule.repeatActive || ownerRecurringDraftDays !== null,
+      repeatEveryDays: ownerRecurringDaysPreview
+    };
+
+    return buildSchedule(previewSchedule, { startWorkingOn, expirationDate }, today)
+      .filter((entry) => entry.kind === 'recurring' && !entry.past)
+      .slice(0, 3);
+  }, [expirationDate, ownerRecurringDaysPreview, ownerRecurringDraftDays, schedule, startWorkingOn, today]);
 
   const resetAddEdits = () => {
     setEditingOneOffDate(null);
