@@ -74,6 +74,14 @@ function splitShortDate(value: string) {
   return { month: month?.toUpperCase() ?? '', day: day ?? '' };
 }
 
+function positiveIntegerDraft(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 function buildSchedule(
   state: ScheduleState,
   item: { startWorkingOn: string | null; expirationDate: string | null },
@@ -251,6 +259,8 @@ export function ReminderScheduleDrawer({
   const recipientSummary = recipients.length ? `${ownerLabel} + ${recipients.length} external` : ownerLabel;
   const editingKind = editingLeadTime !== null ? 'deadline' : editingOneOffDate ? 'manual' : null;
   const editingLabel = editingKind === 'deadline' ? 'Deadline reminder' : editingKind === 'manual' ? 'Manual reminder' : '';
+  const ownerRecurringDaysPreview = positiveIntegerDraft(recurringDraft) ?? schedule.repeatEveryDays;
+  const externalRecurringDaysPreview = positiveIntegerDraft(externalRecurringDraft) ?? externalSchedule.repeatEveryDays;
 
   const resetAddEdits = () => {
     setEditingOneOffDate(null);
@@ -668,7 +678,7 @@ export function ReminderScheduleDrawer({
                       />
                       <div>
                         <strong>Recurring nudge</strong>
-                        <p>Repeats every {schedule.repeatEveryDays} days while the item is open.</p>
+                        <p>Repeats every {ownerRecurringDaysPreview} days while the item is open.</p>
                         <div className="schedule-chip-row">
                           {recurringPreviewRows.length ? recurringPreviewRows.map((entry) => (
                             <span className={`schedule-tag is-${entry.status}`} key={entry.iso}>{shortDate(entry.iso)}</span>
@@ -751,7 +761,7 @@ export function ReminderScheduleDrawer({
                       />
                       <div>
                         <strong>External recurring nudge</strong>
-                        <p>Repeats every {externalSchedule.repeatEveryDays} days while the item is open.</p>
+                        <p>Repeats every {externalRecurringDaysPreview} days while the item is open.</p>
                         <div className="schedule-inline-add">
                           <input
                             aria-label="External repeat cadence"
