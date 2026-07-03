@@ -8853,8 +8853,8 @@ button.secondary-link {
   gap: 8px;
 }
 
-.act-card .stbtns label,
-.act-card .stbtns .complete-trigger {
+.act-card .stbtns > label,
+.act-card .stbtns > .complete-trigger {
   display: grid;
   min-width: 0;
   gap: 1px;
@@ -8872,14 +8872,14 @@ button.secondary-link {
   text-decoration: none;
 }
 
-.act-card .stbtns input {
+.act-card .stbtns > label > input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
 
-.act-card .stbtns label:has(input:checked),
-.act-card .stbtns .complete-trigger:hover {
+.act-card .stbtns > label:has(> input:checked),
+.act-card .stbtns > .complete-trigger:hover {
   border-color: var(--navy);
   background: var(--navy);
   color: #f3f1e8;
@@ -8891,8 +8891,8 @@ button.secondary-link {
   font-weight: 600;
 }
 
-.act-card .stbtns label:has(input:checked) small,
-.act-card .stbtns .complete-trigger:hover small {
+.act-card .stbtns > label:has(> input:checked) small,
+.act-card .stbtns > .complete-trigger:hover small {
   color: #aebfc0;
 }
 
