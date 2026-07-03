@@ -6,6 +6,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "verify:import-v2": "node --test scripts/verify_import_v2_contract.mjs",
+    "verify:reminders": "node --test scripts/verify_reminder_external_contract.mjs",
     "verify:settings-access": "node scripts/verify_customer_settings_access.mjs"
   },
   "dependencies": {
