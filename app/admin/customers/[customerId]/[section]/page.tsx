@@ -5,8 +5,10 @@ import { ArrowRight, CheckCircle2, ShieldAlert, UploadCloud } from 'lucide-react
 import { applyComplianceWorkbookImport, importComplianceWorkbook } from '@/app/actions/imports';
 import { saveOwnerCodeMapping } from '@/app/actions/owner-codes';
 import { queueCompanyReminders } from '@/app/actions/reminders';
+import { ReferenceListsPanel } from '@/components/reference-lists/reference-lists-panel';
 import { getAdminCustomerWorkspace, type AdminCustomerWorkspace } from '@/lib/admin-customer-workspace';
 import { customerRoleLabel } from '@/lib/customer-detail';
+import { getReferenceLists, type ReferenceListsData } from '@/lib/reference-lists';
 import { setOwnerCodeExemption } from '../users/actions';
 
 type CustomerSectionPageProps = {
@@ -14,7 +16,7 @@ type CustomerSectionPageProps = {
   searchParams?: { message?: string };
 };
 
-const validSections = new Set(['overview', 'setup', 'import', 'codes', 'diagnostics', 'danger']);
+const validSections = new Set(['overview', 'setup', 'import', 'lists', 'codes', 'diagnostics', 'danger']);
 const sectionAliases: Record<string, string> = {
   workbook: 'import',
   reminders: 'diagnostics',
@@ -188,11 +190,71 @@ function Setup({ workspace }: { workspace: AdminCustomerWorkspace }) {
   );
 }
 
-function ImportReview({ workspace }: { workspace: AdminCustomerWorkspace }) {
+function issueValue(issue: AdminCustomerWorkspace['importReview']['issues'][number]) {
+  const value = issue.details?.value;
+  return typeof value === 'string' && value.trim() ? value.trim() : issue.message;
+}
+
+function referenceIssueKind(issue: AdminCustomerWorkspace['importReview']['issues'][number]) {
+  if (issue.status !== 'open') return null;
+  if (issue.issue_type === 'unknown_agency') return 'agency';
+  if (issue.issue_type === 'unknown_vessel') return 'vessel';
+  return null;
+}
+
+function ImportResolutionControls({
+  issue,
+  referenceLists
+}: {
+  issue: AdminCustomerWorkspace['importReview']['issues'][number];
+  referenceLists: ReferenceListsData;
+}) {
+  const kind = referenceIssueKind(issue);
+  if (!kind) return null;
+
+  const value = issueValue(issue);
+  const options = kind === 'agency' ? referenceLists.agencies : referenceLists.vessels;
+  const label = kind === 'agency' ? 'Agency' : 'Vessel';
+
+  return (
+    <div className="cd-resolution-controls">
+      <input type="hidden" name="resolutionIssueId" value={issue.id} />
+      <label>
+        <span>Action</span>
+        <select name={`resolutionAction:${issue.id}`} defaultValue={options.length ? 'map' : 'create'}>
+          {options.length ? <option value="map">Map to existing {label.toLowerCase()}</option> : null}
+          <option value="create">Create {label.toLowerCase()}</option>
+        </select>
+      </label>
+      {options.length ? (
+        <label>
+          <span>Existing {label.toLowerCase()}</span>
+          <select name={`resolutionTargetId:${issue.id}`} defaultValue={options[0]?.id ?? ''}>
+            {options.map((option) => <option value={option.id} key={option.id}>{option.name}</option>)}
+          </select>
+        </label>
+      ) : null}
+      <label>
+        <span>New name</span>
+        <input name={`resolutionCreateName:${issue.id}`} defaultValue={value} />
+      </label>
+    </div>
+  );
+}
+
+function ImportReview({
+  workspace,
+  referenceLists
+}: {
+  workspace: AdminCustomerWorkspace;
+  referenceLists: ReferenceListsData;
+}) {
   const { customer, importReview } = workspace;
   const latest = importReview.latestRun;
   const safeRows = importReview.metrics.safeCreateCount + importReview.metrics.safeUpdateCount;
   const canApplySafeRows = latest?.mode === 'dry_run' && !latest.applied_run_id && safeRows > 0;
+  const referenceIssues = importReview.issues.filter((issue) => referenceIssueKind(issue));
+  const canApplyWithResolutions = latest?.mode === 'dry_run' && !latest.applied_run_id && referenceIssues.length > 0;
 
   return (
     <>
@@ -252,13 +314,16 @@ function ImportReview({ workspace }: { workspace: AdminCustomerWorkspace }) {
               <h2>Structured issues</h2>
               <span className="cd-chip attention">{importReview.issues.length || importReview.warnings.length}</span>
             </div>
-            <div className="cd-list">
+            <form action={applyComplianceWorkbookImport} className="cd-list cd-import-resolution-list">
+              <input type="hidden" name="companyId" value={customer.id} />
+              {latest ? <input type="hidden" name="importRunId" value={latest.id} /> : null}
               <div className="cd-row head warning-row"><span>Issue</span><span>Row</span><span>Severity</span></div>
               {importReview.issues.length > 0 ? importReview.issues.map((issue) => (
-                <div className="cd-row warning-row" key={issue.id}>
+                <div className="cd-row warning-row import-issue-row" key={issue.id}>
                   <strong>{issue.message}</strong>
                   <span>{issue.source_row_number ?? '-'}</span>
                   <span className={`cd-chip ${statusChip(issue.severity)}`}>{issue.issue_type}</span>
+                  <ImportResolutionControls issue={issue} referenceLists={referenceLists} />
                 </div>
               )) : importReview.warnings.length === 0 ? (
                 <div className="cd-row warning-row"><strong>No persisted issues</strong><span>-</span><span className="cd-chip ready">Clear</span></div>
@@ -269,7 +334,12 @@ function ImportReview({ workspace }: { workspace: AdminCustomerWorkspace }) {
                   <span className={`cd-chip ${statusChip(warning.severity)}`}>{warning.severity}</span>
                 </div>
               ))}
-            </div>
+              {canApplyWithResolutions ? (
+                <div className="cd-resolution-footer">
+                  <button className="cd-button primary" type="submit">Apply with resolutions</button>
+                </div>
+              ) : null}
+            </form>
           </section>
         </div>
       </section>
@@ -322,6 +392,36 @@ function OwnerCodes({ workspace }: { workspace: AdminCustomerWorkspace }) {
             </div>
           ))}
         </div>
+      </section>
+    </>
+  );
+}
+
+function ReferenceLists({
+  workspace,
+  data,
+  message
+}: {
+  workspace: AdminCustomerWorkspace;
+  data: ReferenceListsData;
+  message?: string | null;
+}) {
+  const { customer } = workspace;
+
+  return (
+    <>
+      <SectionHeader
+        eyebrow="Reference lists"
+        title="Canonical agencies, vessels, contacts, and groups"
+        description="FF Admin can inspect and configure customer reference lists without becoming a customer workspace user."
+      />
+      <section className="cd-body">
+        <ReferenceListsPanel
+          data={data}
+          redirectTo={`/admin/customers/${customer.id}/lists`}
+          message={message}
+          ffAdminInspecting
+        />
       </section>
     </>
   );
@@ -457,13 +557,17 @@ export default async function CustomerSectionPage({ params, searchParams }: Cust
   if (!validSections.has(params.section)) notFound();
 
   const workspace = await getAdminCustomerWorkspace(params.customerId);
+  const referenceLists = params.section === 'lists' || params.section === 'import'
+    ? await getReferenceLists(params.customerId)
+    : null;
 
   return (
     <>
       {searchParams?.message ? <div className="cd-inline-message" role="status">{searchParams.message}</div> : null}
       {params.section === 'overview' ? <Overview workspace={workspace} /> : null}
       {params.section === 'setup' ? <Setup workspace={workspace} /> : null}
-      {params.section === 'import' ? <ImportReview workspace={workspace} /> : null}
+      {params.section === 'import' && referenceLists ? <ImportReview workspace={workspace} referenceLists={referenceLists} /> : null}
+      {params.section === 'lists' && referenceLists ? <ReferenceLists workspace={workspace} data={referenceLists} message={searchParams?.message} /> : null}
       {params.section === 'codes' ? <OwnerCodes workspace={workspace} /> : null}
       {params.section === 'diagnostics' ? <Diagnostics workspace={workspace} /> : null}
       {params.section === 'danger' ? <Danger workspace={workspace} /> : null}

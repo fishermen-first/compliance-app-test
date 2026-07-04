@@ -31,6 +31,8 @@ type ReminderRecipient = {
   recipient_name: string | null;
   recipient_email: string;
   recipient_type: string;
+  external_contact_id?: string | null;
+  contact_group_id?: string | null;
 };
 
 type ReminderLog = {
@@ -57,6 +59,19 @@ type HistoryEntry = {
 type OwnerOption = {
   code: string;
   display_name?: string | null;
+};
+
+type ReferenceContactOption = {
+  id: string;
+  name: string | null;
+  email: string;
+  active: boolean;
+};
+
+type ReferenceContactGroupOption = {
+  id: string;
+  name: string;
+  members: Array<{ id: string; email: string; name: string | null }>;
 };
 
 function statusOptionLabel(value: string | null) {
@@ -174,6 +189,8 @@ export function ComplianceItemDetail({
   reminderLogs,
   vessels,
   ownerOptions = [],
+  referenceContacts = [],
+  referenceContactGroups = [],
   canUpdateStatus,
   canCompleteItem,
   canEditCore,
@@ -190,6 +207,8 @@ export function ComplianceItemDetail({
   reminderLogs: ReminderLog[];
   vessels: VesselOption[];
   ownerOptions?: OwnerOption[];
+  referenceContacts?: ReferenceContactOption[];
+  referenceContactGroups?: ReferenceContactGroupOption[];
   canUpdateStatus: boolean;
   canCompleteItem: boolean;
   canEditCore: boolean;
@@ -211,7 +230,7 @@ export function ComplianceItemDetail({
   const oneOffDates = uniqueDates(ownerReminderRules
     .filter((rule) => rule.trigger_type === 'on_specific_date' && rule.active)
     .map((rule) => rule.send_on));
-  const externalRecipients = recipients.filter((recipient) => ['additional', 'external'].includes(recipient.recipient_type));
+  const externalRecipients = recipients.filter((recipient) => ['additional', 'external', 'group'].includes(recipient.recipient_type));
   const activeExternalRules = externalReminderRules.filter((rule) => rule.active);
   const latestReminder = reminderLogs[0];
   const nextReminder = nextExpectedReminder(item, reminderRules);
@@ -375,6 +394,8 @@ export function ComplianceItemDetail({
                 instructions={item.instructions}
                 reminderRules={reminderRules}
                 additionalRecipients={externalRecipients}
+                referenceContacts={referenceContacts}
+                referenceContactGroups={referenceContactGroups}
                 today={todayIso()}
               />
             ) : null}

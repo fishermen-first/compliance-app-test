@@ -16,6 +16,34 @@ function customerImportPath(companyId: string, message: string) {
   return `/admin/customers/${companyId}/import?message=${encodeURIComponent(message)}`;
 }
 
+type ImportResolution = {
+  issue_id: string;
+  action: 'map' | 'create';
+  target_id?: string;
+  create_name?: string;
+};
+
+function parseImportResolutions(formData: FormData) {
+  return formData.getAll('resolutionIssueId').flatMap<ImportResolution>((entry) => {
+    const issueId = String(entry ?? '').trim();
+    if (!issueId) return [];
+
+    const action = String(formData.get(`resolutionAction:${issueId}`) ?? '').trim();
+    const targetId = String(formData.get(`resolutionTargetId:${issueId}`) ?? '').trim();
+    const createName = String(formData.get(`resolutionCreateName:${issueId}`) ?? '').trim();
+
+    if (action === 'map' && targetId) {
+      return [{ issue_id: issueId, action: 'map', target_id: targetId }];
+    }
+
+    if (action === 'create' && createName) {
+      return [{ issue_id: issueId, action: 'create', create_name: createName }];
+    }
+
+    return [];
+  });
+}
+
 type ImporterUser = {
   id: string;
   email?: string | null;
@@ -174,7 +202,8 @@ export async function applyComplianceWorkbookImport(formData: FormData) {
   const { data: applyRunId, error: applyError } = await admin.rpc('apply_compliance_workbook_import', {
     target_import_run_id: importRunId,
     approved_issue_ids: [],
-    applied_by: user.id
+    applied_by: user.id,
+    resolutions: parseImportResolutions(formData)
   });
 
   if (applyError) throw new Error(applyError.message);

@@ -4,6 +4,7 @@ import { ArrowLeft, LogOut } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
 import { ComplianceItemDetail } from '@/components/compliance-item-detail';
 import { mapComplianceItem } from '@/lib/customer-data';
+import { getReferenceLists } from '@/lib/reference-lists';
 import { createClient } from '@/lib/supabase/server';
 
 type AdminItemDetailPageProps = {
@@ -23,7 +24,7 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
   const companyId = params.id;
   const itemId = params.itemId;
 
-  const [{ data: company }, { data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }, { data: reminderLogs }, { data: vessels }, { data: ownerCodes }] = await Promise.all([
+  const [{ data: company }, { data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }, { data: reminderLogs }, { data: vessels }, { data: ownerCodes }, referenceLists] = await Promise.all([
     supabase.from('companies').select('id, name, timezone').eq('id', companyId).maybeSingle(),
     supabase
       .from('compliance_items')
@@ -43,9 +44,9 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
       .eq('company_id', companyId)
       .eq('item_id', itemId)
       .order('created_at', { ascending: true }),
-    supabase
+    (supabase as any)
       .from('compliance_item_notification_recipients')
-      .select('recipient_name, recipient_email, recipient_type')
+      .select('recipient_name, recipient_email, recipient_type, external_contact_id, contact_group_id')
       .eq('company_id', companyId)
       .eq('item_id', itemId)
       .order('created_at', { ascending: true }),
@@ -66,7 +67,8 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
       .from('company_owner_codes')
       .select('code, display_name')
       .eq('company_id', companyId)
-      .order('code')
+      .order('code'),
+    getReferenceLists(companyId)
   ]);
 
   if (!company || !rawItem) notFound();
@@ -104,6 +106,8 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
           reminderLogs={reminderLogs ?? []}
           vessels={vessels ?? []}
           ownerOptions={ownerCodes ?? []}
+          referenceContacts={referenceLists.contacts}
+          referenceContactGroups={referenceLists.groups}
           canUpdateStatus
           canCompleteItem
           canEditCore

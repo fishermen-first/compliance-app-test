@@ -58,7 +58,7 @@ export class WorkbookImportError extends Error {
   }
 }
 
-const parserVersion = 'import-v2-quarter-periods-2026-07-03';
+const parserVersion = 'import-v3-reference-lists-2026-07-04';
 
 const legacyHeaders = [
   'ownerRaw',

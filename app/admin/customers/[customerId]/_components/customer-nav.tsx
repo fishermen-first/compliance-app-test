@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, ChevronLeft, Database, Eye, Grid2X2, ShieldAlert, SlidersHorizontal, Tag, UserPlus, UsersRound } from 'lucide-react';
+import { Activity, ChevronLeft, Database, Eye, Grid2X2, ListTree, ShieldAlert, SlidersHorizontal, Tag, UserPlus, UsersRound } from 'lucide-react';
 
 type Gate = {
   id: 'workbook' | 'codes' | 'users' | 'verify';
@@ -31,6 +31,7 @@ const sections = [
   { id: 'overview', label: 'Overview', icon: Grid2X2 },
   { id: 'setup', label: 'Setup', icon: SlidersHorizontal },
   { id: 'import', label: 'Import review', icon: Database },
+  { id: 'lists', label: 'Reference lists', icon: ListTree },
   { id: 'codes', label: 'Owner codes', icon: Tag },
   { id: 'users', label: 'Users & access', icon: UsersRound },
   { id: 'diagnostics', label: 'Diagnostics', icon: Activity },
@@ -63,6 +64,7 @@ function badgeFor(sectionId: string, customer: CustomerNavData) {
   if (sectionId === 'overview') return `${customer.gates.filter((gate) => gate.done).length}/${customer.gates.length}`;
   if (sectionId === 'setup') return customer.gates.find((gate) => gate.current)?.label.split(' ')[0] ?? 'Done';
   if (sectionId === 'import') return String(customer.itemCount);
+  if (sectionId === 'lists') return String(customer.vesselCount);
   if (sectionId === 'codes') return String(customer.ownerCodeCount);
   if (sectionId === 'users') return String(customer.userCount);
   if (sectionId === 'diagnostics') return String(customer.pendingInvitationCount);

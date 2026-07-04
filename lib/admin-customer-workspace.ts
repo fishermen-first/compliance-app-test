@@ -88,6 +88,7 @@ type ImportIssueRow = {
   severity: string;
   message: string;
   status: string;
+  details: Record<string, unknown> | null;
 };
 
 type ReminderLogRow = {
@@ -515,7 +516,7 @@ export async function getAdminCustomerWorkspace(customerId: string): Promise<Adm
   const issuesResult = issueRunId
     ? await admin
         .from('compliance_import_issues')
-        .select('id, source_row_number, issue_type, severity, message, status')
+        .select('id, source_row_number, issue_type, severity, message, status, details')
         .eq('import_run_id', issueRunId)
         .order('source_row_number', { ascending: true, nullsFirst: false })
         .limit(75)

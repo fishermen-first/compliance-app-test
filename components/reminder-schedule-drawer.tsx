@@ -19,11 +19,30 @@ type ReminderRecipient = {
   recipient_name: string | null;
   recipient_email: string;
   recipient_type: string;
+  external_contact_id?: string | null;
+  contact_group_id?: string | null;
 };
 
 type EditableRecipient = {
+  kind: 'direct' | 'contact' | 'group';
   name: string;
   email: string;
+  externalContactId?: string | null;
+  contactGroupId?: string | null;
+  memberCount?: number;
+};
+
+type ReferenceContactOption = {
+  id: string;
+  name: string | null;
+  email: string;
+  active: boolean;
+};
+
+type ReferenceContactGroupOption = {
+  id: string;
+  name: string;
+  members: Array<{ id: string; email: string; name: string | null }>;
 };
 
 type ScheduleEntry = {
@@ -214,6 +233,8 @@ export function ReminderScheduleDrawer({
   instructions,
   reminderRules,
   additionalRecipients,
+  referenceContacts,
+  referenceContactGroups,
   today
 }: {
   itemId: string;
@@ -226,6 +247,8 @@ export function ReminderScheduleDrawer({
   instructions: string | null;
   reminderRules: ReminderRule[];
   additionalRecipients: ReminderRecipient[];
+  referenceContacts: ReferenceContactOption[];
+  referenceContactGroups: ReferenceContactGroupOption[];
   today: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -248,11 +271,18 @@ export function ReminderScheduleDrawer({
   const [editingLeadTime, setEditingLeadTime] = useState<number | null>(null);
   const [recipients, setRecipients] = useState<EditableRecipient[]>(() => (
     additionalRecipients.map((recipient) => ({
+      kind: recipient.recipient_type === 'group' ? 'group' : recipient.external_contact_id ? 'contact' : 'direct',
       name: recipient.recipient_name ?? '',
-      email: recipient.recipient_email
+      email: recipient.recipient_type === 'group' ? '' : recipient.recipient_email,
+      externalContactId: recipient.external_contact_id ?? null,
+      contactGroupId: recipient.contact_group_id ?? null,
+      memberCount: recipient.contact_group_id
+        ? referenceContactGroups.find((group) => group.id === recipient.contact_group_id)?.members.length ?? 0
+        : undefined
     }))
   ));
-  const [recipientDraft, setRecipientDraft] = useState<EditableRecipient>({ name: '', email: '' });
+  const [recipientDraft, setRecipientDraft] = useState<EditableRecipient>({ kind: 'direct', name: '', email: '' });
+  const [selectedReferenceRecipients, setSelectedReferenceRecipients] = useState<string[]>([]);
 
   const sortedLeadTimes = useMemo(() => [...schedule.leadTimes].sort((a, b) => b - a), [schedule.leadTimes]);
   const sortedExternalLeadTimes = useMemo(() => [...externalSchedule.leadTimes].sort((a, b) => b - a), [externalSchedule.leadTimes]);
@@ -398,11 +428,57 @@ export function ReminderScheduleDrawer({
     const email = recipientDraft.email.trim().toLowerCase();
     if (!email) return;
     setRecipients((current) => (
-      current.some((recipient) => recipient.email.toLowerCase() === email)
+      current.some((recipient) => recipient.kind !== 'group' && recipient.email.toLowerCase() === email)
         ? current
-        : [...current, { name: recipientDraft.name.trim(), email }]
+        : [...current, { kind: 'direct', name: recipientDraft.name.trim(), email }]
     ));
-    setRecipientDraft({ name: '', email: '' });
+    setRecipientDraft({ kind: 'direct', name: '', email: '' });
+  };
+
+  const recipientKey = (recipient: EditableRecipient) => {
+    if (recipient.kind === 'group') return `group:${recipient.contactGroupId}`;
+    if (recipient.kind === 'contact') return `contact:${recipient.externalContactId}`;
+    return `direct:${recipient.email.toLowerCase()}`;
+  };
+
+  const addSelectedReferenceRecipients = () => {
+    if (selectedReferenceRecipients.length === 0) return;
+
+    setRecipients((current) => {
+      const byKey = new Map(current.map((recipient) => [recipientKey(recipient), recipient]));
+
+      selectedReferenceRecipients.forEach((value) => {
+        const [kind, id] = value.split(':');
+
+        if (kind === 'contact') {
+          const contact = referenceContacts.find((entry) => entry.id === id);
+          if (!contact) return;
+          const next: EditableRecipient = {
+            kind: 'contact',
+            name: contact.name ?? '',
+            email: contact.email,
+            externalContactId: contact.id
+          };
+          byKey.set(recipientKey(next), next);
+        }
+
+        if (kind === 'group') {
+          const group = referenceContactGroups.find((entry) => entry.id === id);
+          if (!group) return;
+          const next: EditableRecipient = {
+            kind: 'group',
+            name: group.name,
+            email: '',
+            contactGroupId: group.id,
+            memberCount: group.members.length
+          };
+          byKey.set(recipientKey(next), next);
+        }
+      });
+
+      return Array.from(byKey.values());
+    });
+    setSelectedReferenceRecipients([]);
   };
 
   const addExternalDeadline = () => {
@@ -560,9 +636,12 @@ export function ReminderScheduleDrawer({
               <input type="hidden" name="externalRepeatEveryDays" value={externalSchedule.repeatEveryDays} />
               {externalSchedule.oneOffDates.map((date) => <input type="hidden" name="externalOneOffDate" value={date} key={date} />)}
               {recipients.map((recipient) => (
-                <span key={recipient.email}>
+                <span key={recipientKey(recipient)}>
+                  <input type="hidden" name="additionalRecipientType" value={recipient.kind === 'group' ? 'group' : 'external'} />
                   <input type="hidden" name="additionalRecipientName" value={recipient.name} />
                   <input type="hidden" name="additionalRecipientEmail" value={recipient.email} />
+                  <input type="hidden" name="additionalRecipientContactId" value={recipient.externalContactId ?? ''} />
+                  <input type="hidden" name="additionalRecipientGroupId" value={recipient.contactGroupId ?? ''} />
                 </span>
               ))}
 
@@ -932,14 +1011,48 @@ export function ReminderScheduleDrawer({
                       <span className="schedule-tag is-owner">Owner</span>
                     </div>
                     {recipients.map((recipient) => (
-                      <div className="schedule-recipient-row" key={recipient.email}>
+                      <div className="schedule-recipient-row" key={recipientKey(recipient)}>
                         <div>
                           <strong>{recipient.name || 'External recipient'}</strong>
-                          <span>{recipient.email}</span>
+                          <span>
+                            {recipient.kind === 'group'
+                              ? `${recipient.memberCount ?? 0} group ${recipient.memberCount === 1 ? 'member' : 'members'}`
+                              : recipient.email}
+                          </span>
                         </div>
-                        <button type="button" onClick={() => setRecipients((current) => current.filter((entry) => entry.email !== recipient.email))}>Remove</button>
+                        <span className={`schedule-tag ${recipient.kind === 'group' ? 'is-next' : 'is-copy'}`}>
+                          {recipient.kind === 'group' ? 'Group' : 'Contact'}
+                        </span>
+                        <button type="button" onClick={() => setRecipients((current) => current.filter((entry) => recipientKey(entry) !== recipientKey(recipient)))}>Remove</button>
                       </div>
                     ))}
+                    {referenceContacts.length || referenceContactGroups.length ? (
+                      <div className="schedule-reference-add">
+                        <label>
+                          Saved contacts and groups
+                          <select
+                            multiple
+                            value={selectedReferenceRecipients}
+                            onChange={(event) => {
+                              const selected = Array.from(event.currentTarget.selectedOptions).map((option) => option.value);
+                              setSelectedReferenceRecipients(selected);
+                            }}
+                          >
+                            {referenceContacts.filter((contact) => contact.active).map((contact) => (
+                              <option value={`contact:${contact.id}`} key={`contact:${contact.id}`}>
+                                {contact.name ? `${contact.name} - ${contact.email}` : contact.email}
+                              </option>
+                            ))}
+                            {referenceContactGroups.map((group) => (
+                              <option value={`group:${group.id}`} key={`group:${group.id}`}>
+                                {group.name} ({group.members.length})
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <button type="button" onClick={addSelectedReferenceRecipients} disabled={selectedReferenceRecipients.length === 0}>Add selected</button>
+                      </div>
+                    ) : null}
                     <div className="schedule-recipient-add">
                       <input
                         type="text"

@@ -19,7 +19,6 @@ const complianceAreas = [
 ];
 
 const frequencyLabels = ['Annually', 'Quarterly', 'Biennially', 'Triennially', 'Twice a year', 'Every 5 Years', 'Every 10 Years', 'Unannounced', 'New Permit', 'NA', 'Custom'];
-const agencyTypes = ['USCG', 'NOAA', 'EPA', 'State', 'Class Society', 'Internal'];
 const newItemFormId = 'new-item-form';
 
 type Relation<T> = T | T[] | null | undefined;
@@ -136,12 +135,17 @@ export default async function NewItemPage() {
   if (!membership || !canCreateComplianceItems(membership.role)) redirect('/');
 
   const admin = createAdminClient();
-  const [{ data: vessels }, { data: ownerCodes }, { data: memberships }, { data: invitations }] = await Promise.all([
+  const [{ data: vessels }, { data: agencies }, { data: ownerCodes }, { data: memberships }, { data: invitations }] = await Promise.all([
     supabase
       .from('vessels')
       .select('id, name')
       .eq('company_id', membership.company_id)
       .eq('active', true)
+      .order('name'),
+    (supabase as any)
+      .from('agencies')
+      .select('id, name')
+      .eq('company_id', membership.company_id)
       .order('name'),
     admin
       .from('company_owner_codes')
@@ -197,7 +201,12 @@ export default async function NewItemPage() {
 
               <label className="new-item-field">
                 <span className="new-item-label">Agency / Type</span>
-                <input name="agencyType" list="agency-type-options" placeholder="USCG" />
+                <select name="agencyId" defaultValue="">
+                  <option value="">No agency</option>
+                  {((agencies ?? []) as Array<{ id: string; name: string }>).map((agency) => (
+                    <option value={agency.id} key={agency.id}>{agency.name}</option>
+                  ))}
+                </select>
               </label>
 
               <label className="new-item-field">
@@ -306,10 +315,6 @@ export default async function NewItemPage() {
               <button type="submit">Create item</button>
             </div>
           </div>
-
-          <datalist id="agency-type-options">
-            {agencyTypes.map((agency) => <option value={agency} key={agency} />)}
-          </datalist>
         </form>
       </section>
     </main>

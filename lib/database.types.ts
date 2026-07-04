@@ -7,13 +7,110 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
+      agencies: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          kind: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          kind?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agencies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agency_aliases: {
+        Row: {
+          agency_id: string
+          alias: string
+          company_id: string
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          alias: string
+          company_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          alias?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_aliases_agency_fk"
+            columns: ["company_id", "agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["company_id", "id"]
+          },
+          {
+            foreignKeyName: "agency_aliases_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_admins: {
         Row: {
           created_at: string
@@ -620,6 +717,8 @@ export type Database = {
           normalized_vessel_or_scope: string | null
           parsed_record: Json
           proposed_action: string
+          resolved_agency_id: string | null
+          resolved_vessel_id: string | null
           source_agency_type: string | null
           source_compliance_area: string | null
           source_expiration_date: string | null
@@ -657,6 +756,8 @@ export type Database = {
           normalized_vessel_or_scope?: string | null
           parsed_record?: Json
           proposed_action?: string
+          resolved_agency_id?: string | null
+          resolved_vessel_id?: string | null
           source_agency_type?: string | null
           source_compliance_area?: string | null
           source_expiration_date?: string | null
@@ -694,6 +795,8 @@ export type Database = {
           normalized_vessel_or_scope?: string | null
           parsed_record?: Json
           proposed_action?: string
+          resolved_agency_id?: string | null
+          resolved_vessel_id?: string | null
           source_agency_type?: string | null
           source_compliance_area?: string | null
           source_expiration_date?: string | null
@@ -735,6 +838,20 @@ export type Database = {
             columns: ["matched_item_id"]
             isOneToOne: false
             referencedRelation: "compliance_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_import_run_rows_resolved_agency_id_fkey"
+            columns: ["resolved_agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_import_run_rows_resolved_vessel_id_fkey"
+            columns: ["resolved_vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
         ]
@@ -843,7 +960,9 @@ export type Database = {
       compliance_item_notification_recipients: {
         Row: {
           company_id: string
+          contact_group_id: string | null
           created_at: string
+          external_contact_id: string | null
           id: string
           item_id: string
           recipient_email: string
@@ -852,7 +971,9 @@ export type Database = {
         }
         Insert: {
           company_id: string
+          contact_group_id?: string | null
           created_at?: string
+          external_contact_id?: string | null
           id?: string
           item_id: string
           recipient_email: string
@@ -861,7 +982,9 @@ export type Database = {
         }
         Update: {
           company_id?: string
+          contact_group_id?: string | null
           created_at?: string
+          external_contact_id?: string | null
           id?: string
           item_id?: string
           recipient_email?: string
@@ -874,6 +997,20 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_item_notification_recipients_contact_group_fk"
+            columns: ["contact_group_id"]
+            isOneToOne: false
+            referencedRelation: "contact_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_item_notification_recipients_external_contact_fk"
+            columns: ["external_contact_id"]
+            isOneToOne: false
+            referencedRelation: "external_contacts"
             referencedColumns: ["id"]
           },
           {
@@ -1047,6 +1184,7 @@ export type Database = {
       }
       compliance_items: {
         Row: {
+          agency_id: string | null
           agency_type: string | null
           company_id: string
           completed_at: string | null
@@ -1097,6 +1235,7 @@ export type Database = {
           vessel_id: string | null
         }
         Insert: {
+          agency_id?: string | null
           agency_type?: string | null
           company_id: string
           completed_at?: string | null
@@ -1147,6 +1286,7 @@ export type Database = {
           vessel_id?: string | null
         }
         Update: {
+          agency_id?: string | null
           agency_type?: string | null
           company_id?: string
           completed_at?: string | null
@@ -1198,6 +1338,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "compliance_items_company_agency_fk"
+            columns: ["company_id", "agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["company_id", "id"]
+          },
+          {
             foreignKeyName: "compliance_items_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -1230,6 +1377,80 @@ export type Database = {
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_group_members: {
+        Row: {
+          company_id: string
+          created_at: string
+          email: string
+          group_id: string
+          id: string
+          name: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          email: string
+          group_id: string
+          id?: string
+          name?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          email?: string
+          group_id?: string
+          id?: string
+          name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_group_members_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_group_members_group_fk"
+            columns: ["company_id", "group_id"]
+            isOneToOne: false
+            referencedRelation: "contact_groups"
+            referencedColumns: ["company_id", "id"]
+          },
+        ]
+      }
+      contact_groups: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_groups_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1319,6 +1540,47 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "compliance_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_contacts: {
+        Row: {
+          active: boolean
+          company_id: string
+          created_at: string
+          email: string
+          id: string
+          name: string | null
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          company_id: string
+          created_at?: string
+          email: string
+          id?: string
+          name?: string | null
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          company_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string | null
+          role?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1502,9 +1764,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _apply_import_v3_resolutions: {
+        Args: {
+          decided_by?: string
+          resolutions: Json
+          target_import_run_id: string
+        }
+        Returns: undefined
+      }
       _customer_settings_actor_role: {
         Args: { require_admin: boolean; target_company_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      _import_v3_resolve_agency: {
+        Args: { target_company_id: string; value: string }
+        Returns: string
+      }
+      _import_v3_resolve_vessel: {
+        Args: { target_company_id: string; value: string }
+        Returns: string
       }
       _replace_compliance_item_reminder_rules: {
         Args: {
@@ -1533,13 +1811,27 @@ export type Database = {
         Returns: boolean
       }
       accept_company_invite: { Args: { full_name?: string }; Returns: string }
-      apply_compliance_workbook_import: {
-        Args: {
-          applied_by?: string
-          approved_issue_ids?: string[]
-          target_import_run_id: string
-        }
-        Returns: string
+      apply_compliance_workbook_import:
+        | {
+            Args: {
+              applied_by?: string
+              approved_issue_ids?: string[]
+              target_import_run_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              applied_by?: string
+              approved_issue_ids?: string[]
+              resolutions?: Json
+              target_import_run_id: string
+            }
+            Returns: string
+          }
+      apply_import_v3_reference_review: {
+        Args: { target_import_run_id: string }
+        Returns: undefined
       }
       can_edit_compliance_item_core: {
         Args: { target_item_id: string }
@@ -1623,6 +1915,7 @@ export type Database = {
           }
         | {
             Args: {
+              item_agency_id?: string
               item_agency_type?: string
               item_compliance_area?: string
               item_expiration_date?: string
@@ -1693,9 +1986,33 @@ export type Database = {
         Args: { target_company_id: string }
         Returns: boolean
       }
+      merge_agencies: {
+        Args: { from_agency_id: string; to_agency_id: string }
+        Returns: undefined
+      }
       normalize_owner_code_list: {
         Args: { fallback_owner_code?: string; owner_codes: string[] }
         Returns: string[]
+      }
+      remove_agency: {
+        Args: {
+          expected_item_count?: number
+          reassign_to_agency_id?: string
+          target_agency_id: string
+        }
+        Returns: undefined
+      }
+      remove_vessel: {
+        Args: {
+          expected_item_count?: number
+          reassign_to_vessel_id?: string
+          target_vessel_id: string
+        }
+        Returns: undefined
+      }
+      reseed_vessels_from_items: {
+        Args: { target_company_id?: string }
+        Returns: number
       }
       save_compliance_item_reminders: {
         Args: {
@@ -1821,6 +2138,7 @@ export type Database = {
           }
         | {
             Args: {
+              next_agency_id?: string
               next_agency_type?: string
               next_compliance_area?: string
               next_expiration_date?: string
@@ -2000,6 +2318,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["owner", "office_admin", "office_user", "vessel_user"],

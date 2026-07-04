@@ -116,30 +116,68 @@ function requireEmail(value: string) {
   return email;
 }
 
-function addRecipient(recipients: Map<string, { recipient_name: string | null; recipient_email: string }>, name: string | null, email: string) {
+type AdditionalRecipient = {
+  recipient_type: 'external' | 'group';
+  recipient_name: string | null;
+  recipient_email?: string;
+  external_contact_id?: string | null;
+  contact_group_id?: string | null;
+};
+
+function addRecipient(
+  recipients: Map<string, AdditionalRecipient>,
+  name: string | null,
+  email: string,
+  externalContactId?: string | null
+) {
   const recipientEmail = requireEmail(email);
   if (!recipients.has(recipientEmail)) {
     recipients.set(recipientEmail, {
+      recipient_type: 'external',
       recipient_name: name?.trim() || null,
-      recipient_email: recipientEmail
+      recipient_email: recipientEmail,
+      external_contact_id: externalContactId || null
+    });
+  }
+}
+
+function addGroupRecipient(recipients: Map<string, AdditionalRecipient>, name: string | null, groupId: string) {
+  const key = `group:${groupId}`;
+  if (!recipients.has(key)) {
+    recipients.set(key, {
+      recipient_type: 'group',
+      recipient_name: name?.trim() || null,
+      contact_group_id: groupId
     });
   }
 }
 
 function parseAdditionalRecipients(formData: FormData) {
-  const recipients = new Map<string, { recipient_name: string | null; recipient_email: string }>();
+  const recipients = new Map<string, AdditionalRecipient>();
+  const types = formData.getAll('additionalRecipientType');
   const names = formData.getAll('additionalRecipientName');
   const emails = formData.getAll('additionalRecipientEmail');
-  const rowCount = Math.max(names.length, emails.length);
+  const contactIds = formData.getAll('additionalRecipientContactId');
+  const groupIds = formData.getAll('additionalRecipientGroupId');
+  const rowCount = Math.max(types.length, names.length, emails.length, contactIds.length, groupIds.length);
 
   for (let index = 0; index < rowCount; index += 1) {
+    const type = String(types[index] ?? '').trim();
     const name = String(names[index] ?? '').trim();
     const email = String(emails[index] ?? '').trim();
+    const contactId = String(contactIds[index] ?? '').trim();
+    const groupId = String(groupIds[index] ?? '').trim();
+
+    if (type === 'group' || groupId) {
+      if (!groupId) throw new Error('Contact group is required for group recipients');
+      addGroupRecipient(recipients, name, groupId);
+      continue;
+    }
 
     if (!name && !email) continue;
     if (!email) throw new Error('Additional recipient email is required when a name is provided');
 
-    addRecipient(recipients, name, email);
+    addRecipient(recipients, name, email, contactId || null);
   }
 
   const bulkRecipients = optionalString(formData, 'additionalRecipients');
@@ -216,6 +254,7 @@ export async function createComplianceItem(formData: FormData) {
     item_name: requiredString(formData, 'itemName'),
     item_number: optionalString(formData, 'itemNumber'),
     item_agency_type: optionalString(formData, 'agencyType'),
+    item_agency_id: optionalString(formData, 'agencyId'),
     item_compliance_area: requiredString(formData, 'complianceArea'),
     item_frequency_label: frequencyLabel,
     item_recurrence_unit: recurrence.recurrence_unit,
@@ -257,7 +296,8 @@ export async function updateComplianceItemCore(formData: FormData) {
     next_expiration_date: optionalString(formData, 'expirationDate'),
     next_status_notes: optionalString(formData, 'statusNotes'),
     next_instructions: optionalString(formData, 'instructions'),
-    next_sharepoint_url: optionalString(formData, 'sharepointUrl')
+    next_sharepoint_url: optionalString(formData, 'sharepointUrl'),
+    ...(formData.has('agencyId') ? { next_agency_id: optionalString(formData, 'agencyId') } : {})
   });
 
   if (error) throw new Error(error.message);

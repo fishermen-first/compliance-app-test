@@ -3,10 +3,12 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { AccessDrawer } from '@/components/access-drawer';
 import { NoAccessScreen } from '@/components/no-access-screen';
 import { OwnerDrawer } from '@/components/owner-drawer';
+import { ReferenceListsPanel } from '@/components/reference-lists/reference-lists-panel';
 import { WorkspaceBlockedScreen } from '@/components/workspace-blocked-screen';
 import { createOwnerCode } from './actions';
 import { type Database } from '@/lib/database.types';
-import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
+import { accessRoleLabel, isActiveCustomerRole, isCustomerOwnerRole } from '@/lib/roles';
+import { getReferenceLists } from '@/lib/reference-lists';
 import { createClient } from '@/lib/supabase/server';
 
 type AppRole = Database['public']['Enums']['app_role'];
@@ -184,7 +186,7 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
   const company = relation(membership.companies);
   const companyId = membership.company_id;
 
-  if (!isCustomerOwnerRole(membership.role)) {
+  if (!isActiveCustomerRole(membership.role)) {
     return (
       <div className="app-shell">
         <AppSidebar
@@ -199,6 +201,30 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
             <strong>Workspace owner access required.</strong>
             <p>Ask a workspace owner or FF Admin to review access settings.</p>
           </section>
+        </main>
+      </div>
+    );
+  }
+
+  if (!isCustomerOwnerRole(membership.role)) {
+    const referenceLists = await getReferenceLists(companyId);
+
+    return (
+      <div className="app-shell">
+        <AppSidebar
+          companyName={company?.name ?? 'FF Compliance'}
+          userRole={accessRoleLabel(membership.role)}
+          userName={profileResult.data?.full_name ?? userData.user.email}
+          userEmail={userData.user.email}
+          activePath="/settings"
+        />
+        <main className="settings-setup-page">
+          <header className="page-header">
+            <p className="eyebrow">Settings</p>
+            <h1>Reference lists</h1>
+            <p className="page-intro">Manage the canonical agencies, vessels, contacts, and groups used by imports and reminders.</p>
+          </header>
+          <ReferenceListsPanel data={referenceLists} redirectTo="/settings" message={searchParams?.message} />
         </main>
       </div>
     );
@@ -338,6 +364,7 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
       joined_at: row.joined_at
     };
   });
+  const referenceLists = await getReferenceLists(companyId);
 
   return (
     <div className="app-shell">
@@ -413,6 +440,8 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
             <p className="panel-empty-copy">Owner-code rows are hidden until mapping can be loaded safely.</p>
           )}
         </section>
+
+        <ReferenceListsPanel data={referenceLists} redirectTo="/settings" message={searchParams?.message} />
 
         <section className="stack-panel" aria-labelledby="access-heading">
           <div className="stack-panel-head">
