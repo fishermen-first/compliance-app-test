@@ -199,16 +199,16 @@ export default async function NewItemPage() {
                 <input className="new-item-name-input" name="itemName" placeholder="USCG Certificate of Documentation" required />
               </label>
 
-              <label className="new-item-field">
-                <span className="new-item-label">Agency / Type</span>
-                <select name="agencyId" defaultValue="">
+              <div className="new-item-field">
+                <span className="new-item-label" id="new-item-agency-label">Agency / Type</span>
+                <select name="agencyId" defaultValue="" aria-labelledby="new-item-agency-label">
                   <option value="">No agency</option>
                   {((agencies ?? []) as Array<{ id: string; name: string }>).map((agency) => (
                     <option value={agency.id} key={agency.id}>{agency.name}</option>
                   ))}
                 </select>
-                <span className="form-note">Need a new agency? Add it in <Link href="/settings/lists">Reference lists</Link>, then choose it here.</span>
-              </label>
+                <p className="form-note">Need a new agency? Add it in <Link href="/settings/lists">Reference lists</Link>, then choose it here.</p>
+              </div>
 
               <label className="new-item-field">
                 <span className="new-item-label">Item number</span>

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { updateComplianceItemCore } from '@/app/actions/items';
 import { inferRecurrence, type ComplianceItem, type RecurrenceUnit } from '@/lib/compliance';
@@ -40,13 +40,21 @@ export function EditItemDetailsDrawer({
   frequencyOptions,
   referenceListHref
 }: EditItemDetailsDrawerProps) {
+  const initialAgencyState = useCallback(() => {
+    const matchedAgency = agencyOptions.find((agency) => agency.id === item.agency_id) ?? agencyOptions.find((agency) => agency.name === item.agency_type);
+    return {
+      selectedAgencyId: matchedAgency?.id ?? '',
+      agencyNameFallback: matchedAgency ? '' : item.agency_type ?? ''
+    };
+  }, [agencyOptions, item.agency_id, item.agency_type]);
+  const initialFrequencyLabel = useCallback(() => item.frequency_label ?? frequencyOptions[0] ?? 'Annually', [frequencyOptions, item.frequency_label]);
+  const initialRecurrenceInterval = useCallback(() => item.recurrence_interval ? String(item.recurrence_interval) : '', [item.recurrence_interval]);
   const [isOpen, setIsOpen] = useState(false);
-  const matchedAgency = agencyOptions.find((agency) => agency.id === item.agency_id) ?? agencyOptions.find((agency) => agency.name === item.agency_type);
-  const [selectedAgencyId, setSelectedAgencyId] = useState(matchedAgency?.id ?? '');
-  const [agencyNameFallback, setAgencyNameFallback] = useState(matchedAgency ? '' : item.agency_type ?? '');
-  const [frequencyLabel, setFrequencyLabel] = useState(item.frequency_label ?? frequencyOptions[0] ?? 'Annually');
+  const [selectedAgencyId, setSelectedAgencyId] = useState(() => initialAgencyState().selectedAgencyId);
+  const [agencyNameFallback, setAgencyNameFallback] = useState(() => initialAgencyState().agencyNameFallback);
+  const [frequencyLabel, setFrequencyLabel] = useState(initialFrequencyLabel);
   const [recurrenceUnit, setRecurrenceUnit] = useState<RecurrenceUnit>(item.recurrence_unit);
-  const [recurrenceInterval, setRecurrenceInterval] = useState(item.recurrence_interval ? String(item.recurrence_interval) : '');
+  const [recurrenceInterval, setRecurrenceInterval] = useState(initialRecurrenceInterval);
   const selectedOwnerCodes = new Set(item.owner_codes?.length ? item.owner_codes : item.owner_current ? [item.owner_current] : []);
 
   const ownerLabel = (owner: OwnerOption) => owner.display_name ? `${owner.display_name} (${owner.code})` : owner.code;
@@ -65,33 +73,52 @@ export function EditItemDetailsDrawer({
     if (!value) setAgencyNameFallback('');
   };
 
+  const resetControlledFields = useCallback(() => {
+    const agencyState = initialAgencyState();
+    setSelectedAgencyId(agencyState.selectedAgencyId);
+    setAgencyNameFallback(agencyState.agencyNameFallback);
+    setFrequencyLabel(initialFrequencyLabel());
+    setRecurrenceUnit(item.recurrence_unit);
+    setRecurrenceInterval(initialRecurrenceInterval());
+  }, [initialAgencyState, initialFrequencyLabel, initialRecurrenceInterval, item.recurrence_unit]);
+
+  const openDrawer = useCallback(() => {
+    resetControlledFields();
+    setIsOpen(true);
+  }, [resetControlledFields]);
+
+  const closeDrawer = useCallback(() => {
+    resetControlledFields();
+    setIsOpen(false);
+  }, [resetControlledFields]);
+
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false);
+      if (event.key === 'Escape') closeDrawer();
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
+  }, [closeDrawer, isOpen]);
 
   return (
     <>
-      <button className="secondary-link edit-details-trigger" type="button" onClick={() => setIsOpen(true)}>
+      <button className="secondary-link edit-details-trigger" type="button" onClick={openDrawer}>
         Edit details
       </button>
 
       {isOpen ? (
         <>
-          <div className="drawer-scrim" onClick={() => setIsOpen(false)} />
+          <div className="drawer-scrim" onClick={closeDrawer} />
           <div className="edit-drawer" role="dialog" aria-modal="true" aria-label="Edit item details">
             <div className="drawer-head">
               <div>
                 <span className="eyebrow">Edit details</span>
                 <strong>{item.item_name}</strong>
               </div>
-              <button className="drawer-icon-button" type="button" aria-label="Close edit details" onClick={() => setIsOpen(false)}>
+              <button className="drawer-icon-button" type="button" aria-label="Close edit details" onClick={closeDrawer}>
                 <X aria-hidden="true" />
               </button>
             </div>
@@ -122,8 +149,8 @@ export function EditItemDetailsDrawer({
                       {agencyOptions.map((agency) => <option value={agency.id} key={agency.id}>{agency.name}</option>)}
                     </select>
                     <input type="hidden" name="agencyType" value={selectedAgencyName} />
-                    <span className="form-note">Need a new agency? Add it in <Link href={referenceListHref}>Reference lists</Link>, then choose it here.</span>
                   </label>
+                  <p className="form-note">Need a new agency? Add it in <Link href={referenceListHref}>Reference lists</Link>, then choose it here.</p>
                 </section>
                 <section className="fsec">
                   <h4>Who and where</h4>
@@ -217,7 +244,7 @@ export function EditItemDetailsDrawer({
                 </section>
               </div>
               <div className="drawer-foot">
-                <button className="secondary-link" type="button" onClick={() => setIsOpen(false)}>Cancel</button>
+                <button className="secondary-link" type="button" onClick={closeDrawer}>Cancel</button>
                 <button type="submit">Save details</button>
               </div>
             </form>

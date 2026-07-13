@@ -274,16 +274,23 @@ export function Dashboard({
     const startDays = daysUntil(item.start_working_on);
     return startDays !== null && startDays > 0 && startDays <= 30;
   }), 'start', 'asc');
-  const queueScopeLabel = showAllOwners
-    ? 'Everyone'
-    : selectedOwnerCodes.length
-      ? selectedOwnerCodes.join(', ')
-      : 'Setup needed';
   const hasSpecificOwnerFilter = Boolean(filters.owner && filters.owner !== 'all');
-  const queueHeading = hasColumnFilters ? 'Filtered work queue' : showAllOwners ? 'Current work queue' : 'My work queue';
-  const intro = showAllOwners
-    ? 'Team items whose start-working date has arrived, plus work already in progress, submitted, or overdue.'
-    : 'Items you own whose start-working date has arrived, plus work already in progress, submitted, or overdue.';
+  const specificOwnerLabel = hasSpecificOwnerFilter ? filters.owner : null;
+  const queueScopeLabel = specificOwnerLabel
+    ? `Owner ${specificOwnerLabel}`
+    : showAllOwners
+      ? 'Everyone'
+      : selectedOwnerCodes.length
+        ? selectedOwnerCodes.join(', ')
+        : 'Setup needed';
+  let queueHeading = showAllOwners ? 'Current work queue' : 'My work queue';
+  if (specificOwnerLabel) queueHeading = `Owner ${specificOwnerLabel} work queue`;
+  if (hasColumnFilters) queueHeading = specificOwnerLabel ? `Filtered ${specificOwnerLabel} work queue` : 'Filtered work queue';
+  const intro = specificOwnerLabel
+    ? `Items assigned to ${specificOwnerLabel} whose start-working date has arrived, plus work already in progress, submitted, or overdue.`
+    : showAllOwners
+      ? 'Team items whose start-working date has arrived, plus work already in progress, submitted, or overdue.'
+      : 'Items you own whose start-working date has arrived, plus work already in progress, submitted, or overdue.';
   const statusLabel = statusFilterOptions.find((option) => option.value === filters.status)?.label ?? 'Actionable';
   const ownerLabel = filters.owner === 'all' ? 'Everyone' : filters.owner ?? (showAllOwners ? 'Everyone' : 'Mine');
   const agencyLabel = filters.type ?? 'All';
