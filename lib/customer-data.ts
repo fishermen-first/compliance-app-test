@@ -14,6 +14,7 @@ export function mapComplianceItem(row: any): ComplianceItem {
     company_id: row.company_id,
     vessel_id: row.vessel_id,
     vessel_name: row.vessels?.name ?? null,
+    agency_id: row.agency_id,
     owner_raw: row.owner_raw,
     owner_current: row.owner_current,
     owner_codes: ownerCodes.length ? Array.from(new Set(ownerCodes)) : row.owner_current ? [row.owner_current] : [],

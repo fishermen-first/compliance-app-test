@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createComplianceItem } from '@/app/actions/items';
 import { NewItemNotesDisclosure, NewItemSchedulePreview } from '@/components/new-item-form-client';
+import { frequencyLabelOptions } from '@/lib/compliance';
 import { canCreateComplianceItems } from '@/lib/roles';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -18,7 +19,6 @@ const complianceAreas = [
   'Other'
 ];
 
-const frequencyLabels = ['Annually', 'Quarterly', 'Biennially', 'Triennially', 'Twice a year', 'Every 5 Years', 'Every 10 Years', 'Unannounced', 'New Permit', 'NA', 'Custom'];
 const newItemFormId = 'new-item-form';
 
 type Relation<T> = T | T[] | null | undefined;
@@ -207,6 +207,7 @@ export default async function NewItemPage() {
                     <option value={agency.id} key={agency.id}>{agency.name}</option>
                   ))}
                 </select>
+                <span className="form-note">Need a new agency? Add it in <Link href="/settings/lists">Reference lists</Link>, then choose it here.</span>
               </label>
 
               <label className="new-item-field">
@@ -272,7 +273,7 @@ export default async function NewItemPage() {
               <label className="new-item-field">
                 <span className="new-item-label">Frequency</span>
                 <select name="frequencyLabel" defaultValue="Annually">
-                  {frequencyLabels.map((frequency) => <option value={frequency} key={frequency}>{frequency}</option>)}
+                  {frequencyLabelOptions.map((frequency) => <option value={frequency} key={frequency}>{frequency}</option>)}
                 </select>
               </label>
 

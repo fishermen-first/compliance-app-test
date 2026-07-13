@@ -7,8 +7,10 @@ import { type Database } from '@/lib/database.types';
 import { createClient } from '@/lib/supabase/server';
 
 type RecurrenceUnit = Database['public']['Enums']['recurrence_unit'];
+type ComplianceItemStatus = Database['public']['Enums']['compliance_item_status'];
 
 const recurrenceUnits = new Set<RecurrenceUnit>(['years', 'months', 'manual', 'none']);
+const complianceItemStatuses = new Set<ComplianceItemStatus>(['not_started', 'in_progress', 'submitted', 'complete', 'discontinued']);
 
 function optionalString(formData: FormData, name: string) {
   const value = String(formData.get(name) ?? '').trim();
@@ -311,9 +313,28 @@ export async function updateComplianceItemCore(formData: FormData) {
 
 export async function updateComplianceItemStatus(formData: FormData) {
   const itemId = requiredString(formData, 'itemId');
-  const status = requiredString(formData, 'status');
   const notes = optionalString(formData, 'notes');
   const { supabase } = await requireMembership({ allowAppAdmin: true });
+  const requestedStatus = optionalString(formData, 'status');
+  let status: ComplianceItemStatus;
+
+  if (requestedStatus) {
+    if (!complianceItemStatuses.has(requestedStatus as ComplianceItemStatus)) {
+      throw new Error('status is invalid');
+    }
+    status = requestedStatus as ComplianceItemStatus;
+  } else {
+    const { data: currentItem, error: currentItemError } = await supabase
+      .from('compliance_items')
+      .select('status')
+      .eq('id', itemId)
+      .maybeSingle();
+
+    if (currentItemError) throw new Error(currentItemError.message);
+    if (!currentItem) throw new Error('Compliance item not found');
+
+    status = currentItem.status as ComplianceItemStatus;
+  }
 
   const { error } = await supabase.rpc('update_compliance_item_status', {
     target_item_id: itemId,

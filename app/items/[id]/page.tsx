@@ -84,6 +84,7 @@ export default async function ItemDetailPage({ params, searchParams }: ItemDetai
           reminderLogs={reminderLogs ?? []}
           vessels={vessels ?? []}
           ownerOptions={ownerCodes.map((owner) => ({ code: owner.code, display_name: owner.display_name }))}
+          agencyOptions={referenceLists.agencies.map((agency) => ({ id: agency.id, name: agency.name }))}
           referenceContacts={referenceLists.contacts}
           referenceContactGroups={referenceLists.groups}
           canUpdateStatus={canManageItem}
@@ -94,6 +95,7 @@ export default async function ItemDetailPage({ params, searchParams }: ItemDetai
           backHref="/"
           backLabel="Back to work queue"
           itemPathPrefix="/items"
+          referenceListHref="/settings/lists"
         />
       </main>
     </div>

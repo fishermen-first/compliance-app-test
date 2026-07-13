@@ -110,13 +110,26 @@ function sortValue(item: ComplianceItem, sort: SortKey) {
   if (sort === 'agency') return item.agency_type ?? '';
   if (sort === 'start') return item.start_working_on ?? '9999-12-31';
   if (sort === 'expiration') return item.expiration_date ?? '9999-12-31';
-  return displayState(item);
+  return operationalStatusRank(item);
+}
+
+function operationalStatusRank(item: ComplianceItem) {
+  if (itemIsOverdue(item)) return 0;
+  if (displayState(item) === 'Due') return 1;
+  if (item.status === 'in_progress') return 2;
+  if (item.status === 'submitted') return 3;
+  return 4;
+}
+
+function compareSortValues(left: string | number, right: string | number) {
+  if (typeof left === 'number' && typeof right === 'number') return left - right;
+  return String(left).localeCompare(String(right));
 }
 
 function sortItems(items: ComplianceItem[], sort: SortKey, dir: 'asc' | 'desc') {
   const multiplier = dir === 'desc' ? -1 : 1;
   return [...items].sort((a, b) => {
-    const compared = String(sortValue(a, sort)).localeCompare(String(sortValue(b, sort)));
+    const compared = compareSortValues(sortValue(a, sort), sortValue(b, sort));
     return compared === 0 ? a.item_name.localeCompare(b.item_name) : compared * multiplier;
   });
 }
@@ -209,6 +222,7 @@ export function Dashboard({
   selectedOwnerCodes,
   showAllOwners,
   hasOwnerMapping,
+  ownerFilterCodes,
   canCreateItems,
   filters
 }: {
@@ -224,6 +238,7 @@ export function Dashboard({
   filters: DashboardFilters;
 }) {
   const isCustomerOwner = isCustomerOwnerRole(currentUserRole);
+  const canViewEveryone = isCustomerOwner || currentUserRole === 'office_user';
   const isUnmappedRegularUser = !isCustomerOwner && !hasOwnerMapping;
   const openItems = items.filter((item) => !['complete', 'discontinued'].includes(item.status));
   const scopedItems = showAllOwners
@@ -264,11 +279,13 @@ export function Dashboard({
     : selectedOwnerCodes.length
       ? selectedOwnerCodes.join(', ')
       : 'Setup needed';
+  const hasSpecificOwnerFilter = Boolean(filters.owner && filters.owner !== 'all');
   const queueHeading = hasColumnFilters ? 'Filtered work queue' : showAllOwners ? 'Current work queue' : 'My work queue';
   const intro = showAllOwners
-    ? 'Items across the workspace whose start-working date has arrived, with each owner\'s latest progress note visible from the list.'
+    ? 'Team items whose start-working date has arrived, plus work already in progress, submitted, or overdue.'
     : 'Items you own whose start-working date has arrived, plus work already in progress, submitted, or overdue.';
-  const statusLabel = statusFilterOptions.find((option) => option.value === filters.status)?.label ?? 'All active';
+  const statusLabel = statusFilterOptions.find((option) => option.value === filters.status)?.label ?? 'Actionable';
+  const ownerLabel = filters.owner === 'all' ? 'Everyone' : filters.owner ?? (showAllOwners ? 'Everyone' : 'Mine');
   const agencyLabel = filters.type ?? 'All';
   const vesselLabel = filters.vessel ?? 'All';
   const frequencyLabel = filters.frequency ?? 'All';
@@ -284,10 +301,11 @@ export function Dashboard({
 
         <div className="header-actions">
           <div className="scope-seg" aria-label="Queue scope">
-            <Link href={dashboardHref(filters, { owner: undefined })} aria-current={!showAllOwners ? 'true' : undefined} scroll={false}>
+            <Link href={dashboardHref(filters, { owner: undefined })} aria-current={!showAllOwners && !hasSpecificOwnerFilter ? 'true' : undefined} scroll={false}>
               Mine - {selectedOwnerCodes.length ? selectedOwnerCodes.join(', ') : 'setup'}
             </Link>
-            {isCustomerOwner ? (
+            {hasSpecificOwnerFilter ? <span aria-current="true">Owner {filters.owner}</span> : null}
+            {canViewEveryone ? (
               <Link href={dashboardHref(filters, { owner: 'all' })} aria-current={showAllOwners ? 'true' : undefined} scroll={false}>
                 Everyone
               </Link>
@@ -358,6 +376,15 @@ export function Dashboard({
                 <Link className={filters.vessel === vessel ? 'active' : ''} href={dashboardHref(filters, { vessel })} key={vessel} scroll={false}>{vessel}</Link>
               ))}
             </FilterMenu>
+            {canViewEveryone ? (
+              <FilterMenu label="Owner" selectedLabel={ownerLabel}>
+                <Link className={!filters.owner && !showAllOwners ? 'active' : ''} href={dashboardHref(filters, { owner: undefined })} scroll={false}>Mine</Link>
+                <Link className={filters.owner === 'all' || showAllOwners ? 'active' : ''} href={dashboardHref(filters, { owner: 'all' })} scroll={false}>Everyone</Link>
+                {ownerFilterCodes.map((owner) => (
+                  <Link className={filters.owner === owner ? 'active' : ''} href={dashboardHref(filters, { owner })} key={owner} scroll={false}>{owner}</Link>
+                ))}
+              </FilterMenu>
+            ) : null}
             <FilterMenu label="Agency" selectedLabel={agencyLabel}>
               <Link className={!filters.type ? 'active' : ''} href={dashboardHref(filters, { type: undefined })} scroll={false}>All agencies</Link>
               {typeOptions.map((type) => (
@@ -365,7 +392,7 @@ export function Dashboard({
               ))}
             </FilterMenu>
             <FilterMenu label="Status" selectedLabel={statusLabel}>
-              <Link className={!filters.status ? 'active' : ''} href={dashboardHref(filters, { status: undefined })} scroll={false}>All active</Link>
+              <Link className={!filters.status ? 'active' : ''} href={dashboardHref(filters, { status: undefined })} scroll={false}>Actionable</Link>
               {statusFilterOptions.map((option) => (
                 <Link className={filters.status === option.value ? 'active' : ''} href={dashboardHref(filters, { status: option.value })} key={option.value} scroll={false}>{option.label}</Link>
               ))}
@@ -410,7 +437,7 @@ export function Dashboard({
                   <td colSpan={visibleColumns.length}>
                     <div className="empty-state">
                       <h3>{isUnmappedRegularUser ? 'No owner queue yet' : hasColumnFilters ? 'No items match these filters' : 'No actionable items right now'}</h3>
-                      <p>{isUnmappedRegularUser ? 'Your queue will appear after a workspace owner maps your login to an owner code.' : hasColumnFilters ? 'Clear or adjust the filters to bring more compliance work back into view.' : 'Items will appear here when their start-working date arrives, or when they are in progress, submitted, or overdue.'}</p>
+                      <p>{isUnmappedRegularUser ? 'Your queue will appear after a workspace owner maps your login to an owner code.' : hasColumnFilters ? 'Clear or adjust the filters to bring more compliance work back into view.' : 'Actionable items appear here when their start-working date arrives, or when they are in progress, submitted, or overdue.'}</p>
                     </div>
                   </td>
                 </tr>

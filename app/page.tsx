@@ -74,6 +74,7 @@ export default async function Home({ searchParams }: HomeProps) {
   const requestedOwner = searchParams?.owner;
   const mappedOwnerCodes = ownerCodes.filter((owner) => owner.is_assigned_to_current_user).map((owner) => owner.code);
   const isCustomerOwner = isCustomerOwnerRole(membership.role);
+  const canViewEveryone = isCustomerOwner || membership.role === 'office_user';
   const requestedOwnerCode = requestedOwner && requestedOwner !== 'all' ? decodeURIComponent(requestedOwner) : null;
   const validOwnerCodes = new Set([
     ...ownerCodes.map((owner) => owner.code),
@@ -82,21 +83,21 @@ export default async function Home({ searchParams }: HomeProps) {
   const requestedOwnerAllowed = Boolean(
     requestedOwnerCode
     && validOwnerCodes.has(requestedOwnerCode)
-    && (isCustomerOwner || mappedOwnerCodes.includes(requestedOwnerCode))
+    && (canViewEveryone || mappedOwnerCodes.includes(requestedOwnerCode))
   );
-  const showAllOwners = isCustomerOwner && (requestedOwner === 'all' || (!requestedOwner && mappedOwnerCodes.length === 0));
+  const showAllOwners = canViewEveryone && (requestedOwner === 'all' || (isCustomerOwner && !requestedOwner && mappedOwnerCodes.length === 0));
   const selectedOwnerCodes = requestedOwnerAllowed && requestedOwnerCode
     ? [requestedOwnerCode]
     : showAllOwners
       ? []
       : mappedOwnerCodes;
   const canCreateItems = canCreateComplianceItems(membership.role);
-  const validOwnerFilter = requestedOwner === 'all' && isCustomerOwner
+  const validOwnerFilter = requestedOwner === 'all' && canViewEveryone
     ? 'all'
     : requestedOwnerAllowed && requestedOwnerCode
       ? requestedOwnerCode
       : undefined;
-  const ownerFilterCodes = isCustomerOwner
+  const ownerFilterCodes = canViewEveryone
     ? Array.from(validOwnerCodes).sort((a, b) => a.localeCompare(b))
     : mappedOwnerCodes;
   const sidebarDueCount = items.filter((item) => {

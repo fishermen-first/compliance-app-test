@@ -80,14 +80,35 @@ function sortValue(item: ComplianceItem, sort: SortKey) {
   if (sort === 'frequency') return item.frequency_label ?? '';
   if (sort === 'start') return item.start_working_on ?? '9999-12-31';
   if (sort === 'expiration') return item.expiration_date ?? '9999-12-31';
-  return displayState(item);
+  return operationalStatusRank(item);
+}
+
+function operationalStatusRank(item: ComplianceItem) {
+  if (itemIsOverdue(item)) return 0;
+  if (displayState(item) === 'Due') return 1;
+  if (item.status === 'in_progress') return 2;
+  if (item.status === 'submitted') return 3;
+  if (displayState(item) === 'Not due yet') return 4;
+  if (item.status === 'complete') return 5;
+  return 6;
+}
+
+function compareSortValues(left: string | number, right: string | number) {
+  if (typeof left === 'number' && typeof right === 'number') return left - right;
+  return String(left).localeCompare(String(right));
 }
 
 function sortItems(items: ComplianceItem[], sort: SortKey, dir: 'asc' | 'desc') {
   const multiplier = dir === 'desc' ? -1 : 1;
   return [...items].sort((a, b) => {
-    const compared = String(sortValue(a, sort)).localeCompare(String(sortValue(b, sort)));
-    return compared === 0 ? a.item_name.localeCompare(b.item_name) : compared * multiplier;
+    const compared = compareSortValues(sortValue(a, sort), sortValue(b, sort));
+    if (compared !== 0) return compared * multiplier;
+
+    const startCompared = String(a.start_working_on ?? '9999-12-31').localeCompare(String(b.start_working_on ?? '9999-12-31'));
+    if (startCompared !== 0) return startCompared;
+
+    const expirationCompared = String(a.expiration_date ?? '9999-12-31').localeCompare(String(b.expiration_date ?? '9999-12-31'));
+    return expirationCompared === 0 ? a.item_name.localeCompare(b.item_name) : expirationCompared;
   });
 }
 
@@ -167,7 +188,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const canCreateItems = canCreateComplianceItems(membership.role);
   const owners = Array.from(new Set(allItems.flatMap(itemOwnerCodes))).sort();
   const vessels = Array.from(new Set(allItems.map(itemVessel))).sort();
-  const sort = sortKeys.has(searchParams?.sort as SortKey) ? searchParams?.sort as SortKey : 'start';
+  const sort = sortKeys.has(searchParams?.sort as SortKey) ? searchParams?.sort as SortKey : 'status';
   const dir = searchParams?.dir === 'desc' ? 'desc' : 'asc';
   const visibleColumns = selectedColumns(searchParams?.columns);
   const q = (searchParams?.q ?? '').trim().toLowerCase();

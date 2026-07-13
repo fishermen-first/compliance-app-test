@@ -43,7 +43,7 @@ const roleOptions: Array<{ value: AppRole; label: string; disabled?: boolean }> 
 const permissionCopy: Record<AppRole, string> = {
   owner: 'Owners can edit records, manage reminders, invite users, manage owner codes, and change workspace settings.',
   office_admin: 'Legacy role. This role no longer grants admin permissions.',
-  office_user: 'Office users only see and update records assigned to their owner codes.',
+  office_user: 'Office users can view the team queue, but only update records assigned to their owner codes.',
   vessel_user: 'Legacy role. This role no longer grants item permissions.'
 };
 

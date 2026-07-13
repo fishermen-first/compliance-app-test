@@ -9273,7 +9273,8 @@ button.secondary-link {
   white-space: nowrap;
 }
 
-.scope-seg a[aria-current="true"] {
+.scope-seg a[aria-current="true"],
+.scope-seg span[aria-current="true"] {
   background: var(--navy);
   color: #f3f1e8;
 }
@@ -10162,6 +10163,15 @@ button.secondary-link {
   padding: 16px 18px 18px;
   border-top: 1px solid var(--line);
   background: #fbfaf3;
+}
+
+.schedule-restore-panel {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px dashed #c6d5ce;
+  border-radius: 8px;
+  background: #fffdf7;
 }
 
 .schedule-segmented {

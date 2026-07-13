@@ -7,6 +7,7 @@ export type ComplianceItem = {
   company_id: string;
   vessel_id: string | null;
   vessel_name?: string | null;
+  agency_id?: string | null;
   owner_raw: string | null;
   owner_current: string | null;
   owner_codes?: string[];
@@ -76,6 +77,20 @@ export const statusChipClasses: Record<DisplayState, string> = {
   Complete: 'st st-comp',
   'Did not renew': 'st st-disc'
 };
+
+export const frequencyLabelOptions = [
+  'Annually',
+  'Quarterly',
+  'Biennially',
+  'Triennially',
+  'Twice a year',
+  'Every 5 Years',
+  'Every 10 Years',
+  'Unannounced',
+  'New Permit',
+  'N/A',
+  'Manual'
+] as const;
 
 export function todayIso() {
   return new Date().toISOString().slice(0, 10);

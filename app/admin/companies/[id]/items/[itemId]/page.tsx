@@ -106,6 +106,7 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
           reminderLogs={reminderLogs ?? []}
           vessels={vessels ?? []}
           ownerOptions={ownerCodes ?? []}
+          agencyOptions={referenceLists.agencies.map((agency) => ({ id: agency.id, name: agency.name }))}
           referenceContacts={referenceLists.contacts}
           referenceContactGroups={referenceLists.groups}
           canUpdateStatus
@@ -115,6 +116,7 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
           backHref={`/admin/customers/${companyId}/users`}
           backLabel="Back to customer users"
           itemPathPrefix={`/admin/companies/${companyId}/items`}
+          referenceListHref={`/admin/customers/${companyId}/lists`}
         />
       </section>
     </main>

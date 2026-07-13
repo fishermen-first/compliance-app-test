@@ -91,7 +91,7 @@ export function CompleteItemModal({
                 ) : (
                   <p className="form-note">{canCreateNext ? 'The next recurring item will use the saved recurrence dates.' : 'No recurring item will be created because this item has no automatic recurrence.'}</p>
                 )}
-                <p className="carry-note">Reminder rules, external recipients, co-owners, and standing instructions carry over automatically when this item rolls forward.</p>
+                <p className="carry-note">Start, deadline, recurring rules, external recipients, co-owners, and standing instructions carry over automatically. One-off reminder dates stay with the completed cycle.</p>
               </div>
               <div className="drawer-foot">
                 <button className="secondary-link" type="button" onClick={() => setIsOpen(false)}>Cancel</button>

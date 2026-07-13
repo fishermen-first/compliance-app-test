@@ -186,8 +186,7 @@ function initialSchedule(reminderRules: ReminderRule[], audience: 'owner' | 'ext
   const startRule = rules.find((rule) => rule.trigger_type === 'on_start_date');
   const deadlineRules = rules.filter((rule) => rule.trigger_type === 'days_before_expiration');
   const repeatRule = rules.find((rule) => rule.trigger_type === 'repeat_after_start');
-  const activeDeadlineRules = deadlineRules.filter((rule) => rule.active);
-  const storedLeadTimes = uniqueNumbers(activeDeadlineRules.map((rule) => rule.days_before));
+  const storedLeadTimes = uniqueNumbers(deadlineRules.map((rule) => rule.days_before));
   const fallbackLeadTimes = audience === 'owner' && deadlineRules.length === 0 ? [14] : [];
 
   return {
@@ -269,6 +268,8 @@ export function ReminderScheduleDrawer({
   });
   const [editingOneOffDate, setEditingOneOffDate] = useState<string | null>(null);
   const [editingLeadTime, setEditingLeadTime] = useState<number | null>(null);
+  const [removedLeadTimes, setRemovedLeadTimes] = useState<number[]>([]);
+  const [removedOneOffDates, setRemovedOneOffDates] = useState<string[]>([]);
   const [recipients, setRecipients] = useState<EditableRecipient[]>(() => (
     additionalRecipients.map((recipient) => ({
       kind: recipient.recipient_type === 'group' ? 'group' : recipient.external_contact_id ? 'contact' : 'direct',
@@ -365,6 +366,7 @@ export function ReminderScheduleDrawer({
         : [...withoutEditedDate, specificDateDraft].sort();
       return { ...current, oneOffDates };
     });
+    setRemovedOneOffDates((current) => current.filter((date) => date !== specificDateDraft));
     setSpecificDateDraft('');
     setEditingOneOffDate(null);
   };
@@ -382,6 +384,7 @@ export function ReminderScheduleDrawer({
         : [...withoutEditedLeadTime, parsed];
       return { ...current, expirationActive: true, leadTimes };
     });
+    setRemovedLeadTimes((current) => current.filter((leadTime) => leadTime !== parsed));
     setDeadlineDraft('');
     setEditingLeadTime(null);
   };
@@ -397,6 +400,16 @@ export function ReminderScheduleDrawer({
       ...current,
       leadTimes: current.leadTimes.filter((leadTime) => leadTime !== value)
     }));
+    setRemovedLeadTimes((current) => current.includes(value) ? current : [...current, value].sort((a, b) => b - a));
+  };
+
+  const restoreLeadTime = (value: number) => {
+    setSchedule((current) => ({
+      ...current,
+      expirationActive: true,
+      leadTimes: current.leadTimes.includes(value) ? current.leadTimes : [...current.leadTimes, value]
+    }));
+    setRemovedLeadTimes((current) => current.filter((leadTime) => leadTime !== value));
   };
 
   const editLeadTime = (value: number) => {
@@ -418,10 +431,19 @@ export function ReminderScheduleDrawer({
       ...current,
       oneOffDates: current.oneOffDates.filter((date) => date !== value)
     }));
+    setRemovedOneOffDates((current) => current.includes(value) ? current : [...current, value].sort());
     if (editingOneOffDate === value) {
       setEditingOneOffDate(null);
       setSpecificDateDraft('');
     }
+  };
+
+  const restoreOneOff = (value: string) => {
+    setSchedule((current) => ({
+      ...current,
+      oneOffDates: current.oneOffDates.includes(value) ? current.oneOffDates : [...current.oneOffDates, value].sort()
+    }));
+    setRemovedOneOffDates((current) => current.filter((date) => date !== value));
   };
 
   const addRecipient = () => {
@@ -748,6 +770,23 @@ export function ReminderScheduleDrawer({
                       </div>
                     )}
                     {renderAddPanel()}
+                    {removedLeadTimes.length || removedOneOffDates.length ? (
+                      <div className="schedule-restore-panel">
+                        <span className="schedule-field-note">Removed during this edit session</span>
+                        <div className="schedule-chip-row">
+                          {removedLeadTimes.map((leadTime) => (
+                            <button className="schedule-offset-chip" type="button" onClick={() => restoreLeadTime(leadTime)} key={`restore-lead-${leadTime}`}>
+                              Restore {leadTime}d
+                            </button>
+                          ))}
+                          {removedOneOffDates.map((date) => (
+                            <button className="schedule-offset-chip" type="button" onClick={() => restoreOneOff(date)} key={`restore-date-${date}`}>
+                              Restore {formatDate(date)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </section>
 
@@ -755,7 +794,7 @@ export function ReminderScheduleDrawer({
                   <div className="schedule-section-head">
                     <div>
                       <h4>Rules that create reminders</h4>
-                      <p>These generate owner reminders in the scheduled list above.</p>
+                      <p>These generate owner reminders in the scheduled list above. Start, deadline, and recurring rule changes carry into future renewal cycles; one-off dates stay on this cycle only.</p>
                     </div>
                   </div>
                   <div className="schedule-rule-list">

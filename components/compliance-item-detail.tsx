@@ -8,6 +8,7 @@ import {
   type ComplianceItem,
   daysUntil,
   displayState,
+  frequencyLabelOptions,
   formatDate,
   itemOwnerCodes,
   itemOwnersLabel,
@@ -59,6 +60,11 @@ type HistoryEntry = {
 type OwnerOption = {
   code: string;
   display_name?: string | null;
+};
+
+type AgencyOption = {
+  id: string;
+  name: string;
 };
 
 type ReferenceContactOption = {
@@ -189,6 +195,7 @@ export function ComplianceItemDetail({
   reminderLogs,
   vessels,
   ownerOptions = [],
+  agencyOptions = [],
   referenceContacts = [],
   referenceContactGroups = [],
   canUpdateStatus,
@@ -198,7 +205,8 @@ export function ComplianceItemDetail({
   rolledForwardHref,
   backHref,
   backLabel,
-  itemPathPrefix
+  itemPathPrefix,
+  referenceListHref
 }: {
   item: ComplianceItem;
   history: HistoryEntry[];
@@ -207,6 +215,7 @@ export function ComplianceItemDetail({
   reminderLogs: ReminderLog[];
   vessels: VesselOption[];
   ownerOptions?: OwnerOption[];
+  agencyOptions?: AgencyOption[];
   referenceContacts?: ReferenceContactOption[];
   referenceContactGroups?: ReferenceContactGroupOption[];
   canUpdateStatus: boolean;
@@ -217,6 +226,7 @@ export function ComplianceItemDetail({
   backHref: string;
   backLabel: string;
   itemPathPrefix: string;
+  referenceListHref: string;
 }) {
   const nextDates = proposedNextDates(item);
   const canCreateNext = Boolean(nextDates.nextExpirationDate);
@@ -334,7 +344,7 @@ export function ComplianceItemDetail({
                 <>
                   <textarea className="note-input" form={statusFormId} name="notes" placeholder="waiting on check from accounting; mailed with check #4412" rows={3} />
                   <p className="last-note">Last note: {item.status_notes || 'No status note yet.'}</p>
-                  <button form={statusFormId} type="submit">Save status</button>
+                  <button form={statusFormId} type="submit">Save note/status</button>
                 </>
               ) : null}
             </article>
@@ -352,6 +362,9 @@ export function ComplianceItemDetail({
                   itemPathPrefix={itemPathPrefix}
                   vessels={vessels}
                   ownerOptions={availableOwnerOptions}
+                  agencyOptions={agencyOptions}
+                  frequencyOptions={frequencyLabelOptions}
+                  referenceListHref={referenceListHref}
                 />
               ) : null}
             </div>
@@ -381,7 +394,7 @@ export function ComplianceItemDetail({
               <li><strong>Next scheduled</strong><span>{nextReminder ? formatDate(nextReminder) : 'None'}</span></li>
               <li><strong>Latest send</strong><span>{latestReminder ? `${statusOptionLabel(latestReminder.status)} - ${formatTimestamp(latestReminder.sent_at ?? latestReminder.scheduled_for)}` : 'None logged'}</span></li>
             </ul>
-            <p className="carry-note">These settings carry over automatically when this item rolls forward.</p>
+            <p className="carry-note">Start, deadline, recurring rules, external recipients, and standing instructions carry forward. One-off reminder dates stay with this cycle.</p>
             {canManageReminders ? (
               <ReminderScheduleDrawer
                 itemId={item.id}
