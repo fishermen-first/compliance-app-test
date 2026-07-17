@@ -23,6 +23,7 @@ export type ImportedComplianceRecord = {
   };
   ownerRaw: string | null;
   ownerCurrent: string | null;
+  ownerCodes: string[];
   vessel: string | null;
   vesselOrScope: string | null;
   itemName: string;
@@ -58,7 +59,7 @@ export class WorkbookImportError extends Error {
   }
 }
 
-const parserVersion = 'import-v3-reference-lists-2026-07-04';
+const parserVersion = 'import-v4-multi-owner-codes-2026-07-17';
 
 const legacyHeaders = [
   'ownerRaw',
@@ -232,9 +233,19 @@ function importDate(
   return parsed;
 }
 
-function parseOwnerCurrent(ownerRaw: string | null) {
-  const value = ownerRaw?.trim();
-  return value || null;
+export function parseOwnerCodes(ownerRaw: string | null) {
+  const raw = ownerRaw?.trim();
+  if (!raw) return [];
+
+  const seen = new Set<string>();
+  return raw
+    .split(/\s*(?:-->|→|\/)\s*/)
+    .map((code) => code.trim())
+    .filter((code) => {
+      if (!code || seen.has(code)) return false;
+      seen.add(code);
+      return true;
+    });
 }
 
 export function normalizePeriodLabel(value: string | null): PeriodLabel | null {
@@ -379,6 +390,8 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
       }
 
       const ownerRaw = clean(valueFor('owner_code'));
+      const ownerCodes = parseOwnerCodes(ownerRaw);
+      const ownerCurrent = ownerCodes[0] ?? null;
       const vesselOrScope = clean(valueFor('vessel_or_scope'));
       const agencyType = clean(valueFor('regulatory_party'));
       const frequencyLabel = clean(valueFor('frequency'));
@@ -388,7 +401,7 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
       const matchCandidate = {
         itemName: normalizeMatchValue(itemName),
         vesselOrScope: normalizeMatchValue(vesselOrScope),
-        ownerCode: normalizeMatchValue(ownerRaw),
+        ownerCode: normalizeMatchValue(ownerCurrent),
         itemNumber: normalizeMatchValue(itemNumber),
         agencyType: normalizeMatchValue(agencyType),
         periodLabel
@@ -402,7 +415,8 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
         templateItemKey: clean(valueFor('template_item_key')),
         matchCandidate,
         ownerRaw,
-        ownerCurrent: parseOwnerCurrent(ownerRaw),
+        ownerCurrent,
+        ownerCodes,
         vessel: vesselOrScope,
         vesselOrScope,
         itemName,
@@ -447,13 +461,15 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
     const periodLabel = resolvePeriodLabel(legacyPeriodIndex === -1 ? null : clean(row[legacyPeriodIndex] ?? null), itemName, rowNumber, warnings);
     const recurrence = inferRecurrence(frequencyLabel, periodLabel);
     const ownerRaw = clean(raw.ownerRaw);
+    const ownerCodes = parseOwnerCodes(ownerRaw);
+    const ownerCurrent = ownerCodes[0] ?? null;
     const agencyType = clean(raw.agencyType);
     const vessel = clean(raw.vessel);
     const itemNumber = clean(raw.itemNumber);
     const matchCandidate = {
       itemName: normalizeMatchValue(itemName),
       vesselOrScope: normalizeMatchValue(vessel),
-      ownerCode: normalizeMatchValue(ownerRaw),
+      ownerCode: normalizeMatchValue(ownerCurrent),
       itemNumber: normalizeMatchValue(itemNumber),
       agencyType: normalizeMatchValue(agencyType),
       periodLabel
@@ -467,7 +483,8 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
       templateItemKey: null,
       matchCandidate,
       ownerRaw,
-      ownerCurrent: parseOwnerCurrent(ownerRaw),
+      ownerCurrent,
+      ownerCodes,
       vessel,
       vesselOrScope: vessel,
       itemName,
@@ -490,8 +507,7 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
   const vesselNames = new Set(records.map((record) => record.vessel).filter((vessel) => !isCompanyWideVessel(vessel)));
   const ownerCounts = new Map<string, number>();
   records.forEach((record) => {
-    if (!record.ownerCurrent) return;
-    ownerCounts.set(record.ownerCurrent, (ownerCounts.get(record.ownerCurrent) ?? 0) + 1);
+    record.ownerCodes.forEach((code) => ownerCounts.set(code, (ownerCounts.get(code) ?? 0) + 1));
   });
 
   return {

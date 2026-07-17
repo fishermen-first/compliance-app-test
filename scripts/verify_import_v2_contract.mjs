@@ -122,7 +122,18 @@ test('server action dry-runs before apply and no longer upserts item dependencie
   assert.match(action, /dry_run_compliance_workbook_import/);
   assert.match(action, /apply_compliance_workbook_import/);
   assert.match(action, /periodLabel: record\.periodLabel/);
+  assert.match(action, /ownerCodes: record\.ownerCodes/);
   assert.doesNotMatch(action, /from\('vessels'\)\.upsert/);
   assert.doesNotMatch(action, /from\('company_owner_codes'\)\.upsert/);
   assert.doesNotMatch(action, /import_compliance_workbook_records/);
+});
+
+test('multi-owner import migration parses compound codes and synchronizes item owners', () => {
+  const migration = read('supabase/migrations/20260717000100_import_compound_owner_codes.sql');
+
+  assert.match(migration, /create or replace function public\.parse_compound_owner_codes/);
+  assert.match(migration, /-->|→|\//);
+  assert.match(migration, /insert into public\.company_owner_codes/);
+  assert.match(migration, /sync_compliance_item_owner_codes/);
+  assert.match(migration, /new\.owner_current is not distinct from new\.owner_raw/);
 });

@@ -140,6 +140,7 @@ export async function importComplianceWorkbook(formData: FormData) {
     matchCandidate: record.matchCandidate,
     ownerRaw: record.ownerRaw,
     ownerCurrent: record.ownerCurrent,
+    ownerCodes: record.ownerCodes,
     vessel: record.vessel,
     vesselOrScope: record.vesselOrScope,
     itemName: record.itemName,
