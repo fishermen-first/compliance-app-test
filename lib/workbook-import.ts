@@ -59,7 +59,7 @@ export class WorkbookImportError extends Error {
   }
 }
 
-const parserVersion = 'import-v4-multi-owner-codes-2026-07-17';
+const parserVersion = 'import-v3-reference-lists-v4-multi-owner-2026-07-17';
 
 const legacyHeaders = [
   'ownerRaw',

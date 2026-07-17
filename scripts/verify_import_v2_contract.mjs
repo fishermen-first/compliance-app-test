@@ -137,3 +137,13 @@ test('multi-owner import migration parses compound codes and synchronizes item o
   assert.match(migration, /sync_compliance_item_owner_codes/);
   assert.match(migration, /new\.owner_current is not distinct from new\.owner_raw/);
 });
+
+test('multi-owner apply migration preserves raw compound owners through the reviewed import path', () => {
+  const parser = read('lib/workbook-import.ts');
+  const migration = read('supabase/migrations/20260717000200_import_multi_owner_apply_path.sql');
+
+  assert.match(parser, /import-v3-reference-lists-v4-multi-owner-/);
+  assert.match(migration, /apply_import_v3_reference_review/);
+  assert.match(migration, /parsed_record->>'ownerRaw'/);
+  assert.match(migration, /source_owner_code = coalesce/);
+});
