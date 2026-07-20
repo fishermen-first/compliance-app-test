@@ -10,6 +10,10 @@ const sourceRowMigration = await readFile(
   new URL('../supabase/migrations/20260720000200_import_source_row_identity.sql', import.meta.url),
   'utf8'
 );
+const appliedStatusMigration = await readFile(
+  new URL('../supabase/migrations/20260720000300_preserve_applied_import_status.sql', import.meta.url),
+  'utf8'
+);
 
 test('natural-key collisions keep one exact dated update and create the other workbook rows', () => {
   assert.match(migration, /create or replace function public\._import_v3_enforce_unique_natural_matches/);
@@ -48,4 +52,11 @@ test('source-row identity runs before natural-key collision handling', () => {
   const applyOrder = /apply_import_v3_reference_review\(target_import_run_id\);[\s\S]*_import_v3_apply_source_row_matches\(target_import_run_id\);[\s\S]*_import_v3_enforce_unique_natural_matches\(target_import_run_id\);/;
   assert.match(sourceRowMigration, dryRunOrder);
   assert.match(sourceRowMigration, applyOrder);
+});
+
+test('review trigger does not reopen an applied dry run', () => {
+  assert.match(appliedStatusMigration, /new\.mode = 'dry_run'[\s\S]*new\.applied_run_id is null/);
+  assert.match(appliedStatusMigration, /apply_import_v3_reference_review\(new\.id\)/);
+  assert.match(appliedStatusMigration, /_import_v3_apply_source_row_matches\(new\.id\)/);
+  assert.match(appliedStatusMigration, /_import_v3_enforce_unique_natural_matches\(new\.id\)/);
 });
