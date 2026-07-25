@@ -341,6 +341,22 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
     } : null,
     status
   }));
+  const ownerCodeMappingTargets = normalAccessRows
+    .filter((row) => (
+      !row.app_admin_contamination
+      && (row.role === 'owner' || row.role === 'office_user')
+      && row.can_update_owner_codes
+    ))
+    .map((row) => {
+      const resolvedName = resolveNameFromOwnerCodes(row, ownerCodes);
+
+      return {
+        target_kind: row.target_kind,
+        target_id: row.target_id,
+        email: row.email,
+        display_name: row.display_name ?? resolvedName.displayName
+      };
+    });
   const accessDrawerRows = normalAccessRows.map((row) => {
     const resolvedName = resolveNameFromOwnerCodes(row, ownerCodes);
 
@@ -433,7 +449,14 @@ export default async function SettingsPage({ searchParams }: SettingsProps) {
                   <span>Status</span>
                   <span aria-hidden="true"></span>
                 </div>
-                {ownerDrawerRows.map((row) => <OwnerDrawer key={row.code} row={row} />)}
+                {ownerDrawerRows.map((row) => (
+                  <OwnerDrawer
+                    key={row.code}
+                    row={row}
+                    companyId={companyId}
+                    mappingTargets={ownerCodeMappingTargets}
+                  />
+                ))}
               </div>
             )
           ) : (

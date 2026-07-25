@@ -1,7 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
+import { mapOwnerCodeToAccessTarget } from '@/app/settings/actions';
+
+type MappingTarget = {
+  target_kind: 'membership' | 'invitation';
+  target_id: string;
+  email: string | null;
+  display_name: string | null;
+};
 
 type Row = {
   code: string;
@@ -22,13 +30,38 @@ type Row = {
   };
 };
 
-export function OwnerDrawer({ row }: { row: Row }) {
+function mappingTargetKey(target: MappingTarget) {
+  return `${target.target_kind}:${target.target_id}`;
+}
+
+function mappingTargetLabel(target: MappingTarget) {
+  const name = target.display_name?.trim();
+  const identity = name && target.email ? `${name} · ${target.email}` : name ?? target.email ?? 'Unnamed user';
+  const status = target.target_kind === 'invitation' ? ' · invite pending' : '';
+
+  return `${identity}${status}`;
+}
+
+export function OwnerDrawer({
+  row,
+  companyId,
+  mappingTargets
+}: {
+  row: Row;
+  companyId: string;
+  mappingTargets: MappingTarget[];
+}) {
   const [open, setOpen] = useState(false);
+  const [selectedTargetKey, setSelectedTargetKey] = useState('');
+  const targetSelectId = useId();
   const name = row.target?.display_name ?? row.ownerDisplayName ?? null;
   const email = row.target?.email ?? null;
+  const selectedTarget = mappingTargets.find((target) => mappingTargetKey(target) === selectedTargetKey) ?? null;
 
   useEffect(() => {
     if (!open) return;
+
+    setSelectedTargetKey('');
 
     const handler = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(false);
@@ -106,6 +139,49 @@ export function OwnerDrawer({ row }: { row: Row }) {
                   </Link>
                 </div>
               </div>
+
+              {!row.target ? (
+                <div className="field">
+                  {mappingTargets.length > 0 ? (
+                    <form action={mapOwnerCodeToAccessTarget} className="owner-map-form">
+                      <input type="hidden" name="companyId" value={companyId} />
+                      <input type="hidden" name="ownerCode" value={row.code} />
+                      {selectedTarget ? (
+                        <>
+                          <input type="hidden" name="targetKind" value={selectedTarget.target_kind} />
+                          <input type="hidden" name="targetId" value={selectedTarget.target_id} />
+                        </>
+                      ) : null}
+                      <label htmlFor={targetSelectId}>Map to person</label>
+                      <select
+                        id={targetSelectId}
+                        value={selectedTargetKey}
+                        onChange={(event) => setSelectedTargetKey(event.target.value)}
+                      >
+                        <option value="">Choose a person</option>
+                        {mappingTargets.map((target) => (
+                          <option key={mappingTargetKey(target)} value={mappingTargetKey(target)}>
+                            {mappingTargetLabel(target)}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="drawer-field-note">
+                        This adds {row.code} without removing the person&apos;s existing owner codes.
+                      </p>
+                      <button className="btn-primary" type="submit" disabled={!selectedTarget}>
+                        Map owner code
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <span className="label-text">Map to person</span>
+                      <p className="drawer-field-note">
+                        No eligible customer users are available. Ask FF Admin to add or invite the person first.
+                      </p>
+                    </>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             <div className="drawer-foot">

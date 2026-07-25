@@ -8622,6 +8622,20 @@ button.secondary-link {
   margin-top: 6px;
 }
 
+.settings-setup-page .drawer .owner-map-form {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-setup-page .drawer .owner-map-form label,
+.settings-setup-page .drawer .owner-map-form .drawer-field-note {
+  margin: 0;
+}
+
+.settings-setup-page .drawer .owner-map-form .btn-primary {
+  justify-self: start;
+}
+
 .field-link {
   display: inline-flex;
   margin-top: 8px;

@@ -6,6 +6,7 @@ import { type Database } from '@/lib/database.types';
 import { createClient } from '@/lib/supabase/server';
 
 type AppRole = Database['public']['Enums']['app_role'];
+type SettingsAccessRow = Database['public']['Functions']['settings_get_access_rows']['Returns'][number];
 
 const roleValues = new Set<AppRole>(['owner', 'office_user']);
 
@@ -208,6 +209,47 @@ export async function updateOwnerCodeAssignment(formData: FormData) {
   });
 
   settingsRedirect('Owner-code assignments updated.');
+}
+
+export async function mapOwnerCodeToAccessTarget(formData: FormData) {
+  const targetCompanyId = requiredString(formData, 'companyId');
+  const selectedTargetKind = targetKind(formData);
+  const selectedTargetId = requiredString(formData, 'targetId');
+  const code = normalizeOwnerCode(requiredString(formData, 'ownerCode'));
+
+  if (!code) {
+    throw new Error('Owner code is required.');
+  }
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('settings_get_access_rows', {
+    target_company_id: targetCompanyId
+  });
+
+  if (error) {
+    settingsRedirect(rpcMessage(error));
+  }
+
+  const selectedTarget = ((data ?? []) as SettingsAccessRow[]).find((row) => (
+    row.target_kind === selectedTargetKind
+    && row.target_id === selectedTargetId
+  ));
+
+  if (!selectedTarget) {
+    return settingsRedirect('Access target not found.');
+  }
+
+  const codes = Array.from(new Set([...(selectedTarget.owner_codes ?? []), code]));
+
+  await ensureOwnerCodesExist(targetCompanyId, codes);
+  await callSettingsRpc('settings_update_owner_code_assignment', {
+    target_company_id: targetCompanyId,
+    target_kind: selectedTargetKind,
+    target_id: selectedTargetId,
+    owner_codes: codes
+  });
+
+  settingsRedirect(`Owner code ${code} mapped.`);
 }
 
 export async function updateAccessDrawerSettings(formData: FormData) {
