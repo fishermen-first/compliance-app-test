@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { Archive, Bell, CalendarDays, ClipboardList, HelpCircle, ListChecks, LogOut, Settings, ShieldCheck } from 'lucide-react';
+import { Archive, Bell, CalendarDays, ClipboardList, HelpCircle, ListChecks, ListTodo, LogOut, Settings, ShieldCheck } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
 
 const navItems = [
   { label: 'Dashboard', icon: ClipboardList, href: '/' },
+  { label: 'Tasks', icon: ListTodo, href: '/tasks' },
   { label: 'All items', icon: ListChecks, href: '/items' },
   { label: 'Calendar', icon: CalendarDays, href: '/calendar' },
   { label: 'Completed', icon: Archive, href: '/completed' },
