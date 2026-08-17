@@ -2,14 +2,34 @@ import Link from 'next/link';
 import { Archive, Bell, CalendarDays, ClipboardList, HelpCircle, ListChecks, ListTodo, LogOut, Settings, ShieldCheck } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
 
-const navItems = [
-  { label: 'Dashboard', icon: ClipboardList, href: '/' },
-  { label: 'Tasks', icon: ListTodo, href: '/tasks' },
-  { label: 'All items', icon: ListChecks, href: '/items' },
-  { label: 'Calendar', icon: CalendarDays, href: '/calendar' },
-  { label: 'Completed', icon: Archive, href: '/completed' },
-  { label: 'Reminders', icon: Bell, href: '/reminders' },
-  { label: 'Workspace setup', icon: Settings, href: '/settings' }
+const navSections = [
+  {
+    label: 'Overview',
+    items: [
+      { label: 'Dashboard', description: 'Compliance + task overview', icon: ClipboardList, href: '/' }
+    ]
+  },
+  {
+    label: 'Your work',
+    items: [
+      { label: 'Tasks', description: 'Personal and assigned to-dos', icon: ListTodo, href: '/tasks' }
+    ]
+  },
+  {
+    label: 'Compliance',
+    items: [
+      { label: 'Compliance records', description: 'All requirements and deadlines', icon: ListChecks, href: '/items' },
+      { label: 'Calendar', description: 'Start and due dates', icon: CalendarDays, href: '/calendar' },
+      { label: 'Completed records', description: 'Finished compliance history', icon: Archive, href: '/completed' },
+      { label: 'Reminder center', description: 'Schedules and delivery activity', icon: Bell, href: '/reminders' }
+    ]
+  },
+  {
+    label: 'Workspace',
+    items: [
+      { label: 'Workspace settings', description: 'People, vessels, and lists', icon: Settings, href: '/settings' }
+    ]
+  }
 ];
 
 function initials(name: string) {
@@ -52,17 +72,34 @@ export function AppSidebar({
       </div>
 
       <nav className="side-nav" aria-label="Application navigation">
-        {[...navItems, ...(isAppAdmin ? [{ label: 'Admin', icon: ShieldCheck, href: '/admin' }] : [])].map((item) => {
-          const Icon = item.icon;
-          const isDashboard = item.href === '/';
-          return (
-            <Link className={activePath === item.href ? 'active' : ''} href={item.href} key={item.label}>
-              <Icon aria-hidden="true" />
-              <span>{item.label}</span>
-              {isDashboard && typeof dueCount === 'number' ? <b>{dueCount}</b> : null}
+        {navSections.map((section) => (
+          <section className="side-nav-section" aria-labelledby={`side-nav-${section.label.toLowerCase().replaceAll(' ', '-')}`} key={section.label}>
+            <h2 id={`side-nav-${section.label.toLowerCase().replaceAll(' ', '-')}`}>{section.label}</h2>
+            {section.items.map((item) => {
+              const Icon = item.icon;
+              const isDashboard = item.href === '/';
+              return (
+                <Link className={activePath === item.href ? 'active' : ''} href={item.href} key={item.label}>
+                  <Icon aria-hidden="true" />
+                  <span className="side-nav-copy">
+                    <strong>{item.label}</strong>
+                    <small>{item.description}</small>
+                  </span>
+                  {isDashboard && typeof dueCount === 'number' ? <b aria-label={`${dueCount} compliance items due`} title={`${dueCount} compliance items due`}>{dueCount}</b> : null}
+                </Link>
+              );
+            })}
+          </section>
+        ))}
+        {isAppAdmin ? (
+          <section className="side-nav-section" aria-labelledby="side-nav-platform">
+            <h2 id="side-nav-platform">Platform</h2>
+            <Link className={activePath === '/admin' ? 'active' : ''} href="/admin">
+              <ShieldCheck aria-hidden="true" />
+              <span className="side-nav-copy"><strong>FF Admin</strong><small>Manage customer workspaces</small></span>
             </Link>
-          );
-        })}
+          </section>
+        ) : null}
       </nav>
 
       <div className="sidebar-user-block">
