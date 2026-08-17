@@ -10024,6 +10024,53 @@ button.secondary-link {
   font-size: 13px;
 }
 
+.items-records-table {
+  min-width: 1240px;
+  table-layout: fixed;
+}
+
+.items-records-table th,
+.items-records-table td {
+  padding: 17px 16px;
+}
+
+.items-records-table tbody td {
+  height: 92px;
+  line-height: 1.45;
+}
+
+.items-records-table [data-column="item"] { width: 260px; }
+.items-records-table [data-column="vessel"] { width: 130px; }
+.items-records-table [data-column="owner"] { width: 92px; text-align: center; }
+.items-records-table [data-column="agency"] { width: 125px; }
+.items-records-table [data-column="frequency"] { width: 135px; }
+.items-records-table [data-column="start"],
+.items-records-table [data-column="expiration"] { width: 118px; }
+.items-records-table [data-column="status"] { width: 160px; }
+.items-records-table [data-column="note"] { width: 250px; }
+.items-records-table [data-column="itemNumber"] { width: 120px; }
+
+.items-records-table td[data-column="owner"] .own-chip {
+  min-width: 38px;
+  width: max-content;
+  max-width: 100%;
+  height: 26px;
+  margin-inline: auto;
+  padding-inline: 9px;
+  white-space: nowrap;
+}
+
+.items-records-table .item-link {
+  gap: 5px;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+.items-records-table .cell-note {
+  max-width: 100%;
+  line-height: 1.45;
+}
+
 .redesign-table .item-link {
   display: grid;
   gap: 3px;

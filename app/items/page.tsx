@@ -160,10 +160,10 @@ function FilterMenu({ label, selectedLabel, children }: { label: string; selecte
   );
 }
 
-function ItemCell({ item, column, ownerNames }: { item: ComplianceItem; column: ColumnKey; ownerNames: Map<string, string> }) {
+function ItemCell({ item, column }: { item: ComplianceItem; column: ColumnKey }) {
   if (column === 'item') {
     return (
-      <td>
+      <td data-column="item">
         <Link className="item-link" href={`/items/${item.id}`}>
           <span>{item.item_name}</span>
           <small className="subline">{item.compliance_area ?? 'Other'}</small>
@@ -171,21 +171,20 @@ function ItemCell({ item, column, ownerNames }: { item: ComplianceItem; column: 
       </td>
     );
   }
-  if (column === 'vessel') return <td>{itemVessel(item)}</td>;
-  if (column === 'owner') return <td><span className="own-chip">{item.owner_current ? ownerNames.get(item.owner_current) ?? item.owner_current : 'Unassigned'}</span></td>;
-  if (column === 'agency') return <td>{item.agency_type ?? '-'}</td>;
-  if (column === 'frequency') return <td>{item.frequency_label ?? '-'}</td>;
-  if (column === 'start') return <td>{formatDate(item.start_working_on)}</td>;
-  if (column === 'expiration') return <td>{formatDate(item.expiration_date)}</td>;
-  if (column === 'status') return <td><StatusBadge item={item} /></td>;
-  if (column === 'note') return <td><span className="cell-note">{item.status_notes || 'No note yet'}</span></td>;
-  return <td>{item.item_number ?? '-'}</td>;
+  if (column === 'vessel') return <td data-column="vessel">{itemVessel(item)}</td>;
+  if (column === 'owner') return <td data-column="owner"><span className="own-chip">{item.owner_current ?? '—'}</span></td>;
+  if (column === 'agency') return <td data-column="agency">{item.agency_type ?? '-'}</td>;
+  if (column === 'frequency') return <td data-column="frequency">{item.frequency_label ?? '-'}</td>;
+  if (column === 'start') return <td data-column="start">{formatDate(item.start_working_on)}</td>;
+  if (column === 'expiration') return <td data-column="expiration">{formatDate(item.expiration_date)}</td>;
+  if (column === 'status') return <td data-column="status"><StatusBadge item={item} /></td>;
+  if (column === 'note') return <td data-column="note"><span className="cell-note">{item.status_notes || 'No note yet'}</span></td>;
+  return <td data-column="itemNumber">{item.item_number ?? '-'}</td>;
 }
 
 export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const { membership, company, profile, user } = await getCustomerContext();
   const [allItems, ownerCodes] = await Promise.all([getCustomerItems(membership.company_id), getCompanyOwnerCodes(membership.company_id)]);
-  const ownerNames = new Map(ownerCodes.map((owner) => [owner.code, owner.display_name ?? owner.code]));
   const canCreateItems = canCreateComplianceItems(membership.role);
   const owners = ownerCodes.map((owner) => owner.code).sort();
   const vessels = Array.from(new Set(allItems.map(itemVessel))).sort();
@@ -282,12 +281,12 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
           </div>
 
           <div className="redesign-table-wrap">
-            <table className="redesign-table" aria-label="All compliance items">
+            <table className="redesign-table items-records-table" aria-label="All compliance items">
               <thead>
                 <tr>
                   {visibleColumns.map((columnKey) => {
                     const column = columns.find((candidate) => candidate.key === columnKey)!;
-                    return <th key={column.key}><SortHeader column={column} dir={dir} searchParams={searchParams} sort={sort} /></th>;
+                    return <th data-column={column.key} key={column.key}><SortHeader column={column} dir={dir} searchParams={searchParams} sort={sort} /></th>;
                   })}
                 </tr>
               </thead>
@@ -303,7 +302,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
                   </tr>
                 ) : pagedItems.map((item) => (
                   <tr key={item.id}>
-                    {visibleColumns.map((column) => <ItemCell column={column} item={item} ownerNames={ownerNames} key={column} />)}
+                    {visibleColumns.map((column) => <ItemCell column={column} item={item} key={column} />)}
                   </tr>
                 ))}
               </tbody>
