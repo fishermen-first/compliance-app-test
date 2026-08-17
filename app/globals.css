@@ -10025,7 +10025,8 @@ button.secondary-link {
 }
 
 .items-records-table {
-  min-width: 1240px;
+  width: 1420px;
+  min-width: 100%;
   table-layout: fixed;
 }
 
@@ -10041,7 +10042,7 @@ button.secondary-link {
 
 .items-records-table [data-column="item"] { width: 260px; }
 .items-records-table [data-column="vessel"] { width: 130px; }
-.items-records-table [data-column="owner"] { width: 92px; text-align: center; }
+.items-records-table [data-column="owner"] { width: 120px; text-align: center; }
 .items-records-table [data-column="agency"] { width: 125px; }
 .items-records-table [data-column="frequency"] { width: 135px; }
 .items-records-table [data-column="start"],
@@ -10049,6 +10050,15 @@ button.secondary-link {
 .items-records-table [data-column="status"] { width: 160px; }
 .items-records-table [data-column="note"] { width: 250px; }
 .items-records-table [data-column="itemNumber"] { width: 120px; }
+
+.items-records-table th[data-column="owner"] .th-sort {
+  justify-content: center;
+  width: 100%;
+}
+
+.items-records-table th .th-sort {
+  white-space: nowrap;
+}
 
 .items-records-table td[data-column="owner"] .own-chip {
   min-width: 38px;
