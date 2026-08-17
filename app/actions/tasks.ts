@@ -75,6 +75,7 @@ function taskPriority(formData: FormData) {
 }
 
 function refreshTasks() {
+  revalidatePath('/');
   revalidatePath('/tasks');
 }
 

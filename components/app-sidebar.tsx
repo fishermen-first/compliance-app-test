@@ -47,6 +47,7 @@ export function AppSidebar({
   userName,
   userEmail,
   dueCount,
+  dueLabel = 'compliance items due',
   isAppAdmin = false,
   activePath = '/'
 }: {
@@ -55,6 +56,7 @@ export function AppSidebar({
   userName?: string | null;
   userEmail?: string | null;
   dueCount?: number;
+  dueLabel?: string;
   isAppAdmin?: boolean;
   activePath?: string;
 }) {
@@ -85,7 +87,7 @@ export function AppSidebar({
                     <strong>{item.label}</strong>
                     <small>{item.description}</small>
                   </span>
-                  {isDashboard && typeof dueCount === 'number' ? <b aria-label={`${dueCount} compliance items due`} title={`${dueCount} compliance items due`}>{dueCount}</b> : null}
+                  {isDashboard && typeof dueCount === 'number' ? <b aria-label={`${dueCount} ${dueLabel}`} title={`${dueCount} ${dueLabel}`}>{dueCount}</b> : null}
                 </Link>
               );
             })}
