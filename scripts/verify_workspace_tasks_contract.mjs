@@ -58,3 +58,10 @@ test('generated database types include workspace tasks', () => {
   assert.match(types, /workspace_tasks: \{/);
   assert.match(types, /foreignKeyName: "workspace_tasks_assigned_to_fkey"/);
 });
+
+test('workspace owner member labels use a scoped RPC without weakening profile RLS', () => {
+  assert.match(migration, /function public\.get_workspace_task_members\(target_company_id uuid\)/);
+  assert.match(migration, /Workspace owner access required/);
+  assert.match(migration, /grant execute on function public\.get_workspace_task_members\(uuid\) to authenticated/);
+  assert.match(page, /supabase\.rpc\('get_workspace_task_members'/);
+});

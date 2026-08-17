@@ -15,8 +15,6 @@ type TaskPageProps = {
   searchParams?: { view?: string; status?: string };
 };
 
-type ProfileRelation = { full_name: string | null; email: string | null } | Array<{ full_name: string | null; email: string | null }> | null;
-
 type WorkspaceTask = {
   id: string;
   title: string;
@@ -28,20 +26,15 @@ type WorkspaceTask = {
   completed_at: string | null;
   archived_at: string | null;
   created_at: string;
-  assignee: ProfileRelation;
 };
 
 type WorkspaceMember = {
   user_id: string;
-  profiles: ProfileRelation;
+  full_name: string | null;
+  email: string | null;
 };
 
-function relation<T>(value: T | T[] | null | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-function personLabel(profile: ProfileRelation) {
-  const person = relation(profile);
+function personLabel(person: { full_name: string | null; email: string | null } | null | undefined) {
   return person?.full_name ?? person?.email ?? 'Workspace user';
 }
 
@@ -100,7 +93,7 @@ function TaskEditor({ task, members, canManageAll, currentUserId }: {
             <label className="task-field task-full-field">
               <span>Assigned to</span>
               <select name="assignedTo" defaultValue={task.assigned_to}>
-                {members.map((member) => <option value={member.user_id} key={member.user_id}>{personLabel(member.profiles)}</option>)}
+                {members.map((member) => <option value={member.user_id} key={member.user_id}>{personLabel(member)}</option>)}
               </select>
             </label>
           ) : null}
@@ -127,27 +120,27 @@ export default async function TasksPage({ searchParams }: TaskPageProps) {
 
   let query = (supabase as any)
     .from('workspace_tasks')
-    .select('id, title, details, assigned_to, status, priority, due_date, completed_at, archived_at, created_at, assignee:profiles!workspace_tasks_assigned_to_fkey(full_name, email)')
+    .select('id, title, details, assigned_to, status, priority, due_date, completed_at, archived_at, created_at')
     .eq('company_id', membership.company_id);
 
   if (view === 'mine') query = query.eq('assigned_to', user.id);
   if (status === 'archived') query = query.not('archived_at', 'is', null);
   else query = query.is('archived_at', null).eq('status', status);
 
-  const [{ data: taskRows, error: taskError }, { data: memberRows }, complianceItems] = await Promise.all([
+  const [{ data: taskRows, error: taskError }, memberResult, complianceItems] = await Promise.all([
     query.order('due_date', { ascending: true, nullsFirst: false }).order('created_at', { ascending: false }),
-    supabase
-      .from('company_memberships')
-      .select('user_id, profiles(full_name, email)')
-      .eq('company_id', membership.company_id)
-      .order('created_at', { ascending: true }),
+    canManageAll
+      ? supabase.rpc('get_workspace_task_members', { target_company_id: membership.company_id })
+      : Promise.resolve({ data: [{ user_id: user.id, full_name: profile?.full_name ?? null, email: profile?.email ?? user.email ?? null }], error: null }),
     getCustomerItems(membership.company_id)
   ]);
 
   if (taskError) throw new Error(taskError.message);
+  if (memberResult.error) throw new Error(memberResult.error.message);
 
   const tasks = (taskRows ?? []) as WorkspaceTask[];
-  const members = (memberRows ?? []) as unknown as WorkspaceMember[];
+  const members = (memberResult.data ?? []) as WorkspaceMember[];
+  const membersById = new Map(members.map((member) => [member.user_id, member]));
   const openCount = tasks.filter((task) => task.status === 'open' && !task.archived_at).length;
   const overdueCount = tasks.filter((task) => task.status === 'open' && task.due_date && task.due_date < todayIso() && !task.archived_at).length;
   const dueCount = complianceItems.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item) === 'Due' || itemIsOverdue(item))).length;
@@ -219,7 +212,7 @@ export default async function TasksPage({ searchParams }: TaskPageProps) {
                   <label className="task-field task-full-field">
                     <span>Assigned to</span>
                     <select name="assignedTo" defaultValue={user.id}>
-                      {members.map((member) => <option value={member.user_id} key={member.user_id}>{personLabel(member.profiles)}</option>)}
+                      {members.map((member) => <option value={member.user_id} key={member.user_id}>{personLabel(member)}</option>)}
                     </select>
                   </label>
                 ) : null}
@@ -251,7 +244,7 @@ export default async function TasksPage({ searchParams }: TaskPageProps) {
                     {task.details ? <p>{task.details}</p> : null}
                     <div className="task-meta">
                       <span className={overdue ? 'task-due is-overdue' : 'task-due'}><CalendarDays aria-hidden="true" />{taskDate(task.due_date)}</span>
-                      {canManageAll || view === 'all' ? <span><UserRound aria-hidden="true" />{personLabel(task.assignee)}</span> : null}
+                      {canManageAll || view === 'all' ? <span><UserRound aria-hidden="true" />{personLabel(membersById.get(task.assigned_to))}</span> : null}
                       {task.priority !== 'normal' ? <span className={`task-priority ${task.priority}`}>{task.priority} priority</span> : null}
                     </div>
                   </div>

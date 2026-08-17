@@ -157,5 +157,36 @@ grant select, insert, update on table public.workspace_tasks to authenticated;
 
 revoke execute on function public.set_workspace_task_updated_at() from public, anon, authenticated;
 
+create or replace function public.get_workspace_task_members(target_company_id uuid)
+returns table (
+  user_id uuid,
+  full_name text,
+  email text
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not (
+    public.is_app_admin()
+    or public.has_company_role(target_company_id, array['owner', 'office_admin']::public.app_role[])
+  ) then
+    raise exception 'Workspace owner access required';
+  end if;
+
+  return query
+  select membership.user_id, profile.full_name, profile.email::text
+  from public.company_memberships membership
+  join public.profiles profile on profile.id = membership.user_id
+  where membership.company_id = target_company_id
+  order by coalesce(profile.full_name, profile.email::text), profile.email::text;
+end;
+$$;
+
+revoke execute on function public.get_workspace_task_members(uuid) from public, anon;
+grant execute on function public.get_workspace_task_members(uuid) to authenticated;
+
 comment on table public.workspace_tasks is
   'Customer-created workspace tasks. Assignees see their own tasks; workspace owners can manage all company tasks.';

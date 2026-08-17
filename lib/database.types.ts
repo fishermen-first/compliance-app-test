@@ -2055,6 +2055,14 @@ export type Database = {
           records: number
         }[]
       }
+      get_workspace_task_members: {
+        Args: { target_company_id: string }
+        Returns: {
+          email: string
+          full_name: string
+          user_id: string
+        }[]
+      }
       has_company_role: {
         Args: {
           allowed_roles: Database["public"]["Enums"]["app_role"][]
