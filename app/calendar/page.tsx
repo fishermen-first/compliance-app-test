@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { AppSidebar } from '@/components/app-sidebar';
 import { StatusBadge } from '@/components/status-badge';
-import { daysUntil, displayState, formatDate, isWorkQueueItem, itemHasAnyOwnerCode, itemOwnerCodes, itemOwnersLabel, itemIsOverdue, type ComplianceItem } from '@/lib/compliance';
+import { daysUntil, displayState, formatDate, isWorkQueueItem, itemHasAnyOwnerCode, itemOwnerCodes, itemIsOverdue, type ComplianceItem } from '@/lib/compliance';
 import { getCompanyOwnerCodes, getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer-data';
 import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
 
@@ -98,10 +98,10 @@ function planningSections(items: ComplianceItem[]) {
   ];
 }
 
-function PlanningRow({ item }: { item: ComplianceItem }) {
+function PlanningRow({ item, ownerNames }: { item: ComplianceItem; ownerNames: Map<string, string> }) {
   return (
     <Link className="planning-row" href={`/items/${item.id}`}>
-      <span className="planning-owner-pill">{itemOwnersLabel(item)}</span>
+      <span className="planning-owner-pill">{item.owner_current ? ownerNames.get(item.owner_current) ?? item.owner_current : 'Unassigned'}</span>
       <div className="planning-entity">
         <strong>{itemVessel(item)}</strong>
         <span>{item.agency_type ?? 'No agency'} · {item.compliance_area ?? 'Other'}</span>
@@ -132,6 +132,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     getCompanyOwnerCodes(membership.company_id)
   ]);
   const openItems = items.filter((item) => !['complete', 'discontinued'].includes(item.status));
+  const ownerNames = new Map(ownerCodes.map((owner) => [owner.code, owner.display_name ?? owner.code]));
   const ownerCodeRows = Array.from(new Set([
     ...ownerCodes.map((owner) => owner.code),
     ...openItems.flatMap(itemOwnerCodes)
@@ -212,7 +213,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
           </div>
           {canViewAllOwners ? (
             <div>
-              <span>Owner</span>
+              <span>Assigned to</span>
               <Link className={showAllOwners ? 'active' : ''} href={calendarHref({ scope: 'all' })}>All</Link>
               {ownerCodeRows.map((owner) => (
                 <Link className={selectedOwnerCodes.length === 1 && selectedOwnerCodes[0] === owner ? 'active' : ''} href={calendarHref({ owner })} key={owner}>{owner}</Link>
@@ -253,14 +254,14 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                 {section.items.length > 0 ? (
                   <div className="planning-table">
                     <div className="planning-table-head" aria-hidden="true">
-                      <span>Owner</span>
+                      <span>Assigned to</span>
                       <span>Vessel / company</span>
                       <span>Item and notes</span>
                       <span>Start working on</span>
                       <span>Expiration</span>
                       <span>Status</span>
                     </div>
-                    {section.items.map((item) => <PlanningRow item={item} key={item.id} />)}
+                    {section.items.map((item) => <PlanningRow item={item} ownerNames={ownerNames} key={item.id} />)}
                   </div>
                 ) : (
                   <p className="planning-empty">{section.empty}</p>

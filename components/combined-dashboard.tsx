@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { AlertTriangle, CalendarDays, Check, ChevronRight, Circle, ClipboardCheck, Clock3, ListTodo, ShieldAlert, UserRound } from 'lucide-react';
 import { createWorkspaceTask, setWorkspaceTaskCompletion } from '@/app/actions/tasks';
-import { daysUntil, displayState, isWorkQueueItem, itemIsOverdue, itemOwnersLabel, shortDate, type ComplianceItem } from '@/lib/compliance';
+import { daysUntil, displayState, isWorkQueueItem, itemIsOverdue, shortDate, type ComplianceItem } from '@/lib/compliance';
 import { itemVessel } from '@/lib/customer-data';
 
 export type DashboardTask = {
@@ -52,6 +52,7 @@ export function CombinedDashboard({
   complianceItems,
   tasks,
   members,
+  ownerNames,
   canViewEveryone,
   showEveryone
 }: {
@@ -61,6 +62,7 @@ export function CombinedDashboard({
   complianceItems: ComplianceItem[];
   tasks: DashboardTask[];
   members: DashboardMember[];
+  ownerNames: Record<string, string>;
   canViewEveryone: boolean;
   showEveryone: boolean;
 }) {
@@ -129,7 +131,7 @@ export function CombinedDashboard({
           ) : (
             <article className="cdash-work-row" key={`compliance-${entry.item.id}`}>
               <span className={`cdash-status-dot ${itemIsOverdue(entry.item) ? 'overdue' : ''}`}><ClipboardCheck aria-hidden="true" /></span>
-              <div><span className="cdash-type compliance">Compliance</span><h3>{entry.item.item_name}</h3><p>{dateMeta(entry.item.expiration_date, 'Expires')} · {itemVessel(entry.item)} · {itemOwnersLabel(entry.item)}</p></div>
+              <div><span className="cdash-type compliance">Compliance</span><h3>{entry.item.item_name}</h3><p>{dateMeta(entry.item.expiration_date, 'Expires')} · {itemVessel(entry.item)} · {entry.item.owner_current ? ownerNames[entry.item.owner_current] ?? entry.item.owner_current : 'Unassigned'}</p></div>
               <span className={`cdash-state ${itemIsOverdue(entry.item) ? 'overdue' : ''}`}>{itemIsOverdue(entry.item) ? 'Overdue' : displayState(entry.item)}</span>
               <Link className="cdash-row-link" href={`/items/${entry.item.id}`} aria-label={`Open compliance record ${entry.item.item_name}`}><ChevronRight aria-hidden="true" /></Link>
             </article>

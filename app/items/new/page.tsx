@@ -240,7 +240,7 @@ export default async function NewItemPage() {
               </label>
 
               <label className="new-item-field">
-                <span className="new-item-label">Owner</span>
+                <span className="new-item-label">Assigned to</span>
                 <select name="ownerCurrent" defaultValue="">
                   <option value="">Unassigned</option>
                   {owners.map((owner) => <option value={owner.code} key={owner.code}>{owner.label}</option>)}
@@ -248,19 +248,6 @@ export default async function NewItemPage() {
               </label>
             </div>
 
-            {owners.length > 1 ? (
-              <div className="new-item-owner-grid" aria-label="Co-owners">
-                <span className="new-item-label">Co-owners <small>Optional</small></span>
-                <div>
-                  {owners.map((owner) => (
-                    <label className="owner-check" key={owner.code}>
-                      <input name="ownerCoOwnerCodes" type="checkbox" value={owner.code} />
-                      <span>{owner.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ) : null}
           </section>
 
           <section className="new-item-card new-item-schedule-card" aria-labelledby="new-item-schedule">

@@ -55,8 +55,6 @@ export function EditItemDetailsDrawer({
   const [frequencyLabel, setFrequencyLabel] = useState(initialFrequencyLabel);
   const [recurrenceUnit, setRecurrenceUnit] = useState<RecurrenceUnit>(item.recurrence_unit);
   const [recurrenceInterval, setRecurrenceInterval] = useState(initialRecurrenceInterval);
-  const selectedOwnerCodes = new Set(item.owner_codes?.length ? item.owner_codes : item.owner_current ? [item.owner_current] : []);
-
   const ownerLabel = (owner: OwnerOption) => owner.display_name ? `${owner.display_name} (${owner.code})` : owner.code;
   const visibleFrequencyOptions = Array.from(new Set([...frequencyOptions, item.frequency_label].filter((value): value is string => Boolean(value))));
   const selectedAgencyName = agencyOptions.find((agency) => agency.id === selectedAgencyId)?.name ?? agencyNameFallback;
@@ -156,7 +154,7 @@ export function EditItemDetailsDrawer({
                   <h4>Who and where</h4>
                   <div className="f2">
                     <label>
-                      Primary owner
+                      Assigned to
                       <select name="ownerCurrent" defaultValue={item.owner_current ?? ''}>
                         <option value="">Unassigned</option>
                         {ownerOptions.map((owner) => <option value={owner.code} key={owner.code}>{ownerLabel(owner)}</option>)}
@@ -170,28 +168,14 @@ export function EditItemDetailsDrawer({
                       </select>
                     </label>
                   </div>
-                  <label>
-                    Original workbook owner code
-                    <input name="ownerRaw" defaultValue={item.owner_raw ?? ''} placeholder="Leave blank unless correcting imported data" />
-                    <span className="form-note">Use the Owner dropdown for routing. This field is only for preserving imported workbook codes when needed.</span>
-                  </label>
-                  <div className="owner-checkbox-list">
-                    <span>Co-owners</span>
-                    <div>
-                      {ownerOptions.map((owner) => (
-                        <label className="owner-check" key={owner.code}>
-                          <input
-                            name="ownerCoOwnerCodes"
-                            type="checkbox"
-                            value={owner.code}
-                            defaultChecked={selectedOwnerCodes.has(owner.code) && owner.code !== item.owner_current}
-                          />
-                          <span>{ownerLabel(owner)}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <small>Co-owners can edit, complete, and manage reminders for this item.</small>
-                  </div>
+                  <input type="hidden" name="ownerRaw" value={item.owner_raw ?? ''} />
+                  {item.owner_raw ? (
+                    <details className="import-information">
+                      <summary>Import information</summary>
+                      <div><span>Original workbook owner code</span><code>{item.owner_raw}</code></div>
+                      <p>Preserved from the source workbook for reference. It does not change who this record is assigned to.</p>
+                    </details>
+                  ) : null}
                 </section>
                 <section className="fsec">
                   <h4>Schedule</h4>

@@ -11,7 +11,6 @@ import {
   frequencyLabelOptions,
   formatDate,
   itemOwnerCodes,
-  itemOwnersLabel,
   proposedNextDates,
   storedStatusLabels,
   todayIso
@@ -247,6 +246,10 @@ export function ComplianceItemDetail({
   const currentStep = workflowIndex(item);
   const statusFormId = `status-${item.id}`;
   const availableOwnerOptions = ownerOptionsWithCurrent(ownerOptions, item);
+  const assignedOwner = availableOwnerOptions.find((owner) => owner.code === item.owner_current);
+  const assignedToLabel = item.owner_current
+    ? assignedOwner?.display_name ?? item.owner_current
+    : 'Unassigned';
   const workflowSteps = [
     { label: 'Not due yet', copy: 'Waiting for the start-working date.' },
     { label: 'Due', copy: 'Office work can start.' },
@@ -263,7 +266,7 @@ export function ComplianceItemDetail({
           <h1>{item.item_name}</h1>
           <div className="item-meta-line">
             <span>{itemVessel(item)}</span>
-            <span className="own-chip">{itemOwnersLabel(item)}</span>
+            <span className="own-chip">{assignedToLabel}</span>
             <span>{item.agency_type ?? 'No agency'}</span>
             <span>{item.frequency_label ?? 'No frequency'}</span>
           </div>
@@ -370,7 +373,7 @@ export function ComplianceItemDetail({
             </div>
             <dl className="definition-grid">
               <div><dt>Vessel</dt><dd>{itemVessel(item)}</dd></div>
-              <div><dt>Owner</dt><dd>{itemOwnersLabel(item)}</dd></div>
+              <div><dt>Assigned to</dt><dd>{assignedToLabel}</dd></div>
               <div><dt>Agency</dt><dd>{item.agency_type ?? '-'}</dd></div>
               <div><dt>Item #</dt><dd>{item.item_number ?? '-'}</dd></div>
               <div><dt>Frequency</dt><dd>{item.frequency_label ?? '-'}</dd></div>
@@ -401,7 +404,7 @@ export function ComplianceItemDetail({
                 itemName={item.item_name}
                 itemPathPrefix={itemPathPrefix}
                 itemVesselName={itemVessel(item)}
-                ownerCode={itemOwnersLabel(item)}
+                ownerCode={item.owner_current ?? ''}
                 startWorkingOn={item.start_working_on}
                 expirationDate={item.expiration_date}
                 instructions={item.instructions}

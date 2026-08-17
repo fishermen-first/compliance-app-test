@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { Download } from 'lucide-react';
 import { AppSidebar } from '@/components/app-sidebar';
-import { displayState, formatDate, itemHasOwnerCode, itemOwnerCodes, itemOwnersLabel, itemIsOverdue } from '@/lib/compliance';
-import { getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer-data';
+import { displayState, formatDate, itemIsOverdue } from '@/lib/compliance';
+import { getCompanyOwnerCodes, getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer-data';
 import { accessRoleLabel } from '@/lib/roles';
 
 type CompletedPageProps = {
@@ -59,7 +59,9 @@ function SortHeader({ label, sortKey, searchParams, sort, dir }: { label: string
 
 export default async function CompletedPage({ searchParams }: CompletedPageProps) {
   const { membership, company, profile, user, supabase } = await getCustomerContext();
-  const items = await getCustomerItems(membership.company_id);
+  const [items, ownerCodes] = await Promise.all([getCustomerItems(membership.company_id), getCompanyOwnerCodes(membership.company_id)]);
+  const ownerNames = new Map(ownerCodes.map((owner) => [owner.code, owner.display_name ?? owner.code]));
+  const assignedTo = (item: (typeof items)[number]) => item.owner_current ? ownerNames.get(item.owner_current) ?? item.owner_current : 'Unassigned';
   const completedItems = items.filter((item) => item.status === 'complete');
   const completedIds = completedItems.map((item) => item.id);
   const { data: completeHistory } = completedIds.length > 0
@@ -76,14 +78,14 @@ export default async function CompletedPage({ searchParams }: CompletedPageProps
     if (!historyByItem.has(row.item_id)) historyByItem.set(row.item_id, row);
   });
   const years = Array.from(new Set(completedItems.map((item) => item.completed_at?.slice(0, 4)).filter(Boolean) as string[])).sort((a, b) => b.localeCompare(a));
-  const owners = Array.from(new Set(completedItems.flatMap(itemOwnerCodes))).sort();
+  const owners = ownerCodes.map((owner) => owner.code).sort();
   const vessels = Array.from(new Set(completedItems.map(itemVessel))).sort();
   const sort = sortKeys.has(searchParams?.sort as SortKey) ? searchParams?.sort as SortKey : 'completed';
   const dir = searchParams?.dir === 'asc' ? 'asc' : 'desc';
 
   const filtered = completedItems.filter((item) => {
     if (searchParams?.year && item.completed_at?.slice(0, 4) !== searchParams.year) return false;
-    if (searchParams?.owner && !itemHasOwnerCode(item, searchParams.owner)) return false;
+    if (searchParams?.owner && item.owner_current !== searchParams.owner) return false;
     if (searchParams?.vessel && itemVessel(item) !== searchParams.vessel) return false;
     return true;
   });
@@ -95,7 +97,7 @@ export default async function CompletedPage({ searchParams }: CompletedPageProps
     const values: Record<SortKey, [string, string]> = {
       item: [a.item_name, b.item_name],
       vessel: [itemVessel(a), itemVessel(b)],
-      owner: [itemOwnersLabel(a), itemOwnersLabel(b)],
+      owner: [assignedTo(a), assignedTo(b)],
       completed: [a.completed_at ?? '', b.completed_at ?? ''],
       by: [actorLabel(aHistory), actorLabel(bHistory)]
     };
@@ -104,11 +106,11 @@ export default async function CompletedPage({ searchParams }: CompletedPageProps
   });
 
   const csv = [
-    ['Item', 'Vessel', 'Owner', 'Completed', 'By', 'Final note', 'Proof'].map(csvEscape).join(','),
+    ['Item', 'Vessel', 'Assigned to', 'Completed', 'By', 'Final note', 'Proof'].map(csvEscape).join(','),
     ...sorted.map((item) => [
       item.item_name,
       itemVessel(item),
-      itemOwnersLabel(item),
+      assignedTo(item),
       item.completed_at ?? '',
       actorLabel(historyByItem.get(item.id)),
       item.status_notes ?? '',
@@ -169,7 +171,7 @@ export default async function CompletedPage({ searchParams }: CompletedPageProps
                 <tr>
                   <th><SortHeader dir={dir} label="Item" searchParams={searchParams} sort={sort} sortKey="item" /></th>
                   <th><SortHeader dir={dir} label="Vessel" searchParams={searchParams} sort={sort} sortKey="vessel" /></th>
-                  <th><SortHeader dir={dir} label="Owner" searchParams={searchParams} sort={sort} sortKey="owner" /></th>
+                  <th><SortHeader dir={dir} label="Assigned to" searchParams={searchParams} sort={sort} sortKey="owner" /></th>
                   <th><SortHeader dir={dir} label="Completed" searchParams={searchParams} sort={sort} sortKey="completed" /></th>
                   <th><SortHeader dir={dir} label="By" searchParams={searchParams} sort={sort} sortKey="by" /></th>
                   <th>Final note</th>
@@ -185,7 +187,7 @@ export default async function CompletedPage({ searchParams }: CompletedPageProps
                     <tr key={item.id}>
                       <td><Link className="item-link" href={`/items/${item.id}`}>{item.item_name}</Link></td>
                       <td>{itemVessel(item)}</td>
-                      <td><span className="own-chip">{itemOwnersLabel(item)}</span></td>
+                      <td><span className="own-chip">{assignedTo(item)}</span></td>
                       <td>{formatDate(item.completed_at)}</td>
                       <td>{actorLabel(history)}</td>
                       <td><span className="cell-note">{item.status_notes ?? history?.notes ?? 'No final note'}</span></td>

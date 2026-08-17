@@ -100,6 +100,7 @@ export default async function Home({ searchParams }: HomeProps) {
         complianceItems={complianceItems}
         tasks={tasks}
         members={members}
+        ownerNames={Object.fromEntries(ownerCodes.map((owner) => [owner.code, owner.display_name ?? owner.code]))}
         canViewEveryone={canViewEveryone}
         showEveryone={showEveryone}
       />

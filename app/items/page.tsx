@@ -3,8 +3,8 @@ import { type ReactNode } from 'react';
 import { Columns3, Plus } from 'lucide-react';
 import { AppSidebar } from '@/components/app-sidebar';
 import { StatusBadge } from '@/components/status-badge';
-import { type ComplianceItem, displayState, displayStateParam, formatDate, itemHasOwnerCode, itemOwnerCodes, itemOwnersLabel, itemIsOverdue } from '@/lib/compliance';
-import { getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer-data';
+import { type ComplianceItem, displayState, displayStateParam, formatDate, itemIsOverdue } from '@/lib/compliance';
+import { getCompanyOwnerCodes, getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer-data';
 import { accessRoleLabel, canCreateComplianceItems } from '@/lib/roles';
 
 type ItemsPageProps = {
@@ -29,7 +29,7 @@ const pageSize = 10;
 const columns: Array<{ key: ColumnKey; label: string }> = [
   { key: 'item', label: 'Item' },
   { key: 'vessel', label: 'Vessel' },
-  { key: 'owner', label: 'Owner' },
+  { key: 'owner', label: 'Assigned to' },
   { key: 'agency', label: 'Agency' },
   { key: 'frequency', label: 'Frequency' },
   { key: 'start', label: 'Start' },
@@ -73,7 +73,7 @@ function itemsHref(searchParams: ItemsPageProps['searchParams'], updates: Record
 }
 
 function sortValue(item: ComplianceItem, sort: SortKey) {
-  if (sort === 'owner') return itemOwnersLabel(item);
+  if (sort === 'owner') return item.owner_current ?? '';
   if (sort === 'vessel') return itemVessel(item);
   if (sort === 'item') return item.item_name;
   if (sort === 'agency') return item.agency_type ?? '';
@@ -160,7 +160,7 @@ function FilterMenu({ label, selectedLabel, children }: { label: string; selecte
   );
 }
 
-function ItemCell({ item, column }: { item: ComplianceItem; column: ColumnKey }) {
+function ItemCell({ item, column, ownerNames }: { item: ComplianceItem; column: ColumnKey; ownerNames: Map<string, string> }) {
   if (column === 'item') {
     return (
       <td>
@@ -172,7 +172,7 @@ function ItemCell({ item, column }: { item: ComplianceItem; column: ColumnKey })
     );
   }
   if (column === 'vessel') return <td>{itemVessel(item)}</td>;
-  if (column === 'owner') return <td><span className="own-chip">{itemOwnersLabel(item)}</span></td>;
+  if (column === 'owner') return <td><span className="own-chip">{item.owner_current ? ownerNames.get(item.owner_current) ?? item.owner_current : 'Unassigned'}</span></td>;
   if (column === 'agency') return <td>{item.agency_type ?? '-'}</td>;
   if (column === 'frequency') return <td>{item.frequency_label ?? '-'}</td>;
   if (column === 'start') return <td>{formatDate(item.start_working_on)}</td>;
@@ -184,9 +184,10 @@ function ItemCell({ item, column }: { item: ComplianceItem; column: ColumnKey })
 
 export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const { membership, company, profile, user } = await getCustomerContext();
-  const allItems = await getCustomerItems(membership.company_id);
+  const [allItems, ownerCodes] = await Promise.all([getCustomerItems(membership.company_id), getCompanyOwnerCodes(membership.company_id)]);
+  const ownerNames = new Map(ownerCodes.map((owner) => [owner.code, owner.display_name ?? owner.code]));
   const canCreateItems = canCreateComplianceItems(membership.role);
-  const owners = Array.from(new Set(allItems.flatMap(itemOwnerCodes))).sort();
+  const owners = ownerCodes.map((owner) => owner.code).sort();
   const vessels = Array.from(new Set(allItems.map(itemVessel))).sort();
   const sort = sortKeys.has(searchParams?.sort as SortKey) ? searchParams?.sort as SortKey : 'status';
   const dir = searchParams?.dir === 'desc' ? 'desc' : 'asc';
@@ -201,7 +202,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
     }
     if (searchParams?.status === 'overdue' && !itemIsOverdue(item)) return false;
     if (searchParams?.status && searchParams.status !== 'overdue' && searchParams.status !== item.status && searchParams.status !== displayStateParam(item)) return false;
-    if (searchParams?.owner && !itemHasOwnerCode(item, searchParams.owner)) return false;
+    if (searchParams?.owner && item.owner_current !== searchParams.owner) return false;
     if (searchParams?.vessel && itemVessel(item) !== searchParams.vessel) return false;
     return true;
   }), sort, dir);
@@ -252,7 +253,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
         <section className="panel queue-filter-panel" aria-label="Item filters">
           <div className="queue-tools">
             <div className="filter-chip-bar">
-              <FilterMenu label="Owner" selectedLabel={ownerLabel}>
+              <FilterMenu label="Assigned to" selectedLabel={ownerLabel}>
                 <Link className={!searchParams?.owner ? 'active' : ''} href={itemsHref(searchParams, { owner: undefined, page: undefined })} scroll={false}>All owners</Link>
                 {owners.map((owner) => <Link className={searchParams?.owner === owner ? 'active' : ''} href={itemsHref(searchParams, { owner, page: undefined })} key={owner} scroll={false}>{owner}</Link>)}
               </FilterMenu>
@@ -302,7 +303,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
                   </tr>
                 ) : pagedItems.map((item) => (
                   <tr key={item.id}>
-                    {visibleColumns.map((column) => <ItemCell column={column} item={item} key={column} />)}
+                    {visibleColumns.map((column) => <ItemCell column={column} item={item} ownerNames={ownerNames} key={column} />)}
                   </tr>
                 ))}
               </tbody>
