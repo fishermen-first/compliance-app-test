@@ -250,6 +250,9 @@ export function ComplianceItemDetail({
   const assignedToLabel = item.owner_current
     ? assignedOwner?.display_name ?? item.owner_current
     : 'Unassigned';
+  const supportingOwnerLabels = (item.owner_codes ?? [])
+    .filter((code) => code !== item.owner_current)
+    .map((code) => availableOwnerOptions.find((owner) => owner.code === code)?.display_name ?? code);
   const workflowSteps = [
     { label: 'Not due yet', copy: 'Waiting for the start-working date.' },
     { label: 'Due', copy: 'Office work can start.' },
@@ -374,6 +377,7 @@ export function ComplianceItemDetail({
             <dl className="definition-grid">
               <div><dt>Vessel</dt><dd>{itemVessel(item)}</dd></div>
               <div><dt>Assigned to</dt><dd>{assignedToLabel}</dd></div>
+              <div><dt>Supporting owners</dt><dd>{supportingOwnerLabels.length > 0 ? supportingOwnerLabels.join(', ') : 'None'}</dd></div>
               <div><dt>Agency</dt><dd>{item.agency_type ?? '-'}</dd></div>
               <div><dt>Item #</dt><dd>{item.item_number ?? '-'}</dd></div>
               <div><dt>Frequency</dt><dd>{item.frequency_label ?? '-'}</dd></div>

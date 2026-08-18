@@ -244,14 +244,16 @@ export async function createComplianceItem(formData: FormData) {
   const ownerRaw = optionalString(formData, 'ownerRaw');
   const frequencyLabel = optionalString(formData, 'frequencyLabel');
   const recurrence = inferRecurrence(frequencyLabel);
-  const primaryOwner = optionalString(formData, 'ownerCurrent') ?? parseOwnerCurrent(ownerRaw);
+  const selectedOwnerCodes = ownerCodeList(formData);
+  const primaryOwner = selectedOwnerCodes[0] ?? parseOwnerCurrent(ownerRaw);
+  const ownerCodes = selectedOwnerCodes.length > 0 ? selectedOwnerCodes : primaryOwner ? [primaryOwner] : [];
 
   const { data: itemId, error } = await supabase.rpc('create_compliance_item', {
     target_company_id: targetCompanyId,
     target_vessel_id: optionalString(formData, 'vesselId'),
     item_owner_raw: ownerRaw,
     item_owner_current: primaryOwner,
-    item_owner_codes: primaryOwner ? [primaryOwner] : [],
+    item_owner_codes: ownerCodes,
     item_name: requiredString(formData, 'itemName'),
     item_number: optionalString(formData, 'itemNumber'),
     item_agency_type: optionalString(formData, 'agencyType'),
@@ -277,14 +279,15 @@ export async function createComplianceItem(formData: FormData) {
 export async function updateComplianceItemCore(formData: FormData) {
   const itemId = requiredString(formData, 'itemId');
   const { supabase } = await requireMembership({ allowAppAdmin: true });
-  const primaryOwner = optionalString(formData, 'ownerCurrent');
+  const ownerCodes = ownerCodeList(formData);
+  const primaryOwner = ownerCodes[0] ?? null;
 
   const { error } = await supabase.rpc('update_compliance_item_core', {
     target_item_id: itemId,
     next_vessel_id: optionalString(formData, 'vesselId'),
     next_owner_raw: optionalString(formData, 'ownerRaw'),
     next_owner_current: primaryOwner,
-    next_owner_codes: primaryOwner ? [primaryOwner] : [],
+    next_owner_codes: ownerCodes,
     next_item_name: requiredString(formData, 'itemName'),
     next_item_number: optionalString(formData, 'itemNumber'),
     next_agency_type: optionalString(formData, 'agencyType'),

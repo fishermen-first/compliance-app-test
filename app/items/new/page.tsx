@@ -243,9 +243,22 @@ export default async function NewItemPage() {
                 <span className="new-item-label">Assigned to</span>
                 <select name="ownerCurrent" defaultValue="">
                   <option value="">Unassigned</option>
-                  {owners.map((owner) => <option value={owner.code} key={owner.code}>{owner.label}</option>)}
+                  {owners.filter((owner) => !owner.code.includes('/') && !owner.code.includes('-->')).map((owner) => <option value={owner.code} key={owner.code}>{owner.label}</option>)}
                 </select>
               </label>
+            </div>
+
+            <div className="new-item-owner-grid">
+              <span className="new-item-label">Supporting owners <small>(optional)</small></span>
+              <div>
+                {owners.filter((owner) => !owner.code.includes('/') && !owner.code.includes('-->')).map((owner) => (
+                  <label className="owner-check" key={owner.code}>
+                    <input name="ownerCoOwnerCodes" type="checkbox" value={owner.code} />
+                    <span>{owner.label}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="new-item-help">Supporting owners can view and contribute. The assigned owner remains the primary person responsible.</p>
             </div>
 
           </section>
