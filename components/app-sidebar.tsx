@@ -19,7 +19,7 @@ const navSections = [
     label: 'Compliance',
     items: [
       { label: 'Compliance records', description: 'All requirements and deadlines', icon: ListChecks, href: '/items' },
-      { label: 'Calendar', description: 'Start and due dates', icon: CalendarDays, href: '/calendar' },
+      { label: 'Compliance schedule', description: 'Plan start and expiration dates', icon: CalendarDays, href: '/calendar' },
       { label: 'Completed records', description: 'Finished compliance history', icon: Archive, href: '/completed' },
       { label: 'Reminder center', description: 'Schedules and delivery activity', icon: Bell, href: '/reminders' }
     ]

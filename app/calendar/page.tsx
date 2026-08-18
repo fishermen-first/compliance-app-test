@@ -180,14 +180,14 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
       <main className="workspace list-workspace">
         <header className="list-header">
           <div>
-            <p className="eyebrow">Planning calendar · {scopeLabel}</p>
-            <h1>Compliance planning dates</h1>
-            <p>Use this list to plan around the two dates from the workbook: when to start work, and when the item expires or is due.</p>
+            <p className="eyebrow">Compliance schedule · {scopeLabel}</p>
+            <h1>Compliance schedule</h1>
+            <p>Plan work by start-working and expiration dates, from items needing attention now through upcoming deadlines.</p>
           </div>
           <Link className="primary-action" href="/">Work queue</Link>
         </header>
 
-        <section className="customer-summary-grid" aria-label="Calendar summary">
+        <section className="customer-summary-grid" aria-label="Compliance schedule summary">
           <article>
             <span>Needs work now</span>
             <strong>{needsWorkNow.length}</strong>

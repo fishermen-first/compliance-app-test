@@ -141,7 +141,7 @@ export function CombinedDashboard({
 
       <div className="cdash-lower">
         <section className="cdash-card" aria-labelledby="coming-up">
-          <div className="cdash-card-head"><div><h2 id="coming-up">Coming up</h2><p>Next 30 days</p></div><Link href="/calendar">View calendar <ChevronRight aria-hidden="true" /></Link></div>
+          <div className="cdash-card-head"><div><h2 id="coming-up">Coming up</h2><p>Next 30 days</p></div><Link href="/calendar">View schedule <ChevronRight aria-hidden="true" /></Link></div>
           <div className="cdash-upcoming">
             {upcoming.length ? upcoming.map((entry, index) => <article key={`${entry.kind}-${entry.title}-${entry.date}-${index}`}><time dateTime={entry.date}><strong>{shortDate(entry.date).split(' ')[1]}</strong><span>{shortDate(entry.date).split(' ')[0]}</span></time><span className={`cdash-type ${entry.kind}`}>{entry.kind}</span><div><h3>{entry.title}</h3><p>{dateMeta(entry.date)}</p></div></article>) : <div className="cdash-empty compact"><CalendarDays aria-hidden="true" /><p>Nothing scheduled in the next 30 days.</p></div>}
           </div>

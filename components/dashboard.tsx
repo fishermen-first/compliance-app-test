@@ -320,7 +320,7 @@ export function Dashboard({
           </div>
           <Link className="btn" href="/calendar">
             <CalendarDays aria-hidden="true" />
-            <span>Calendar</span>
+            <span>Compliance schedule</span>
           </Link>
           {canCreateItems ? (
             <Link className="btn primary" href="/items/new">
