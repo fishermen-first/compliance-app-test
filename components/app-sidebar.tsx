@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Archive, Bell, CalendarDays, ClipboardList, HelpCircle, ListChecks, ListTodo, LogOut, Settings, ShieldCheck } from 'lucide-react';
+import { Archive, Bell, CalendarDays, ClipboardList, HelpCircle, ListChecks, ListTodo, LogOut, Settings, ShieldCheck, UploadCloud } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
 
 const navSections = [
@@ -27,6 +27,7 @@ const navSections = [
   {
     label: 'Workspace',
     items: [
+      { label: 'Import records', description: 'Upload and review a workbook', icon: UploadCloud, href: '/settings/import', ownerOnly: true },
       { label: 'Workspace settings', description: 'People, vessels, and lists', icon: Settings, href: '/settings' }
     ]
   }
@@ -77,7 +78,7 @@ export function AppSidebar({
         {navSections.map((section) => (
           <section className="side-nav-section" aria-labelledby={`side-nav-${section.label.toLowerCase().replaceAll(' ', '-')}`} key={section.label}>
             <h2 id={`side-nav-${section.label.toLowerCase().replaceAll(' ', '-')}`}>{section.label}</h2>
-            {section.items.map((item) => {
+            {section.items.filter((item) => !('ownerOnly' in item) || userRole === 'Owner').map((item) => {
               const Icon = item.icon;
               const isDashboard = item.href === '/';
               return (

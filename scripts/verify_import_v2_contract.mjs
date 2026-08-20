@@ -23,13 +23,15 @@ function loadWorkbookImportModule() {
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2020
+      target: ts.ScriptTarget.ES2020,
+      esModuleInterop: true
     }
   }).outputText;
   const module = { exports: {} };
 
   vm.runInNewContext(compiled, {
     Buffer,
+    Date,
     exports: module.exports,
     module,
     require: (id) => {
@@ -94,6 +96,87 @@ test('parser treats explicit quarterly periods as annual quarter-specific record
   assert.notEqual(q1Fingerprint, q2Fingerprint);
 });
 
+test('parser normalizes compound workbook owner codes without splitting ordinary hyphens', () => {
+  const { parseOwnerCodes } = loadWorkbookImportModule();
+
+  assert.deepEqual(plain(parseOwnerCodes('SN/ES')), ['SN', 'ES']);
+  assert.deepEqual(plain(parseOwnerCodes('SN-->ES')), ['SN', 'ES']);
+  assert.deepEqual(plain(parseOwnerCodes('SN --> MA')), ['SN', 'MA']);
+  assert.deepEqual(plain(parseOwnerCodes('SN/BJ-->ES')), ['SN', 'BJ', 'ES']);
+  assert.deepEqual(plain(parseOwnerCodes('ES→SN/ES')), ['ES', 'SN']);
+  assert.deepEqual(plain(parseOwnerCodes('Ops - ES confirm')), ['Ops - ES confirm']);
+  assert.deepEqual(plain(parseOwnerCodes(null)), []);
+});
+
+test('parser accepts keyless FF template v1 rows and mints stable template keys', async () => {
+  const { parseComplianceWorkbook } = loadWorkbookImportModule();
+  const ExcelJS = require('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Due Dates');
+  const excelSerialDate = (date) => date.getTime() / 86400000 + 25569;
+
+  sheet.addRow([
+    'owner_code',
+    'vessel_or_scope',
+    'item_name',
+    'item_number',
+    'regulatory_party',
+    'compliance_domain',
+    'obligation_type',
+    'applicability_scope',
+    'frequency',
+    'start_working_on',
+    'due_or_expiration_date'
+  ]);
+  sheet.addRow([
+    'ES',
+    'Arctic Storm',
+    'USCG Certificate of Inspection',
+    'COI-2026',
+    'USCG',
+    'Vessel Compliance',
+    'Inspection',
+    'Vessel',
+    'Annual',
+    excelSerialDate(new Date(Date.UTC(2026, 0, 15))),
+    excelSerialDate(new Date(Date.UTC(2026, 2, 1)))
+  ]);
+  sheet.getCell('J2').numFmt = 'yyyy-mm-dd';
+  sheet.getCell('K2').numFmt = 'yyyy-mm-dd';
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const parsed = await parseComplianceWorkbook(buffer);
+  const [record] = parsed.records;
+
+  assert.equal(parsed.detectedFormat, 'ff_template_v1');
+  assert.equal(parsed.summary.warnings.length, 0);
+  assert.equal(parsed.records.length, 1);
+  assert.match(record.templateItemKey, /^ffv1-[a-f0-9]{24}$/);
+  assert.equal(record.sourceRowJson.template_item_key, undefined);
+});
+
+test('parser names missing and duplicate FF template columns before import', async () => {
+  const { parseComplianceWorkbook } = loadWorkbookImportModule();
+  const ExcelJS = require('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Due Dates');
+  sheet.addRow([
+    'owner_code', 'vessel_or_scope', 'item_name', 'item_number', 'regulatory_party',
+    'compliance_domain', 'obligation_type', 'applicability_scope', 'frequency',
+    'start_working_on', 'owner_code'
+  ]);
+  const buffer = await workbook.xlsx.writeBuffer();
+
+  await assert.rejects(
+    () => parseComplianceWorkbook(buffer),
+    (error) => {
+      assert.match(error.message, /Missing required columns: due_or_expiration_date/);
+      assert.match(error.message, /Duplicate columns: owner_code/);
+      return true;
+    }
+  );
+});
+
 test('phase 1 migration keeps legacy RPC and adds dry-run/apply surfaces', () => {
   const legacy = read('supabase/migrations/20260510150035_import_workbook_records.sql');
   const migration = read('supabase/migrations/20260513000100_import_data_model_v2_phase1.sql');
@@ -126,6 +209,18 @@ test('server action dry-runs before apply and no longer upserts item dependencie
   assert.doesNotMatch(action, /from\('vessels'\)\.upsert/);
   assert.doesNotMatch(action, /from\('company_owner_codes'\)\.upsert/);
   assert.doesNotMatch(action, /import_compliance_workbook_records/);
+});
+
+test('workspace imports require owner membership and bind apply to the same company', () => {
+  const action = read('app/actions/imports.ts');
+  const page = read('app/settings/import/page.tsx');
+  const templateRoute = read('app/api/import-template/route.ts');
+
+  assert.match(action, /eq\('role', 'owner'\)/);
+  assert.match(action, /eq\('company_id', companyId\)/);
+  assert.match(action, /eq\('id', importRunId\).*eq\('company_id', companyId\)/s);
+  assert.match(page, /membership\.role !== 'owner'/);
+  assert.match(templateRoute, /eq\('role', 'owner'\)/);
 });
 
 test('multi-owner import migration parses compound codes and synchronizes item owners', () => {

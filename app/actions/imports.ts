@@ -16,6 +16,10 @@ function customerImportPath(companyId: string, message: string) {
   return `/admin/customers/${companyId}/import?message=${encodeURIComponent(message)}`;
 }
 
+function ownerImportPath(message: string) {
+  return `/settings/import?message=${encodeURIComponent(message)}`;
+}
+
 type ImportResolution = {
   issue_id: string;
   action: 'map' | 'create';
@@ -79,26 +83,31 @@ async function ensureImporterProfile(admin: ReturnType<typeof createAdminClient>
   if (error) throw new Error(error.message);
 }
 
-async function requireAppAdmin() {
+async function requireImporter(companyId: string) {
   const supabase = createClient();
   const { data: userData } = await supabase.auth.getUser();
 
-  if (!userData.user) redirect('/');
+  if (!userData.user) redirect('/login');
 
-  const { data: isAppAdmin } = await supabase.rpc('is_app_admin');
-  if (!isAppAdmin) redirect('/');
+  const [{ data: isAppAdmin }, { data: membership }] = await Promise.all([
+    supabase.rpc('is_app_admin'),
+    supabase.from('company_memberships').select('id').eq('company_id', companyId).eq('user_id', userData.user.id).eq('role', 'owner').maybeSingle()
+  ]);
+  if (!isAppAdmin && !membership) redirect('/');
 
-  return userData.user;
+  return { user: userData.user, isAppAdmin: Boolean(isAppAdmin) };
 }
 
 export async function importComplianceWorkbook(formData: FormData) {
   const companyId = requiredString(formData, 'companyId');
   const workbook = formData.get('workbook');
 
-  const user = await requireAppAdmin();
+  const importer = await requireImporter(companyId);
+  const { user } = importer;
+  const destination = (message: string) => importer.isAppAdmin ? customerImportPath(companyId, message) : ownerImportPath(message);
 
   if (!(workbook instanceof File) || workbook.size === 0) {
-    redirect(customerImportPath(companyId, 'Choose a workbook to import.'));
+    redirect(destination('Choose a workbook to import.'));
   }
 
   const buffer = await workbook.arrayBuffer();
@@ -108,7 +117,7 @@ export async function importComplianceWorkbook(formData: FormData) {
     parsed = await parseComplianceWorkbook(buffer);
   } catch (error) {
     if (error instanceof WorkbookImportError) {
-      redirect(customerImportPath(companyId, error.message));
+      redirect(destination(error.message));
     }
     throw error;
   }
@@ -116,7 +125,7 @@ export async function importComplianceWorkbook(formData: FormData) {
   const { sheetName, detectedFormat, templateVersion, parserVersion, records, summary } = parsed;
 
   if (records.length === 0) {
-    redirect(customerImportPath(companyId, 'No compliance rows were found in the workbook.'));
+    redirect(destination('No compliance rows were found in the workbook.'));
   }
 
   const admin = createAdminClient();
@@ -189,14 +198,20 @@ export async function importComplianceWorkbook(formData: FormData) {
 
   const safeCount = importRun.safe_create_count + importRun.safe_update_count;
   const issueCopy = importRun.issue_count > 0 ? ` ${importRun.issue_count} issues need review.` : '';
-  redirect(customerImportPath(companyId, `Dry run complete: ${importRun.record_count} rows parsed, ${safeCount} safe to apply.${issueCopy}`));
+  redirect(destination(`Dry run complete: ${importRun.record_count} rows parsed, ${safeCount} safe to apply.${issueCopy}`));
 }
 
 export async function applyComplianceWorkbookImport(formData: FormData) {
   const companyId = requiredString(formData, 'companyId');
   const importRunId = requiredString(formData, 'importRunId');
-  const user = await requireAppAdmin();
+  const importer = await requireImporter(companyId);
+  const { user } = importer;
   const admin = createAdminClient();
+
+  const { data: targetRun, error: targetRunError } = await admin.from('company_import_runs').select('id')
+    .eq('id', importRunId).eq('company_id', companyId).eq('mode', 'dry_run').is('applied_run_id', null).maybeSingle();
+  if (targetRunError) throw new Error(targetRunError.message);
+  if (!targetRun) redirect(importer.isAppAdmin ? customerImportPath(companyId, 'Import run is no longer available.') : ownerImportPath('Import run is no longer available.'));
 
   await ensureImporterProfile(admin, user);
 
@@ -226,5 +241,6 @@ export async function applyComplianceWorkbookImport(formData: FormData) {
   revalidatePath(`/admin/customers/${companyId}/codes`);
 
   const skippedCopy = applyRun.skipped_count > 0 ? ` ${applyRun.skipped_count} rows were left unchanged for review.` : '';
-  redirect(customerImportPath(companyId, `Applied ${applyRun.safe_create_count} new rows and ${applyRun.safe_update_count} source updates.${skippedCopy}`));
+  const message = `Applied ${applyRun.safe_create_count} new rows and ${applyRun.safe_update_count} source updates.${skippedCopy}`;
+  redirect(importer.isAppAdmin ? customerImportPath(companyId, message) : ownerImportPath(message));
 }

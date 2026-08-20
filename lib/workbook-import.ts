@@ -89,8 +89,7 @@ const legacyHeaderLabels = [
   'Information'
 ] as const;
 
-const templateRequiredColumns = [
-  'template_item_key',
+export const templateRequiredColumns = [
   'owner_code',
   'vessel_or_scope',
   'item_name',
@@ -103,6 +102,8 @@ const templateRequiredColumns = [
   'start_working_on',
   'due_or_expiration_date'
 ] as const;
+
+const templateOptionalColumns = ['template_item_key', 'period', 'status_notes', 'instructions'] as const;
 
 const companyWideNames = new Set(['asmg', 'ashco', 'company', 'office', '']);
 const optionalPeriodColumns = ['period', 'cycle', 'quarter'] as const;
@@ -163,6 +164,28 @@ function valueForAnyColumn(row: unknown[], columns: Map<string, number>, names: 
 function isTemplateHeader(row: unknown[]) {
   const columns = templateColumnMap(row);
   return templateRequiredColumns.every((column) => columns.has(column));
+}
+
+function assertTemplateHeaderShape(rows: unknown[][]) {
+  const candidates = rows.map((row, index) => {
+    const normalized = row.map(normalizeHeaderLabel).filter(Boolean);
+    const recognized = normalized.filter((label) =>
+      [...templateRequiredColumns, ...templateOptionalColumns].includes(label as never)
+    );
+    return { index, normalized, recognized };
+  }).sort((a, b) => b.recognized.length - a.recognized.length);
+  const candidate = candidates[0];
+  if (!candidate || candidate.recognized.length < 3) return;
+
+  const duplicates = candidate.normalized.filter((label, index) => candidate.normalized.indexOf(label) !== index);
+  const missing = templateRequiredColumns.filter((column) => !candidate.normalized.includes(column));
+  if (duplicates.length > 0 || missing.length > 0) {
+    const details = [
+      missing.length > 0 ? `Missing required columns: ${missing.join(', ')}.` : null,
+      duplicates.length > 0 ? `Duplicate columns: ${Array.from(new Set(duplicates)).join(', ')}.` : null
+    ].filter(Boolean).join(' ');
+    throw new WorkbookImportError(`The FF template header on row ${candidate.index + 1} is invalid. ${details}`);
+  }
 }
 
 function isLegacyHeader(row: unknown[]) {
@@ -358,6 +381,7 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
   const records: ImportedComplianceRecord[] = [];
   const templateHeaderIndex = rows.findIndex((row) => isTemplateHeader(row));
   const legacyHeaderIndex = rows.findIndex((row) => isLegacyHeader(row));
+  if (templateHeaderIndex === -1) assertTemplateHeaderShape(rows);
   const detectedFormat: DetectedWorkbookFormat = templateHeaderIndex !== -1 ? 'ff_template_v1' : 'legacy_due_dates';
   const templateVersion = detectedFormat === 'ff_template_v1' ? 'FF Compliance Import Template v1' : null;
 
@@ -406,13 +430,14 @@ export async function parseComplianceWorkbook(buffer: ArrayBuffer): Promise<{
         agencyType: normalizeMatchValue(agencyType),
         periodLabel
       };
+      const fingerprint = sourceFingerprint(matchCandidate);
 
       records.push({
         sourceRowNumber: rowNumber,
         sourceRowJson,
         sourceRowHash: sha256(sourceRowJson),
-        sourceFingerprint: sourceFingerprint(matchCandidate),
-        templateItemKey: clean(valueFor('template_item_key')),
+        sourceFingerprint: fingerprint,
+        templateItemKey: clean(valueFor('template_item_key')) ?? `ffv1-${fingerprint.slice(0, 24)}`,
         matchCandidate,
         ownerRaw,
         ownerCurrent,
