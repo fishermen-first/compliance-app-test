@@ -197,6 +197,7 @@ export function ComplianceItemDetail({
   agencyOptions = [],
   referenceContacts = [],
   referenceContactGroups = [],
+  linkedTasks = [],
   canUpdateStatus,
   canCompleteItem,
   canEditCore,
@@ -217,6 +218,14 @@ export function ComplianceItemDetail({
   agencyOptions?: AgencyOption[];
   referenceContacts?: ReferenceContactOption[];
   referenceContactGroups?: ReferenceContactGroupOption[];
+  linkedTasks?: Array<{
+    id: string;
+    title: string;
+    status: string;
+    priority: string;
+    due_date: string | null;
+    profiles: { full_name: string | null; email: string | null } | null;
+  }>;
   canUpdateStatus: boolean;
   canCompleteItem: boolean;
   canEditCore: boolean;
@@ -390,6 +399,16 @@ export function ComplianceItemDetail({
         </div>
 
         <aside className="detail-right-rail">
+          <article className="detail-card linked-task-card">
+            <div className="linked-task-card-head"><div><p className="eyebrow">Tasks</p><h2>Related work</h2></div><Link href={`/tasks`}>View all tasks</Link></div>
+            {linkedTasks.length ? (
+              <ul className="linked-task-list">
+                {linkedTasks.map((task) => <li key={task.id}><span className={`linked-task-check${task.status === 'completed' ? ' is-complete' : ''}`} aria-hidden="true" /><div><strong>{task.title}</strong><span>{task.profiles?.full_name ?? task.profiles?.email ?? 'Workspace user'} · {task.due_date ? `Due ${formatDate(task.due_date)}` : 'No due date'}{task.priority === 'high' ? ' · High priority' : ''}</span></div></li>)}
+              </ul>
+            ) : <p className="linked-task-empty">No tasks are linked to this compliance record.</p>}
+            <p className="carry-note">Task completion does not change this compliance record’s status.</p>
+          </article>
+
           <article className="detail-card">
             <p className="eyebrow">Reminders</p>
             <ul className="reminder-card-list">

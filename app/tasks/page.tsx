@@ -1,15 +1,18 @@
 import Link from 'next/link';
-import { Archive, CalendarDays, Check, ChevronRight, Circle, ListTodo, Plus, UserRound } from 'lucide-react';
+import { Archive, Bell, CalendarDays, Check, ChevronRight, Circle, Link2, ListTodo, Plus, UserRound } from 'lucide-react';
 import {
   createWorkspaceTask,
+  dismissWorkspaceTaskReminder,
   setWorkspaceTaskArchived,
   setWorkspaceTaskCompletion,
+  snoozeWorkspaceTaskReminder,
   updateWorkspaceTask
 } from '@/app/actions/tasks';
 import { AppSidebar } from '@/components/app-sidebar';
 import { displayState, itemIsOverdue } from '@/lib/compliance';
 import { getCustomerContext, getCustomerItems } from '@/lib/customer-data';
 import { accessRoleLabel } from '@/lib/roles';
+import { formatTaskReminder, reminderInputValue, taskReminderIsDue } from '@/lib/task-reminders';
 
 type TaskPageProps = {
   searchParams?: { view?: string; status?: string };
@@ -26,7 +29,18 @@ type WorkspaceTask = {
   completed_at: string | null;
   archived_at: string | null;
   created_at: string;
+  compliance_item_id: string | null;
+  reminder_at: string | null;
+  reminder_dismissed_at: string | null;
+  compliance_items: {
+    id: string;
+    item_name: string;
+    status: string;
+    vessels: { name: string } | null;
+  } | null;
 };
+
+type ComplianceRecordOption = { id: string; item_name: string; vessel_name: string | null; status: string };
 
 type WorkspaceMember = {
   user_id: string;
@@ -56,11 +70,13 @@ function taskHref(view: string, status: string) {
   return query ? `/tasks?${query}` : '/tasks';
 }
 
-function TaskEditor({ task, members, canManageAll, currentUserId }: {
+function TaskEditor({ task, members, complianceRecords, canManageAll, currentUserId, timeZone }: {
   task: WorkspaceTask;
   members: WorkspaceMember[];
+  complianceRecords: ComplianceRecordOption[];
   canManageAll: boolean;
   currentUserId: string;
+  timeZone: string;
 }) {
   return (
     <details className="task-details">
@@ -88,6 +104,17 @@ function TaskEditor({ task, members, canManageAll, currentUserId }: {
               <option value="normal">Normal</option>
               <option value="high">High</option>
             </select>
+          </label>
+          <label className="task-field task-full-field">
+            <span>Related compliance record <small>Optional</small></span>
+            <select name="complianceItemId" defaultValue={task.compliance_item_id ?? ''}>
+              <option value="">No record linked</option>
+              {complianceRecords.map((record) => <option value={record.id} key={record.id}>{record.item_name} · {record.vessel_name ?? 'Company-wide'}</option>)}
+            </select>
+          </label>
+          <label className="task-field task-full-field">
+            <span>In-app reminder <small>Optional · {timeZone.replaceAll('_', ' ')}</small></span>
+            <input type="datetime-local" name="reminderAt" defaultValue={reminderInputValue(task.reminder_at, timeZone)} />
           </label>
           {canManageAll ? (
             <label className="task-field task-full-field">
@@ -120,7 +147,7 @@ export default async function TasksPage({ searchParams }: TaskPageProps) {
 
   let query = (supabase as any)
     .from('workspace_tasks')
-    .select('id, title, details, assigned_to, status, priority, due_date, completed_at, archived_at, created_at')
+    .select('id, title, details, assigned_to, status, priority, due_date, completed_at, archived_at, created_at, compliance_item_id, reminder_at, reminder_dismissed_at, compliance_items!workspace_tasks_compliance_item_id_fkey(id, item_name, status, vessels(name))')
     .eq('company_id', membership.company_id);
 
   if (view === 'mine') query = query.eq('assigned_to', user.id);
@@ -144,6 +171,11 @@ export default async function TasksPage({ searchParams }: TaskPageProps) {
   const openCount = tasks.filter((task) => task.status === 'open' && !task.archived_at).length;
   const overdueCount = tasks.filter((task) => task.status === 'open' && task.due_date && task.due_date < todayIso() && !task.archived_at).length;
   const dueCount = complianceItems.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item) === 'Due' || itemIsOverdue(item))).length;
+  const timeZone = company?.timezone || 'America/Los_Angeles';
+  const complianceRecords = complianceItems
+    .filter((item) => !['complete', 'discontinued'].includes(item.status))
+    .map((item) => ({ id: item.id, item_name: item.item_name, vessel_name: item.vessel_name ?? null, status: item.status }));
+  const dueReminders = tasks.filter((task) => task.assigned_to === user.id && task.status === 'open' && !task.archived_at && taskReminderIsDue(task));
 
   return (
     <div className="app-shell">
@@ -169,6 +201,20 @@ export default async function TasksPage({ searchParams }: TaskPageProps) {
         </header>
 
         <section className="task-surface" aria-label="Tasks">
+          {dueReminders.length ? (
+            <section className="task-reminder-center" aria-labelledby="task-reminders-heading">
+              <div className="task-reminder-heading"><span><Bell aria-hidden="true" /></span><div><h2 id="task-reminders-heading">Task reminders</h2><p>{dueReminders.length} reminder{dueReminders.length === 1 ? '' : 's'} need your attention.</p></div></div>
+              {dueReminders.map((task) => (
+                <article className="task-reminder-alert" key={`reminder-${task.id}`}>
+                  <div><strong>{task.title}</strong><span>Reminded {formatTaskReminder(task.reminder_at, timeZone)}</span></div>
+                  <div>
+                    <form action={snoozeWorkspaceTaskReminder}><input type="hidden" name="taskId" value={task.id} /><button type="submit">Snooze until tomorrow</button></form>
+                    <form action={dismissWorkspaceTaskReminder}><input type="hidden" name="taskId" value={task.id} /><button type="submit">Dismiss</button></form>
+                  </div>
+                </article>
+              ))}
+            </section>
+          ) : null}
           <nav className="task-tabs" aria-label="Task views">
             <div>
               <Link className={status === 'open' ? 'active' : ''} href={taskHref(view, 'open')}>Open</Link>
@@ -199,6 +245,17 @@ export default async function TasksPage({ searchParams }: TaskPageProps) {
                 <label className="task-field">
                   <span>Due date</span>
                   <input type="date" name="dueDate" />
+                </label>
+                <label className="task-field task-full-field">
+                  <span>Related compliance record <small>Optional</small></span>
+                  <select name="complianceItemId" defaultValue="">
+                    <option value="">No record linked</option>
+                    {complianceRecords.map((record) => <option value={record.id} key={record.id}>{record.item_name} · {record.vessel_name ?? 'Company-wide'}</option>)}
+                  </select>
+                </label>
+                <label className="task-field task-full-field">
+                  <span>In-app reminder <small>Optional · {timeZone.replaceAll('_', ' ')}</small></span>
+                  <input type="datetime-local" name="reminderAt" />
                 </label>
                 <label className="task-field">
                   <span>Priority</span>
@@ -246,9 +303,11 @@ export default async function TasksPage({ searchParams }: TaskPageProps) {
                       <span className={overdue ? 'task-due is-overdue' : 'task-due'}><CalendarDays aria-hidden="true" />{taskDate(task.due_date)}</span>
                       {canManageAll || view === 'all' ? <span><UserRound aria-hidden="true" />{personLabel(membersById.get(task.assigned_to))}</span> : null}
                       {task.priority !== 'normal' ? <span className={`task-priority ${task.priority}`}>{task.priority} priority</span> : null}
+                      {task.reminder_at && !task.reminder_dismissed_at ? <span className={taskReminderIsDue(task) ? 'task-reminder-meta is-due' : 'task-reminder-meta'}><Bell aria-hidden="true" />{taskReminderIsDue(task) ? 'Reminder due' : formatTaskReminder(task.reminder_at, timeZone)}</span> : null}
+                      {task.compliance_items ? <Link className="task-record-link" href={`/items/${task.compliance_items.id}`}><Link2 aria-hidden="true" />{task.compliance_items.item_name} · {task.compliance_items.vessels?.name ?? 'Company-wide'}</Link> : null}
                     </div>
                   </div>
-                  <TaskEditor task={task} members={members} canManageAll={canManageAll} currentUserId={user.id} />
+                  <TaskEditor task={task} members={members} complianceRecords={complianceRecords} canManageAll={canManageAll} currentUserId={user.id} timeZone={timeZone} />
                 </article>
               );
             })}

@@ -64,7 +64,7 @@ export default async function Home({ searchParams }: HomeProps) {
 
   let taskQuery = (supabase as any)
     .from('workspace_tasks')
-    .select('id, title, details, assigned_to, status, priority, due_date, completed_at, archived_at, created_at')
+    .select('id, title, details, assigned_to, status, priority, due_date, completed_at, archived_at, created_at, compliance_item_id, reminder_at, reminder_dismissed_at, compliance_items!workspace_tasks_compliance_item_id_fkey(id, item_name)')
     .eq('company_id', membership.company_id)
     .is('archived_at', null);
   if (!showEveryone) taskQuery = taskQuery.eq('assigned_to', userData.user.id);
@@ -103,6 +103,7 @@ export default async function Home({ searchParams }: HomeProps) {
         ownerNames={Object.fromEntries(ownerCodes.map((owner) => [owner.code, owner.display_name ?? owner.code]))}
         canViewEveryone={canViewEveryone}
         showEveryone={showEveryone}
+        timeZone={company?.timezone || 'America/Los_Angeles'}
       />
     </div>
   );

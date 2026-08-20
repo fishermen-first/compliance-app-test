@@ -11,7 +11,7 @@ type ItemDetailPageProps = { params: { id: string }; searchParams?: { completed?
 export default async function ItemDetailPage({ params, searchParams }: ItemDetailPageProps) {
   const { supabase, membership, company, profile, user } = await getCustomerContext();
 
-  const [{ data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }, { data: reminderLogs }, { data: vessels }, ownerCodes, referenceLists] = await Promise.all([
+  const [{ data: rawItem }, { data: history }, { data: reminderRules }, { data: recipients }, { data: reminderLogs }, { data: vessels }, { data: linkedTasks }, ownerCodes, referenceLists] = await Promise.all([
     supabase
       .from('compliance_items')
       .select('*, vessels(name), compliance_item_owner_codes(owner_code, is_primary)')
@@ -49,6 +49,13 @@ export default async function ItemDetailPage({ params, searchParams }: ItemDetai
       .eq('company_id', membership.company_id)
       .eq('active', true)
       .order('name'),
+    (supabase as any)
+      .from('workspace_tasks')
+      .select('id, title, status, priority, due_date, archived_at, profiles!workspace_tasks_assigned_to_fkey(full_name, email)')
+      .eq('company_id', membership.company_id)
+      .eq('compliance_item_id', params.id)
+      .is('archived_at', null)
+      .order('due_date', { ascending: true, nullsFirst: false }),
     getCompanyOwnerCodes(membership.company_id),
     getReferenceLists(membership.company_id)
   ]);
@@ -87,6 +94,7 @@ export default async function ItemDetailPage({ params, searchParams }: ItemDetai
           agencyOptions={referenceLists.agencies.map((agency) => ({ id: agency.id, name: agency.name }))}
           referenceContacts={referenceLists.contacts}
           referenceContactGroups={referenceLists.groups}
+          linkedTasks={linkedTasks ?? []}
           canUpdateStatus={canManageItem}
           canCompleteItem={canManageItem}
           canEditCore={canEditCore}

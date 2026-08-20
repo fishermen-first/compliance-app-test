@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { AlertTriangle, CalendarDays, Check, ChevronRight, Circle, ClipboardCheck, Clock3, ListTodo, ShieldAlert, UserRound } from 'lucide-react';
-import { createWorkspaceTask, setWorkspaceTaskCompletion } from '@/app/actions/tasks';
+import { AlertTriangle, Bell, CalendarDays, Check, ChevronRight, Circle, ClipboardCheck, Clock3, Link2, ListTodo, ShieldAlert, UserRound } from 'lucide-react';
+import { createWorkspaceTask, dismissWorkspaceTaskReminder, setWorkspaceTaskCompletion, snoozeWorkspaceTaskReminder } from '@/app/actions/tasks';
 import { daysUntil, displayState, isWorkQueueItem, itemIsOverdue, shortDate, type ComplianceItem } from '@/lib/compliance';
 import { itemVessel } from '@/lib/customer-data';
+import { formatTaskReminder, taskReminderIsDue } from '@/lib/task-reminders';
 
 export type DashboardTask = {
   id: string;
@@ -15,6 +16,10 @@ export type DashboardTask = {
   completed_at: string | null;
   archived_at: string | null;
   created_at: string;
+  compliance_item_id: string | null;
+  reminder_at: string | null;
+  reminder_dismissed_at: string | null;
+  compliance_items: { id: string; item_name: string } | null;
 };
 
 export type DashboardMember = { user_id: string; full_name: string | null; email: string | null };
@@ -54,7 +59,8 @@ export function CombinedDashboard({
   members,
   ownerNames,
   canViewEveryone,
-  showEveryone
+  showEveryone,
+  timeZone
 }: {
   greeting: string;
   currentUserId: string;
@@ -65,10 +71,12 @@ export function CombinedDashboard({
   ownerNames: Record<string, string>;
   canViewEveryone: boolean;
   showEveryone: boolean;
+  timeZone: string;
 }) {
   const openTasks = tasks.filter((task) => task.status === 'open' && !task.archived_at);
   const overdueTasks = openTasks.filter((task) => (daysUntil(task.due_date) ?? 0) < 0);
   const overdueCompliance = complianceItems.filter(itemIsOverdue);
+  const dueReminders = openTasks.filter((task) => task.assigned_to === currentUserId && taskReminderIsDue(task));
   const dueSoonCompliance = complianceItems.filter((item) => !itemIsOverdue(item) && displayState(item) === 'Due');
   const complianceWork = complianceItems.filter(isWorkQueueItem);
   const membersById = new Map(members.map((member) => [member.user_id, member]));
@@ -112,6 +120,15 @@ export function CombinedDashboard({
         <article><span className="danger"><AlertTriangle aria-hidden="true" /></span><div><small>Overdue tasks</small><strong>{overdueTasks.length}</strong><p>Past due date</p></div></article>
       </section>
 
+      {dueReminders.length ? (
+        <section className="cdash-card cdash-reminders" aria-labelledby="dashboard-task-reminders">
+          <div className="cdash-card-head"><div><h2 id="dashboard-task-reminders"><Bell aria-hidden="true" /> Task reminders</h2><p>{dueReminders.length} reminder{dueReminders.length === 1 ? '' : 's'} need your attention</p></div><Link href="/tasks">View tasks <ChevronRight aria-hidden="true" /></Link></div>
+          <div className="cdash-reminder-list">
+            {dueReminders.map((task) => <article key={`dashboard-reminder-${task.id}`}><div><strong>{task.title}</strong><span>Reminded {formatTaskReminder(task.reminder_at, timeZone)}</span></div><div><form action={snoozeWorkspaceTaskReminder}><input type="hidden" name="taskId" value={task.id} /><button type="submit">Snooze</button></form><form action={dismissWorkspaceTaskReminder}><input type="hidden" name="taskId" value={task.id} /><button type="submit">Dismiss</button></form></div></article>)}
+          </div>
+        </section>
+      ) : null}
+
       <section className="cdash-card cdash-attention" aria-labelledby="needs-attention">
         <div className="cdash-card-head">
           <div><h2 id="needs-attention">Needs attention</h2><p>Tasks and compliance work ordered by urgency</p></div>
@@ -124,7 +141,7 @@ export function CombinedDashboard({
                 <input type="hidden" name="taskId" value={entry.task.id} /><input type="hidden" name="complete" value="true" />
                 <button className="cdash-check" type="submit" aria-label={`Complete ${entry.task.title}`}><Circle aria-hidden="true" /><Check aria-hidden="true" /></button>
               </form>
-              <div><span className="cdash-type task">Task</span><h3>{entry.task.title}</h3><p>{dateMeta(entry.task.due_date)} · {personLabel(membersById.get(entry.task.assigned_to))}</p></div>
+              <div><span className="cdash-type task">Task</span><h3>{entry.task.title}</h3><p>{dateMeta(entry.task.due_date)} · {personLabel(membersById.get(entry.task.assigned_to))}{entry.task.compliance_items ? <> · <Link className="cdash-record-link" href={`/items/${entry.task.compliance_items.id}`}><Link2 aria-hidden="true" />{entry.task.compliance_items.item_name}</Link></> : null}</p></div>
               {entry.task.priority === 'high' ? <span className="cdash-priority">High priority</span> : null}
               <Link className="cdash-row-link" href="/tasks" aria-label={`Open task ${entry.task.title}`}><ChevronRight aria-hidden="true" /></Link>
             </article>

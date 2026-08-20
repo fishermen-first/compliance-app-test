@@ -2238,6 +2238,134 @@ button.secondary-link {
   font-size: 13px;
 }
 
+.task-field > span small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.task-record-link,
+.cdash-record-link {
+  align-items: center;
+  color: var(--teal);
+  display: inline-flex;
+  gap: 5px;
+  text-decoration: none;
+}
+
+.task-record-link:hover,
+.cdash-record-link:hover {
+  text-decoration: underline;
+}
+
+.task-record-link svg,
+.cdash-record-link svg {
+  height: 13px;
+  width: 13px;
+}
+
+.task-reminder-meta.is-due {
+  color: #9d4d19;
+  font-weight: 800;
+}
+
+.task-reminder-center {
+  background: #fff9ea;
+  border-bottom: 1px solid #ead9aa;
+  padding: 16px 20px;
+}
+
+.task-reminder-heading {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.task-reminder-heading > span {
+  align-items: center;
+  background: #f5e4ac;
+  border-radius: 8px;
+  color: #795515;
+  display: flex;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.task-reminder-heading h2,
+.task-reminder-heading p {
+  margin: 0;
+}
+
+.task-reminder-heading h2 { font-size: 15px; }
+.task-reminder-heading p { color: #726444; font-size: 12px; }
+
+.task-reminder-alert {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e5d6ad;
+  border-radius: 9px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.task-reminder-alert + .task-reminder-alert { margin-top: 7px; }
+.task-reminder-alert > div:first-child { display: grid; gap: 2px; }
+.task-reminder-alert strong { font-size: 13px; }
+.task-reminder-alert span { color: #75694c; font-size: 11px; }
+.task-reminder-alert > div:last-child,
+.cdash-reminder-list article > div:last-child { display: flex; gap: 7px; }
+.task-reminder-alert button,
+.cdash-reminder-list button {
+  background: transparent;
+  border: 1px solid #cdbf98;
+  border-radius: 7px;
+  color: #5f512f;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 7px 9px;
+}
+
+.cdash-reminders { border-color: #e5d6ad; }
+.cdash-reminders .cdash-card-head h2 { align-items: center; display: flex; gap: 7px; }
+.cdash-reminders .cdash-card-head h2 svg { color: #a36f18; height: 18px; width: 18px; }
+.cdash-reminder-list article {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 12px 18px;
+}
+.cdash-reminder-list article > div:first-child { display: grid; gap: 2px; }
+.cdash-reminder-list strong { font-size: 13px; }
+.cdash-reminder-list span { color: var(--muted); font-size: 11px; }
+
+.linked-task-card-head { align-items: flex-start; display: flex; justify-content: space-between; }
+.linked-task-card-head h2 { margin: 0; }
+.linked-task-card-head a { color: var(--teal); font-size: 12px; font-weight: 800; text-decoration: none; }
+.linked-task-list { list-style: none; margin: 14px 0 0; padding: 0; }
+.linked-task-list li { align-items: flex-start; border-top: 1px solid var(--line); display: flex; gap: 9px; padding: 11px 0; }
+.linked-task-check { border: 2px solid #84928e; border-radius: 50%; display: block; flex: 0 0 auto; height: 16px; margin-top: 2px; width: 16px; }
+.linked-task-check.is-complete { background: var(--teal); border-color: var(--teal); box-shadow: inset 0 0 0 3px #fff; }
+.linked-task-list li > div { display: grid; gap: 3px; }
+.linked-task-list strong { font-size: 12px; }
+.linked-task-list span { color: var(--muted); font-size: 11px; }
+.linked-task-empty { color: var(--muted); font-size: 12px; margin: 14px 0 0; }
+
+@media (max-width: 720px) {
+  .task-reminder-alert,
+  .cdash-reminder-list article { align-items: flex-start; flex-direction: column; }
+  .task-reminder-alert > div:last-child,
+  .cdash-reminder-list article > div:last-child { flex-wrap: wrap; }
+}
+
 @media (max-width: 760px) {
   .tasks-header {
     display: grid;

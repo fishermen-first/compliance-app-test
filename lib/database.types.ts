@@ -1730,6 +1730,7 @@ export type Database = {
           archived_by: string | null
           assigned_to: string
           company_id: string
+          compliance_item_id: string | null
           completed_at: string | null
           completed_by: string | null
           created_at: string
@@ -1738,6 +1739,8 @@ export type Database = {
           due_date: string | null
           id: string
           priority: string
+          reminder_at: string | null
+          reminder_dismissed_at: string | null
           status: string
           title: string
           updated_at: string
@@ -1747,6 +1750,7 @@ export type Database = {
           archived_by?: string | null
           assigned_to: string
           company_id: string
+          compliance_item_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
@@ -1755,6 +1759,8 @@ export type Database = {
           due_date?: string | null
           id?: string
           priority?: string
+          reminder_at?: string | null
+          reminder_dismissed_at?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -1764,6 +1770,7 @@ export type Database = {
           archived_by?: string | null
           assigned_to?: string
           company_id?: string
+          compliance_item_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
           created_at?: string
@@ -1772,6 +1779,8 @@ export type Database = {
           due_date?: string | null
           id?: string
           priority?: string
+          reminder_at?: string | null
+          reminder_dismissed_at?: string | null
           status?: string
           title?: string
           updated_at?: string
@@ -1796,6 +1805,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_tasks_compliance_item_id_fkey"
+            columns: ["compliance_item_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_items"
             referencedColumns: ["id"]
           },
           {

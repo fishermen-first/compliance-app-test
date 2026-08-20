@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { zonedLocalDateTimeToIso } from '@/lib/task-reminders';
 
 const priorities = new Set(['low', 'normal', 'high']);
 
@@ -68,6 +69,32 @@ async function permittedAssignee(
   return assignee;
 }
 
+async function permittedComplianceItem(
+  actor: Awaited<ReturnType<typeof taskActor>>,
+  requestedItemId: string | null
+) {
+  if (!requestedItemId) return null;
+  const { data: item } = await actor.supabase
+    .from('compliance_items')
+    .select('id')
+    .eq('id', requestedItemId)
+    .eq('company_id', actor.membership.company_id)
+    .maybeSingle();
+  if (!item) throw new Error('Choose a compliance record in this workspace');
+  return item.id;
+}
+
+async function taskReminder(actor: Awaited<ReturnType<typeof taskActor>>, formData: FormData) {
+  const value = optionalString(formData, 'reminderAt');
+  if (!value) return null;
+  const { data: company } = await actor.supabase
+    .from('companies')
+    .select('timezone')
+    .eq('id', actor.membership.company_id)
+    .single();
+  return zonedLocalDateTimeToIso(value, company?.timezone || 'America/Los_Angeles');
+}
+
 function taskPriority(formData: FormData) {
   const priority = optionalString(formData, 'priority') ?? 'normal';
   if (!priorities.has(priority)) throw new Error('priority is invalid');
@@ -77,11 +104,14 @@ function taskPriority(formData: FormData) {
 function refreshTasks() {
   revalidatePath('/');
   revalidatePath('/tasks');
+  revalidatePath('/items/[id]', 'page');
 }
 
 export async function createWorkspaceTask(formData: FormData) {
   const actor = await taskActor();
   const assignee = await permittedAssignee(actor, optionalString(formData, 'assignedTo'));
+  const complianceItemId = await permittedComplianceItem(actor, optionalString(formData, 'complianceItemId'));
+  const reminderAt = await taskReminder(actor, formData);
   const title = requiredString(formData, 'title');
   if (title.length > 240) throw new Error('Task title must be 240 characters or fewer');
 
@@ -95,7 +125,9 @@ export async function createWorkspaceTask(formData: FormData) {
     assigned_to: assignee,
     created_by: actor.userId,
     priority: taskPriority(formData),
-    due_date: validDate(formData, 'dueDate')
+    due_date: validDate(formData, 'dueDate'),
+    compliance_item_id: complianceItemId,
+    reminder_at: reminderAt
   });
 
   if (error) throw new Error(error.message);
@@ -106,6 +138,8 @@ export async function updateWorkspaceTask(formData: FormData) {
   const actor = await taskActor();
   const taskId = requiredString(formData, 'taskId');
   const assignee = await permittedAssignee(actor, optionalString(formData, 'assignedTo'));
+  const complianceItemId = await permittedComplianceItem(actor, optionalString(formData, 'complianceItemId'));
+  const reminderAt = await taskReminder(actor, formData);
   const title = requiredString(formData, 'title');
   if (title.length > 240) throw new Error('Task title must be 240 characters or fewer');
 
@@ -119,7 +153,9 @@ export async function updateWorkspaceTask(formData: FormData) {
       details,
       assigned_to: assignee,
       priority: taskPriority(formData),
-      due_date: validDate(formData, 'dueDate')
+      due_date: validDate(formData, 'dueDate'),
+      compliance_item_id: complianceItemId,
+      reminder_at: reminderAt
     })
     .eq('id', taskId)
     .eq('company_id', actor.membership.company_id);
@@ -156,6 +192,35 @@ export async function setWorkspaceTaskArchived(formData: FormData) {
     .eq('id', taskId)
     .eq('company_id', actor.membership.company_id);
 
+  if (error) throw new Error(error.message);
+  refreshTasks();
+}
+
+export async function dismissWorkspaceTaskReminder(formData: FormData) {
+  const actor = await taskActor();
+  const taskId = requiredString(formData, 'taskId');
+  const { error } = await (actor.supabase as any)
+    .from('workspace_tasks')
+    .update({ reminder_dismissed_at: new Date().toISOString() })
+    .eq('id', taskId)
+    .eq('company_id', actor.membership.company_id)
+    .eq('status', 'open')
+    .is('archived_at', null);
+  if (error) throw new Error(error.message);
+  refreshTasks();
+}
+
+export async function snoozeWorkspaceTaskReminder(formData: FormData) {
+  const actor = await taskActor();
+  const taskId = requiredString(formData, 'taskId');
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const { error } = await (actor.supabase as any)
+    .from('workspace_tasks')
+    .update({ reminder_at: tomorrow, reminder_dismissed_at: null })
+    .eq('id', taskId)
+    .eq('company_id', actor.membership.company_id)
+    .eq('status', 'open')
+    .is('archived_at', null);
   if (error) throw new Error(error.message);
   refreshTasks();
 }
