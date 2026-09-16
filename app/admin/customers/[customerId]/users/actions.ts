@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { Resend } from 'resend';
 import { getAppAdminClassification } from '@/lib/app-admins';
 import { type CustomerRole, normalizedEmail, relation, toAppRole } from '@/lib/customer-detail';
-import { env } from '@/lib/env';
+import { createLoginLink } from '@/lib/login-link';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
@@ -277,20 +277,7 @@ async function sendInvitationLink(admin: ReturnType<typeof createAdminClient>, i
     throw new Error('Resend is not configured.');
   }
 
-  const { data, error: linkError } = await admin.auth.admin.generateLink({
-    type: 'magiclink',
-    email,
-    options: {
-      redirectTo: `${env.appBaseUrl}/auth/confirm`
-    }
-  });
-
-  if (linkError) throw new Error(linkError.message);
-
-  const tokenHash = data.properties?.hashed_token;
-  if (!tokenHash) throw new Error('Could not create a login link.');
-
-  const loginUrl = `${env.appBaseUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink`;
+  const loginUrl = await createLoginLink(admin, email);
   const resend = new Resend(apiKey);
   const sent = await resend.emails.send({
     from: senderEmail,

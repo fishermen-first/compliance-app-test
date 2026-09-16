@@ -34,6 +34,13 @@ export type Database = {
   }
   public: {
     Tables: {
+      login_link_requests: {
+        Row: { email_digest: string; requested_at: string }
+        Insert: { email_digest: string; requested_at?: string }
+        Update: { email_digest?: string; requested_at?: string }
+        Relationships: []
+      }
+
       agencies: {
         Row: {
           company_id: string
@@ -1870,6 +1877,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      reserve_login_link_request: {
+        Args: { p_email_digest: string }
+        Returns: boolean
+      }
+
       _apply_import_v3_resolutions: {
         Args: {
           decided_by?: string

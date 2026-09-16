@@ -1,3 +1,4 @@
+import { AuthSubmitButton } from '@/components/auth-submit-button';
 import { Mail } from 'lucide-react';
 import { signInWithMagicLink } from '@/app/actions/auth';
 
@@ -26,10 +27,10 @@ export function AuthScreen({ message }: { message?: string }) {
         <form action={signInWithMagicLink} className="login-form">
           <label htmlFor="email">Work email</label>
           <input id="email" name="email" type="email" placeholder="you@company.com" autoComplete="email" required />
-          <button type="submit">
+          <AuthSubmitButton pendingText="Sending login link…">
             <Mail aria-hidden="true" />
             <span>Email me a login link</span>
-          </button>
+          </AuthSubmitButton>
         </form>
 
         <p className="login-fineprint">

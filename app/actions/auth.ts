@@ -2,25 +2,11 @@
 
 import { redirect } from 'next/navigation';
 import { Resend } from 'resend';
-import { env } from '@/lib/env';
+import { createLoginLink } from '@/lib/login-link';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
 const senderEmail = process.env.RESEND_FROM_EMAIL ?? 'FF Compliance <alerts@fishermenfirst.org>';
-
-function loginErrorMessage(message: string) {
-  const normalized = message.toLowerCase();
-
-  if (
-    normalized.includes('signups not allowed') ||
-    normalized.includes('user not found') ||
-    normalized.includes('database error saving new user')
-  ) {
-    return 'This email has not been added yet. Ask an FF admin to add you first.';
-  }
-
-  return message;
-}
 
 async function hasLoginAccess(email: string) {
   const admin = createAdminClient();
@@ -115,25 +101,14 @@ export async function signInWithMagicLink(formData: FormData) {
   }
 
   const supabaseAdmin = createAdminClient();
-  const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-    type: 'magiclink',
-    email,
-    options: {
-      redirectTo: `${env.appBaseUrl}/auth/confirm`
-    }
-  });
-
-  if (error) {
-    redirect(`/login?message=${encodeURIComponent(loginErrorMessage(error.message))}`);
+  let loginUrl: string;
+  try {
+    loginUrl = await createLoginLink(supabaseAdmin, email);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not create a login link.';
+    redirect(`/login?message=${encodeURIComponent(message)}`);
   }
 
-  const tokenHash = data.properties?.hashed_token;
-
-  if (!tokenHash) {
-    redirect('/login?message=Could%20not%20create%20a%20login%20link.');
-  }
-
-  const loginUrl = `${env.appBaseUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink`;
   const resend = new Resend(apiKey);
   const sent = await resend.emails.send({
     from: senderEmail,
@@ -147,7 +122,7 @@ export async function signInWithMagicLink(formData: FormData) {
     redirect(`/login?message=${encodeURIComponent(sent.error.message)}`);
   }
 
-  redirect('/login?message=Check%20your%20email%20for%20the%20login%20link');
+  redirect('/login?message=Check%20your%20email%20and%20open%20the%20newest%20login%20link');
 }
 
 export async function signOut() {
