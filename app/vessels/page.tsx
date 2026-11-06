@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { AppSidebar } from '@/components/app-sidebar';
-import { displayState, formatDate, isWorkQueueItem, itemIsOverdue, type ComplianceItem } from '@/lib/compliance';
+import { workspaceToday, displayState, formatDate, isWorkQueueItem, itemIsOverdue, type ComplianceItem } from '@/lib/compliance';
 import { getCustomerContext, getCustomerItems } from '@/lib/customer-data';
 import { accessRoleLabel } from '@/lib/roles';
 
@@ -18,6 +18,7 @@ function nextItem(items: ComplianceItem[]) {
 
 export default async function VesselsPage() {
   const { supabase, membership, company, profile, user } = await getCustomerContext();
+  const today = workspaceToday(company?.timezone || 'America/Los_Angeles');
   const [{ data: vessels }, items] = await Promise.all([
     supabase.from('vessels').select('id, name, active').eq('company_id', membership.company_id).order('name'),
     getCustomerItems(membership.company_id)
@@ -26,7 +27,7 @@ export default async function VesselsPage() {
   const vesselRows: VesselRow[] = vessels ?? [];
   const companyWideItems = items.filter((item) => !item.vessel_id);
   const totalOpen = items.filter((item) => !['complete', 'discontinued'].includes(item.status)).length;
-  const dueCount = items.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item) === 'Due' || itemIsOverdue(item))).length;
+  const dueCount = items.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item, today) === 'Due' || itemIsOverdue(item, today))).length;
 
   return (
     <div className="app-shell">
@@ -70,7 +71,7 @@ export default async function VesselsPage() {
           {vesselRows.map((vessel) => {
             const vesselItems = items.filter((item) => item.vessel_id === vessel.id);
             const openItems = vesselItems.filter((item) => !['complete', 'discontinued'].includes(item.status));
-            const actionItems = openItems.filter(isWorkQueueItem);
+            const actionItems = openItems.filter((item) => isWorkQueueItem(item, today));
             const upcoming = nextItem(vesselItems);
             return (
               <article className="panel vessel-summary-card" key={vessel.id}>
@@ -96,7 +97,7 @@ export default async function VesselsPage() {
             </div>
             <dl>
               <div><dt>Open</dt><dd>{companyWideItems.filter((item) => !['complete', 'discontinued'].includes(item.status)).length}</dd></div>
-              <div><dt>Needs action</dt><dd>{companyWideItems.filter(isWorkQueueItem).length}</dd></div>
+              <div><dt>Needs action</dt><dd>{companyWideItems.filter((item) => isWorkQueueItem(item, today)).length}</dd></div>
               <div><dt>Total records</dt><dd>{companyWideItems.length}</dd></div>
             </dl>
             <p>Company-wide records include food safety, administration, or fleet-level compliance items.</p>

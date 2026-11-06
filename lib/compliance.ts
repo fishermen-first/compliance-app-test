@@ -1,5 +1,5 @@
 export type ComplianceItemStatus = 'not_started' | 'in_progress' | 'submitted' | 'complete' | 'discontinued';
-export type DisplayState = 'Not due yet' | 'Due' | 'In progress' | 'Submitted' | 'Complete' | 'Did not renew';
+export type DisplayState = 'Not due yet' | 'Due' | 'In progress' | 'Submitted' | 'Complete' | 'Did not renew' | 'Awaiting schedule';
 export type RecurrenceUnit = 'years' | 'months' | 'manual' | 'none';
 
 export type ComplianceItem = {
@@ -29,6 +29,11 @@ export type ComplianceItem = {
   created_by: string | null;
   source_row_number: number | null;
   previous_item_id?: string | null;
+  snoozed_until?: string | null;
+  snooze_reason?: string | null;
+  archived_at?: string | null;
+  archive_reason?: string | null;
+  awaiting_schedule?: boolean;
 };
 
 export function itemOwnerCodes(item: Pick<ComplianceItem, 'owner_codes' | 'owner_current' | 'owner_raw'>) {
@@ -66,7 +71,8 @@ export const displayStateParams: Record<DisplayState, string> = {
   'In progress': 'in_progress',
   Submitted: 'submitted',
   Complete: 'complete',
-  'Did not renew': 'did_not_renew'
+  'Did not renew': 'did_not_renew',
+  'Awaiting schedule': 'awaiting_schedule'
 };
 
 export const statusChipClasses: Record<DisplayState, string> = {
@@ -75,7 +81,8 @@ export const statusChipClasses: Record<DisplayState, string> = {
   'In progress': 'st st-prog',
   Submitted: 'st st-subm',
   Complete: 'st st-comp',
-  'Did not renew': 'st st-disc'
+  'Did not renew': 'st st-disc',
+  'Awaiting schedule': 'st st-notdue'
 };
 
 export const frequencyLabelOptions = [
@@ -93,7 +100,7 @@ export const frequencyLabelOptions = [
 ] as const;
 
 export function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return workspaceToday();
 }
 
 function parseDate(value: string | null) {
@@ -108,32 +115,33 @@ function daysBetween(start: Date, end: Date) {
   return Math.round((endUtc - startUtc) / 86_400_000);
 }
 
-export function daysUntil(value: string | null) {
+export function daysUntil(value: string | null, referenceDate = workspaceToday()) {
   const date = parseDate(value);
-  const today = parseDate(todayIso());
+  const today = parseDate(referenceDate);
   if (!date || !today) return null;
   return daysBetween(today, date);
 }
 
-export function displayState(item: Pick<ComplianceItem, 'status' | 'start_working_on' | 'expiration_date'>): DisplayState {
+export function displayState(item: Pick<ComplianceItem, 'status' | 'start_working_on' | 'expiration_date' | 'awaiting_schedule' | 'archived_at' | 'snoozed_until'>, today = workspaceToday()): DisplayState {
   if (item.status === 'complete') return 'Complete';
   if (item.status === 'discontinued') return 'Did not renew';
   if (item.status === 'in_progress') return 'In progress';
   if (item.status === 'submitted') return 'Submitted';
 
-  const startDays = daysUntil(item.start_working_on);
+  if (item.awaiting_schedule) return 'Awaiting schedule';
+  const startDays = daysUntil(item.start_working_on, today);
   if (startDays !== null && startDays > 0) return 'Not due yet';
   return 'Due';
 }
 
-export function itemIsOverdue(item: Pick<ComplianceItem, 'status' | 'expiration_date'>) {
-  if (item.status === 'complete' || item.status === 'discontinued') return false;
-  const expirationDays = daysUntil(item.expiration_date);
+export function itemIsOverdue(item: Pick<ComplianceItem, 'status' | 'expiration_date' | 'archived_at'>, today = workspaceToday()) {
+  if (item.archived_at || item.status === 'complete' || item.status === 'discontinued') return false;
+  const expirationDays = daysUntil(item.expiration_date, today);
   return expirationDays !== null && expirationDays < 0;
 }
 
-export function displayStateParam(item: Pick<ComplianceItem, 'status' | 'start_working_on' | 'expiration_date'>) {
-  return displayStateParams[displayState(item)];
+export function displayStateParam(item: Pick<ComplianceItem, 'status' | 'start_working_on' | 'expiration_date' | 'awaiting_schedule' | 'archived_at' | 'snoozed_until'>, today = workspaceToday()) {
+  return displayStateParams[displayState(item, today)];
 }
 
 export function statusChipClassName(state: DisplayState) {
@@ -144,10 +152,24 @@ export function stateClassName(state: DisplayState) {
   return displayStateParams[state].replaceAll('_', '-');
 }
 
-export function isWorkQueueItem(item: Pick<ComplianceItem, 'status' | 'start_working_on' | 'expiration_date'>) {
-  if (item.status === 'complete' || item.status === 'discontinued') return false;
-  const state = displayState(item);
-  return state === 'Due' || state === 'In progress' || state === 'Submitted' || itemIsOverdue(item);
+export function workspaceToday(timeZone = 'America/Los_Angeles', now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+}
+
+export function itemIsSnoozed(item: Pick<ComplianceItem, 'snoozed_until' | 'archived_at'>, today = workspaceToday()) {
+  return !item.archived_at && Boolean(item.snoozed_until && item.snoozed_until > today);
+}
+
+export function matchesSearch(query: string, fields: Array<string | null | undefined>) {
+  const haystack = fields.filter(Boolean).join(' ').toLocaleLowerCase();
+  return query.trim().toLocaleLowerCase().split(/\s+/).every((word) => haystack.includes(word));
+}
+
+export function isWorkQueueItem(item: Pick<ComplianceItem, 'status' | 'start_working_on' | 'expiration_date' | 'awaiting_schedule' | 'archived_at' | 'snoozed_until'>, today = workspaceToday()) {
+  if (itemIsSnoozed(item, today) || item.awaiting_schedule) return false;
+  if (item.archived_at || item.status === 'complete' || item.status === 'discontinued') return false;
+  const state = displayState(item, today);
+  return state === 'Due' || state === 'In progress' || state === 'Submitted' || itemIsOverdue(item, today);
 }
 
 export function formatDate(value: string | null) {

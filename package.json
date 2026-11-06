@@ -8,7 +8,9 @@
     "generate:import-template": "node scripts/generate-import-template.ts",
     "verify:import-v2": "node --test scripts/verify_import_v2_contract.mjs",
     "verify:reminders": "node --test scripts/verify_reminder_external_contract.mjs",
-    "verify:settings-access": "node scripts/verify_customer_settings_access.mjs"
+    "verify:settings-access": "node scripts/verify_customer_settings_access.mjs",
+    "verify:workflow": "node --test scripts/verify_compliance_workflow.mjs",
+    "verify:workflow-local": "node scripts/verify_workflow_local.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",
@@ -23,6 +25,7 @@
     "resend": "^4.0.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.3.14",
     "@types/node": "^20.17.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

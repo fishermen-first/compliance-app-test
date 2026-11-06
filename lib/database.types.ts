@@ -1130,6 +1130,7 @@ export type Database = {
       }
       compliance_item_status_history: {
         Row: {
+          event_type: string
           changed_at: string
           changed_by: string | null
           company_id: string
@@ -1142,6 +1143,7 @@ export type Database = {
           to_status: Database["public"]["Enums"]["compliance_item_status"]
         }
         Insert: {
+          event_type?: string
           changed_at?: string
           changed_by?: string | null
           company_id: string
@@ -1154,6 +1156,7 @@ export type Database = {
           to_status: Database["public"]["Enums"]["compliance_item_status"]
         }
         Update: {
+          event_type?: string
           changed_at?: string
           changed_by?: string | null
           company_id?: string
@@ -1191,6 +1194,12 @@ export type Database = {
       }
       compliance_items: {
         Row: {
+          snoozed_until: string | null
+          snooze_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          archive_reason: string | null
+          awaiting_schedule: boolean
           agency_id: string | null
           agency_type: string | null
           company_id: string
@@ -1242,6 +1251,12 @@ export type Database = {
           vessel_id: string | null
         }
         Insert: {
+          snoozed_until?: string | null
+          snooze_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          archive_reason?: string | null
+          awaiting_schedule?: boolean
           agency_id?: string | null
           agency_type?: string | null
           company_id: string
@@ -1293,6 +1308,12 @@ export type Database = {
           vessel_id?: string | null
         }
         Update: {
+          snoozed_until?: string | null
+          snooze_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          archive_reason?: string | null
+          awaiting_schedule?: boolean
           agency_id?: string | null
           agency_type?: string | null
           company_id?: string
@@ -1344,6 +1365,13 @@ export type Database = {
           vessel_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "compliance_items_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "compliance_items_company_agency_fk"
             columns: ["company_id", "agency_id"]
@@ -1976,6 +2004,22 @@ export type Database = {
           status: Database["public"]["Enums"]["compliance_item_status"]
           vessel_name: string
         }[]
+      }
+      set_compliance_item_queue_state: {
+        Args: { target_item_id: string; queue_action: string; return_on?: string | null; reason?: string | null }
+        Returns: undefined
+      }
+      complete_compliance_item_v2: {
+        Args: {
+          target_item_id: string
+          completion_date: string
+          final_notes?: string | null
+          should_create_next?: boolean
+          next_start_working_on?: string | null
+          next_expiration_date?: string | null
+          next_record_mode?: string
+        }
+        Returns: string
       }
       complete_compliance_item: {
         Args: {

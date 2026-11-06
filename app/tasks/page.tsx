@@ -9,7 +9,7 @@ import {
   updateWorkspaceTask
 } from '@/app/actions/tasks';
 import { AppSidebar } from '@/components/app-sidebar';
-import { displayState, itemIsOverdue } from '@/lib/compliance';
+import { workspaceToday, displayState, itemIsOverdue } from '@/lib/compliance';
 import { getCustomerContext, getCustomerItems } from '@/lib/customer-data';
 import { accessRoleLabel } from '@/lib/roles';
 import { formatTaskReminder, reminderInputValue, taskReminderIsDue } from '@/lib/task-reminders';
@@ -58,9 +58,6 @@ function taskDate(value: string | null) {
     .format(new Date(`${value}T00:00:00Z`));
 }
 
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function taskHref(view: string, status: string) {
   const params = new URLSearchParams();
@@ -109,6 +106,7 @@ function TaskEditor({ task, members, complianceRecords, canManageAll, currentUse
             <span>Related compliance record <small>Optional</small></span>
             <select name="complianceItemId" defaultValue={task.compliance_item_id ?? ''}>
               <option value="">No record linked</option>
+              {task.compliance_item_id && !complianceRecords.some((record) => record.id === task.compliance_item_id) ? <option value={task.compliance_item_id}>{task.compliance_items?.item_name ?? 'Existing linked record'} · Not in active records</option> : null}
               {complianceRecords.map((record) => <option value={record.id} key={record.id}>{record.item_name} · {record.vessel_name ?? 'Company-wide'}</option>)}
             </select>
           </label>
@@ -140,6 +138,7 @@ function TaskEditor({ task, members, complianceRecords, canManageAll, currentUse
 
 export default async function TasksPage({ searchParams }: TaskPageProps) {
   const { membership, company, profile, user, supabase } = await getCustomerContext();
+  const today = workspaceToday(company?.timezone || 'America/Los_Angeles');
   const canManageAll = membership.role === 'owner' || membership.role === 'office_admin';
   const view = canManageAll && searchParams?.view === 'all' ? 'all' : 'mine';
   const allowedStatuses = new Set(['open', 'completed', 'archived']);
@@ -169,8 +168,8 @@ export default async function TasksPage({ searchParams }: TaskPageProps) {
   const members = (memberResult.data ?? []) as WorkspaceMember[];
   const membersById = new Map(members.map((member) => [member.user_id, member]));
   const openCount = tasks.filter((task) => task.status === 'open' && !task.archived_at).length;
-  const overdueCount = tasks.filter((task) => task.status === 'open' && task.due_date && task.due_date < todayIso() && !task.archived_at).length;
-  const dueCount = complianceItems.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item) === 'Due' || itemIsOverdue(item))).length;
+  const overdueCount = tasks.filter((task) => task.status === 'open' && task.due_date && task.due_date < today && !task.archived_at).length;
+  const dueCount = complianceItems.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item, today) === 'Due' || itemIsOverdue(item, today))).length;
   const timeZone = company?.timezone || 'America/Los_Angeles';
   const complianceRecords = complianceItems
     .filter((item) => !['complete', 'discontinued'].includes(item.status))
@@ -286,7 +285,7 @@ export default async function TasksPage({ searchParams }: TaskPageProps) {
                 <p>{status === 'open' ? 'Add a task when something new comes up.' : 'Tasks will appear here when their status changes.'}</p>
               </div>
             ) : tasks.map((task) => {
-              const overdue = task.status === 'open' && Boolean(task.due_date && task.due_date < todayIso());
+              const overdue = task.status === 'open' && Boolean(task.due_date && task.due_date < today);
               return (
                 <article className={`task-row${task.status === 'completed' ? ' is-complete' : ''}`} key={task.id}>
                   <form action={setWorkspaceTaskCompletion} className="task-check-form">

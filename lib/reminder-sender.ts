@@ -82,6 +82,15 @@ export async function sendQueuedRemindersForCompany(companyId: string | null, li
   let failedCount = 0;
 
   for (const reminder of reminders) {
+    // A record may be archived after this batch was claimed.
+    const { data: currentItem, error: currentItemError } = await admin.from('compliance_items')
+      .select('archived_at, awaiting_schedule, status').eq('id', reminder.item_id).single();
+    if (currentItemError) throw new Error(currentItemError.message);
+    if (currentItem.archived_at || currentItem.awaiting_schedule || ['complete', 'discontinued'].includes(currentItem.status)) {
+      const { error: skipError } = await admin.from('reminder_send_log').update({ status: 'skipped', failure_reason: 'Record is no longer active' }).eq('id', reminder.id).is('sent_at', null);
+      if (skipError) throw new Error(skipError.message);
+      continue;
+    }
     const context = await reminderContext(admin, reminder);
     const { subject, body, html } = buildReminderEmail(reminder, { ...context, appBaseUrl: env.appBaseUrl });
 

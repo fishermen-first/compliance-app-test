@@ -1,15 +1,17 @@
 import Link from 'next/link';
 import { type ReactNode } from 'react';
 import { Columns3, Plus } from 'lucide-react';
+import { ItemQueueControls } from '@/components/item-queue-controls';
 import { AppSidebar } from '@/components/app-sidebar';
 import { StatusBadge } from '@/components/status-badge';
-import { type ComplianceItem, displayState, displayStateParam, formatDate, itemIsOverdue } from '@/lib/compliance';
+import { type ComplianceItem, displayState, displayStateParam, formatDate, itemIsOverdue, itemIsSnoozed, matchesSearch, workspaceToday, itemHasAnyOwnerCode } from '@/lib/compliance';
 import { getCompanyOwnerCodes, getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer-data';
 import { accessRoleLabel, canCreateComplianceItems } from '@/lib/roles';
 
 type ItemsPageProps = {
   searchParams?: {
     q?: string;
+    view?: string;
     status?: string;
     owner?: string;
     vessel?: string;
@@ -42,6 +44,7 @@ const columns: Array<{ key: ColumnKey; label: string }> = [
 const defaultColumns: ColumnKey[] = ['item', 'vessel', 'owner', 'agency', 'frequency', 'start', 'expiration', 'status', 'note'];
 const sortKeys = new Set<SortKey>(['item', 'vessel', 'owner', 'agency', 'frequency', 'start', 'expiration', 'status']);
 const statusFilterOptions = [
+  { value: 'awaiting_schedule', label: 'Awaiting schedule' },
   { value: 'due', label: 'Due' },
   { value: 'overdue', label: 'Overdue' },
   { value: 'not_due_yet', label: 'Not due yet' },
@@ -63,7 +66,7 @@ function selectedColumns(value?: string) {
 function itemsHref(searchParams: ItemsPageProps['searchParams'], updates: Record<string, string | null | undefined>) {
   const params = new URLSearchParams();
 
-  for (const key of ['q', 'status', 'owner', 'vessel', 'area', 'sort', 'dir', 'columns', 'page']) {
+  for (const key of ['q', 'view', 'status', 'owner', 'vessel', 'area', 'sort', 'dir', 'columns', 'page']) {
     const value = Object.prototype.hasOwnProperty.call(updates, key) ? updates[key] : searchParams?.[key as keyof NonNullable<ItemsPageProps['searchParams']>];
     if (value) params.set(key, value);
   }
@@ -72,7 +75,7 @@ function itemsHref(searchParams: ItemsPageProps['searchParams'], updates: Record
   return query ? `/items?${query}` : '/items';
 }
 
-function sortValue(item: ComplianceItem, sort: SortKey) {
+function sortValue(item: ComplianceItem, sort: SortKey, today: string) {
   if (sort === 'owner') return item.owner_current ?? '';
   if (sort === 'vessel') return itemVessel(item);
   if (sort === 'item') return item.item_name;
@@ -80,15 +83,15 @@ function sortValue(item: ComplianceItem, sort: SortKey) {
   if (sort === 'frequency') return item.frequency_label ?? '';
   if (sort === 'start') return item.start_working_on ?? '9999-12-31';
   if (sort === 'expiration') return item.expiration_date ?? '9999-12-31';
-  return operationalStatusRank(item);
+  return operationalStatusRank(item, today);
 }
 
-function operationalStatusRank(item: ComplianceItem) {
-  if (itemIsOverdue(item)) return 0;
-  if (displayState(item) === 'Due') return 1;
+function operationalStatusRank(item: ComplianceItem, today: string) {
+  if (itemIsOverdue(item, today)) return 0;
+  if (displayState(item, today) === 'Due') return 1;
   if (item.status === 'in_progress') return 2;
   if (item.status === 'submitted') return 3;
-  if (displayState(item) === 'Not due yet') return 4;
+  if (displayState(item, today) === 'Not due yet') return 4;
   if (item.status === 'complete') return 5;
   return 6;
 }
@@ -98,10 +101,10 @@ function compareSortValues(left: string | number, right: string | number) {
   return String(left).localeCompare(String(right));
 }
 
-function sortItems(items: ComplianceItem[], sort: SortKey, dir: 'asc' | 'desc') {
+function sortItems(items: ComplianceItem[], sort: SortKey, dir: 'asc' | 'desc', today: string) {
   const multiplier = dir === 'desc' ? -1 : 1;
   return [...items].sort((a, b) => {
-    const compared = compareSortValues(sortValue(a, sort), sortValue(b, sort));
+    const compared = compareSortValues(sortValue(a, sort, today), sortValue(b, sort, today));
     if (compared !== 0) return compared * multiplier;
 
     const startCompared = String(a.start_working_on ?? '9999-12-31').localeCompare(String(b.start_working_on ?? '9999-12-31'));
@@ -160,13 +163,15 @@ function FilterMenu({ label, selectedLabel, children }: { label: string; selecte
   );
 }
 
-function ItemCell({ item, column }: { item: ComplianceItem; column: ColumnKey }) {
+function ItemCell({ item, column, today }: { item: ComplianceItem; column: ColumnKey; today: string }) {
   if (column === 'item') {
     return (
       <td data-column="item">
         <Link className="item-link" href={`/items/${item.id}`}>
           <span>{item.item_name}</span>
           <small className="subline">{item.compliance_area ?? 'Other'}</small>
+          {itemIsSnoozed(item, today) ? <small className="subline">Snoozed until {formatDate(item.snoozed_until ?? null)}</small> : null}
+          {item.archived_at ? <small className="subline">Archived · {item.archive_reason}</small> : null}
         </Link>
       </td>
     );
@@ -177,14 +182,18 @@ function ItemCell({ item, column }: { item: ComplianceItem; column: ColumnKey })
   if (column === 'frequency') return <td data-column="frequency">{item.frequency_label ?? '-'}</td>;
   if (column === 'start') return <td data-column="start">{formatDate(item.start_working_on)}</td>;
   if (column === 'expiration') return <td data-column="expiration">{formatDate(item.expiration_date)}</td>;
-  if (column === 'status') return <td data-column="status"><StatusBadge item={item} /></td>;
+  if (column === 'status') return <td data-column="status"><StatusBadge item={item} today={today} /></td>;
   if (column === 'note') return <td data-column="note"><span className="cell-note">{item.status_notes || 'No note yet'}</span></td>;
   return <td data-column="itemNumber">{item.item_number ?? '-'}</td>;
 }
 
 export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const { membership, company, profile, user } = await getCustomerContext();
-  const [allItems, ownerCodes] = await Promise.all([getCustomerItems(membership.company_id), getCompanyOwnerCodes(membership.company_id)]);
+  const [allItems, ownerCodes] = await Promise.all([getCustomerItems(membership.company_id, { includeArchived: searchParams?.view === 'archived' }), getCompanyOwnerCodes(membership.company_id)]);
+  const today = workspaceToday(company?.timezone || 'America/Los_Angeles');
+  const view = ['snoozed', 'awaiting', 'archived'].includes(searchParams?.view ?? '') ? searchParams!.view! : 'all';
+  const mappedCodes = ownerCodes.filter((owner) => owner.is_assigned_to_current_user).map((owner) => owner.code);
+  const canManageItem = (item: ComplianceItem) => membership.role === 'owner' || (membership.role === 'office_user' && itemHasAnyOwnerCode(item, mappedCodes));
   const canCreateItems = canCreateComplianceItems(membership.role);
   const owners = ownerCodes.map((owner) => owner.code).sort();
   const vessels = Array.from(new Set(allItems.map(itemVessel))).sort();
@@ -195,16 +204,18 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const currentPage = Math.max(1, Number(searchParams?.page ?? 1) || 1);
 
   const filteredItems = sortItems(allItems.filter((item) => {
+    if (view === 'archived' ? !item.archived_at : Boolean(item.archived_at)) return false;
+    if (view === 'snoozed' && !itemIsSnoozed(item, today)) return false;
+    if (view === 'awaiting' && !item.awaiting_schedule) return false;
     if (q) {
-      const haystack = [item.item_name, itemVessel(item), item.item_number].filter(Boolean).join(' ').toLowerCase();
-      if (!haystack.includes(q)) return false;
+      if (!matchesSearch(q, [item.item_name, itemVessel(item), item.item_number])) return false;
     }
-    if (searchParams?.status === 'overdue' && !itemIsOverdue(item)) return false;
-    if (searchParams?.status && searchParams.status !== 'overdue' && searchParams.status !== item.status && searchParams.status !== displayStateParam(item)) return false;
-    if (searchParams?.owner && item.owner_current !== searchParams.owner) return false;
+    if (searchParams?.status === 'overdue' && !itemIsOverdue(item, today)) return false;
+    if (searchParams?.status && searchParams.status !== 'overdue' && searchParams.status !== item.status && searchParams.status !== displayStateParam(item, today)) return false;
+    if (searchParams?.owner && !itemHasAnyOwnerCode(item, [searchParams.owner])) return false;
     if (searchParams?.vessel && itemVessel(item) !== searchParams.vessel) return false;
     return true;
-  }), sort, dir);
+  }), sort, dir, today);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const page = Math.min(currentPage, totalPages);
@@ -212,7 +223,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
   const pagedItems = filteredItems.slice(startIndex, startIndex + pageSize);
   const showingStart = filteredItems.length === 0 ? 0 : startIndex + 1;
   const showingEnd = Math.min(startIndex + pageSize, filteredItems.length);
-  const dueCount = allItems.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item) === 'Due' || itemIsOverdue(item))).length;
+  const dueCount = allItems.filter((item) => !item.archived_at && !['complete', 'discontinued'].includes(item.status) && (displayState(item, today) === 'Due' || itemIsOverdue(item, today))).length;
   const userName = profile?.full_name ?? user.email ?? 'User';
   const statusLabel = statusFilterOptions.find((option) => option.value === searchParams?.status)?.label ?? 'All';
   const vesselLabel = searchParams?.vessel ?? 'All';
@@ -237,7 +248,8 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
           </div>
           <div className="header-action-row">
             <form action="/items" className="search-form">
-              <input name="q" defaultValue={searchParams?.q ?? ''} placeholder="Search item, vessel, or item #" />
+              {(['view', 'owner', 'vessel', 'status', 'sort', 'dir', 'columns'] as const).map((key) => searchParams?.[key] ? <input key={key} name={key} type="hidden" value={searchParams[key]} /> : null)}
+              <input name="q" defaultValue={searchParams?.q ?? ''} aria-label="Search compliance records" placeholder="All words, any order" />
               <button className="secondary-action" type="submit">Search</button>
             </form>
             {canCreateItems ? (
@@ -249,6 +261,7 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
           </div>
         </header>
 
+        <nav className="work-scope" aria-label="Record view">{[['all', 'All records'], ['snoozed', 'Snoozed'], ['awaiting', 'Awaiting schedule'], ['archived', 'Archived']].map(([value, label]) => <Link key={value} className={view === value ? 'active' : ''} href={itemsHref(searchParams, { view: value === 'all' ? undefined : value, page: undefined })}>{label}</Link>)}</nav>
         <section className="panel queue-filter-panel" aria-label="Item filters">
           <div className="queue-tools">
             <div className="filter-chip-bar">
@@ -288,12 +301,13 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
                     const column = columns.find((candidate) => candidate.key === columnKey)!;
                     return <th data-column={column.key} key={column.key}><SortHeader column={column} dir={dir} searchParams={searchParams} sort={sort} /></th>;
                   })}
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {pagedItems.length === 0 ? (
                   <tr>
-                    <td colSpan={visibleColumns.length}>
+                    <td colSpan={visibleColumns.length + 1}>
                       <div className="empty-state">
                         <h3>No items match this view</h3>
                         <p>Adjust the search or filters to bring more compliance records back into view.</p>
@@ -302,7 +316,8 @@ export default async function ItemsPage({ searchParams }: ItemsPageProps) {
                   </tr>
                 ) : pagedItems.map((item) => (
                   <tr key={item.id}>
-                    {visibleColumns.map((column) => <ItemCell column={column} item={item} key={column} />)}
+                    {visibleColumns.map((column) => <ItemCell column={column} item={item} today={today} key={column} />)}
+                      <td>{canManageItem(item) ? <ItemQueueControls returnTo={itemsHref(searchParams, {})} itemId={item.id} itemName={item.item_name} archivedAt={item.archived_at} snoozedUntil={item.snoozed_until} snoozeReason={item.snooze_reason} isOpenItem={!['complete', 'discontinued'].includes(item.status)} today={today} /> : null}</td>
                   </tr>
                 ))}
               </tbody>

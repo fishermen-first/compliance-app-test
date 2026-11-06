@@ -264,7 +264,7 @@ export function Dashboard({
   const dueNowItems = scopedItems.filter((item) => displayState(item) === 'Due' && !itemIsOverdue(item));
   const inProgressItems = scopedItems.filter((item) => item.status === 'in_progress');
   const submittedItems = scopedItems.filter((item) => item.status === 'submitted');
-  const overdueItems = scopedItems.filter(itemIsOverdue);
+  const overdueItems = scopedItems.filter((item) => itemIsOverdue(item));
   const queueItems = sortItems(filteredScopedItems.filter((item) => {
     if (filters.status) return true;
     return isWorkQueueItem(item);

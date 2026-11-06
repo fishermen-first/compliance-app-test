@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { AppSidebar } from '@/components/app-sidebar';
 import { ComplianceItemDetail } from '@/components/compliance-item-detail';
-import { itemHasAnyOwnerCode } from '@/lib/compliance';
+import { itemHasAnyOwnerCode, workspaceToday } from '@/lib/compliance';
 import { getCompanyOwnerCodes, getCustomerContext, mapComplianceItem } from '@/lib/customer-data';
 import { getReferenceLists } from '@/lib/reference-lists';
 import { accessRoleLabel } from '@/lib/roles';
@@ -20,7 +20,7 @@ export default async function ItemDetailPage({ params, searchParams }: ItemDetai
       .maybeSingle(),
     supabase
       .from('compliance_item_status_history')
-      .select('from_status, to_status, notes, changed_at, profiles(full_name, email)')
+      .select('event_type, from_status, to_status, notes, changed_at, profiles(full_name, email)')
       .eq('company_id', membership.company_id)
       .eq('item_id', params.id)
       .order('changed_at', { ascending: false }),
@@ -84,6 +84,7 @@ export default async function ItemDetailPage({ params, searchParams }: ItemDetai
       />
       <main className="workspace list-workspace item-detail-page">
         <ComplianceItemDetail
+          workspaceDate={workspaceToday(company?.timezone || 'America/Los_Angeles')}
           item={item}
           history={(history ?? []) as any}
           reminderRules={reminderRules ?? []}

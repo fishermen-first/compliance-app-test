@@ -1,3 +1,4 @@
+import { ItemQueueControls } from '@/components/item-queue-controls';
 import Link from 'next/link';
 import { updateComplianceItemStatus } from '@/app/actions/items';
 import { CompleteItemModal } from '@/components/complete-item-modal';
@@ -49,6 +50,7 @@ type VesselOption = {
 };
 
 type HistoryEntry = {
+  event_type?: string;
   from_status: string | null;
   to_status: string;
   notes: string | null;
@@ -112,8 +114,7 @@ function daysBetweenIso(start: string, end: string) {
   return Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000);
 }
 
-function nextExpectedReminder(item: ComplianceItem, rules: ReminderRule[]) {
-  const today = todayIso();
+function nextExpectedReminder(item: ComplianceItem, rules: ReminderRule[], today: string) {
   const dates = rules.flatMap((rule) => {
     if (!rule.active) return [];
     if (rule.trigger_type === 'on_start_date' && item.start_working_on) return [item.start_working_on];
@@ -157,11 +158,11 @@ function formatTimestamp(value: string | null) {
   return new Date(value).toLocaleString();
 }
 
-function daysRemainingLabel(item: ComplianceItem) {
+function daysRemainingLabel(item: ComplianceItem, today: string) {
   if (item.status === 'complete') return item.completed_at ? `Completed ${formatDate(item.completed_at)}` : 'Complete';
   if (item.status === 'discontinued') return 'Did not renew';
 
-  const days = daysUntil(item.expiration_date);
+  const days = daysUntil(item.expiration_date, today);
   if (days === null) return 'No expiration date';
   if (days < 0) return `${Math.abs(days)} days overdue`;
   if (days === 0) return 'Due today';
@@ -169,11 +170,11 @@ function daysRemainingLabel(item: ComplianceItem) {
   return `${days} days remaining`;
 }
 
-function workflowIndex(item: ComplianceItem) {
+function workflowIndex(item: ComplianceItem, today: string) {
   if (item.status === 'complete') return 4;
   if (item.status === 'submitted') return 3;
   if (item.status === 'in_progress') return 2;
-  if (displayState(item) === 'Due') return 1;
+  if (displayState(item, today) === 'Due') return 1;
   return 0;
 }
 
@@ -206,7 +207,8 @@ export function ComplianceItemDetail({
   backHref,
   backLabel,
   itemPathPrefix,
-  referenceListHref
+  referenceListHref,
+  workspaceDate = todayIso()
 }: {
   item: ComplianceItem;
   history: HistoryEntry[];
@@ -235,10 +237,13 @@ export function ComplianceItemDetail({
   backLabel: string;
   itemPathPrefix: string;
   referenceListHref: string;
+  workspaceDate?: string;
 }) {
+  const canManageQueue = canEditCore;
+  if (item.archived_at) { canUpdateStatus = false; canCompleteItem = false; canEditCore = false; canManageReminders = false; }
   const nextDates = proposedNextDates(item);
   const canCreateNext = Boolean(nextDates.nextExpirationDate);
-  const canCompleteNow = canCompleteItem && !['complete', 'discontinued'].includes(item.status);
+  const canCompleteNow = !item.archived_at && canCompleteItem && !['complete', 'discontinued'].includes(item.status);
   const ownerReminderRules = reminderRules.filter((rule) => (rule.audience ?? 'owner') === 'owner');
   const externalReminderRules = reminderRules.filter((rule) => rule.audience === 'external');
   const startRule = ruleFor(reminderRules, 'on_start_date');
@@ -251,8 +256,8 @@ export function ComplianceItemDetail({
   const externalRecipients = recipients.filter((recipient) => ['additional', 'external', 'group'].includes(recipient.recipient_type));
   const activeExternalRules = externalReminderRules.filter((rule) => rule.active);
   const latestReminder = reminderLogs[0];
-  const nextReminder = nextExpectedReminder(item, reminderRules);
-  const currentStep = workflowIndex(item);
+  const nextReminder = nextExpectedReminder(item, reminderRules, workspaceDate);
+  const currentStep = workflowIndex(item, workspaceDate);
   const statusFormId = `status-${item.id}`;
   const availableOwnerOptions = ownerOptionsWithCurrent(ownerOptions, item);
   const assignedOwner = availableOwnerOptions.find((owner) => owner.code === item.owner_current);
@@ -284,12 +289,18 @@ export function ComplianceItemDetail({
           </div>
         </div>
         <div className="item-status-top">
-          <StatusBadge item={item} />
-          <span className="days-remaining">{daysRemainingLabel(item)}</span>
+          <StatusBadge item={item} today={workspaceDate} />
+          <span className="days-remaining">{daysRemainingLabel(item, workspaceDate)}</span>
         </div>
       </div>
 
-      {!canUpdateStatus && !canCompleteNow && !canEditCore ? (
+      <div className="workflow-notice">
+        <div><strong>{item.archived_at ? 'Archived record' : item.awaiting_schedule ? 'Awaiting schedule' : item.snoozed_until && item.snoozed_until > workspaceDate ? `Snoozed until ${formatDate(item.snoozed_until)}` : 'Queue controls'}</strong>
+          {item.archived_at ? <p>{item.archive_reason} · Restore this record before making changes.</p> : item.awaiting_schedule ? <p>Set the next dates or mark In progress when work resumes.</p> : item.snoozed_until && item.snoozed_until > workspaceDate ? <p>{item.snooze_reason || 'Hidden from Needs attention. Expiration and reminders are unchanged.'}</p> : null}
+        </div>
+        {canManageQueue ? <ItemQueueControls itemId={item.id} itemName={item.item_name} itemPathPrefix={itemPathPrefix} archivedAt={item.archived_at} snoozedUntil={item.snoozed_until} snoozeReason={item.snooze_reason} isOpenItem={!['complete', 'discontinued'].includes(item.status)} today={workspaceDate} /> : null}
+      </div>
+      {!item.archived_at && !canUpdateStatus && !canCompleteNow && !canEditCore ? (
         <section className="owner-notice-panel setup-warning-panel item-access-notice">
           <strong>Read only</strong>
           <span>Your login is not mapped to this item owner code. A workspace owner can update it or map your owner code.</span>
@@ -351,7 +362,7 @@ export function ComplianceItemDetail({
                     canCreateNext={canCreateNext}
                     nextStartWorkingOn={nextDates.nextStartWorkingOn}
                     nextExpirationDate={nextDates.nextExpirationDate}
-                    completionDateDefault={todayIso()}
+                    completionDateDefault={workspaceDate}
                   />
                 ) : null}
               </div>
@@ -435,7 +446,7 @@ export function ComplianceItemDetail({
                 additionalRecipients={externalRecipients}
                 referenceContacts={referenceContacts}
                 referenceContactGroups={referenceContactGroups}
-                today={todayIso()}
+                today={workspaceDate}
               />
             ) : null}
           </article>
@@ -447,7 +458,7 @@ export function ComplianceItemDetail({
               <div className={`tl-ev${index === 0 ? ' is-current' : ''}`} key={`${entry.changed_at}-${entry.to_status}`}>
                 <span className="dot" />
                 <div>
-                  <strong>{statusOptionLabel(entry.from_status)} to {statusOptionLabel(entry.to_status)}</strong>
+                  <strong>{entry.event_type && entry.event_type !== 'status_change' ? 'Queue update' : `${statusOptionLabel(entry.from_status)} to ${statusOptionLabel(entry.to_status)}`}</strong>
                   <div className="who">{new Date(entry.changed_at).toLocaleString()} / {actorLabel(entry)}</div>
                   {entry.notes ? <p>{entry.notes}</p> : null}
                 </div>

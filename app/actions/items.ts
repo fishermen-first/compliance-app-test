@@ -273,6 +273,9 @@ export async function createComplianceItem(formData: FormData) {
 
   revalidatePath('/');
   revalidatePath('/items');
+  revalidatePath('/work');
+  revalidatePath('/calendar');
+  revalidatePath('/completed');
   redirect(itemDetailPath(formData, itemId));
 }
 
@@ -307,6 +310,9 @@ export async function updateComplianceItemCore(formData: FormData) {
 
   revalidatePath('/');
   revalidatePath('/items');
+  revalidatePath('/work');
+  revalidatePath('/calendar');
+  revalidatePath('/completed');
   revalidatePath(`/items/${itemId}`);
   revalidatePath(itemDetailPath(formData, itemId));
   redirect(itemDetailPath(formData, itemId));
@@ -347,6 +353,9 @@ export async function updateComplianceItemStatus(formData: FormData) {
 
   revalidatePath('/');
   revalidatePath('/items');
+  revalidatePath('/work');
+  revalidatePath('/calendar');
+  revalidatePath('/completed');
   revalidatePath(`/items/${itemId}`);
   revalidatePath(itemDetailPath(formData, itemId));
   redirect(itemDetailPath(formData, itemId));
@@ -355,9 +364,12 @@ export async function updateComplianceItemStatus(formData: FormData) {
 export async function completeComplianceItem(formData: FormData) {
   const itemId = requiredString(formData, 'itemId');
   const { supabase } = await requireMembership({ allowAppAdmin: true });
-  const shouldCreateNext = formData.get('createNext') === 'on';
+  const nextRecordMode = optionalString(formData, 'nextRecordMode') ?? 'automatic';
+  if (!['automatic', 'none', 'undated', 'dated'].includes(nextRecordMode)) throw new Error('Choose a valid next record option.');
+  const shouldCreateNext = nextRecordMode !== 'none' && (nextRecordMode !== 'automatic' || formData.get('createNext') === 'on');
 
-  const { data: newItemId, error } = await supabase.rpc('complete_compliance_item', {
+  const { data: newItemId, error } = await supabase.rpc('complete_compliance_item_v2', {
+    next_record_mode: nextRecordMode,
     target_item_id: itemId,
     completion_date: requiredString(formData, 'completionDate'),
     final_notes: optionalString(formData, 'finalNotes'),
@@ -370,6 +382,9 @@ export async function completeComplianceItem(formData: FormData) {
 
   revalidatePath('/');
   revalidatePath('/items');
+  revalidatePath('/work');
+  revalidatePath('/calendar');
+  revalidatePath('/completed');
   revalidatePath(`/items/${itemId}`);
   revalidatePath(itemDetailPath(formData, itemId));
 
@@ -435,8 +450,27 @@ export async function saveComplianceItemReminders(formData: FormData) {
 
   revalidatePath('/');
   revalidatePath('/items');
+  revalidatePath('/work');
+  revalidatePath('/calendar');
+  revalidatePath('/completed');
   revalidatePath(`/items/${itemId}`);
   revalidatePath(itemDetailPath(formData, itemId));
   revalidatePath('/reminders');
+  redirect(itemDetailPath(formData, itemId));
+}
+
+export async function setComplianceItemQueueState(formData: FormData) {
+  const itemId = requiredString(formData, 'itemId');
+  const { supabase } = await requireMembership({ allowAppAdmin: true });
+  const { error } = await supabase.rpc('set_compliance_item_queue_state', {
+    target_item_id: itemId,
+    queue_action: requiredString(formData, 'queueAction'),
+    return_on: optionalString(formData, 'returnOn'),
+    reason: optionalString(formData, 'reason')
+  });
+  if (error) throw new Error(error.message);
+  for (const path of ['/', '/work', '/items', '/calendar', '/completed', '/reminders', `/items/${itemId}`, itemDetailPath(formData, itemId)]) revalidatePath(path);
+  const returnTo = optionalString(formData, 'returnTo');
+  if (returnTo && /^(?:\/|\/work|\/items)(?:\?[^#]*)?$/.test(returnTo)) redirect(returnTo);
   redirect(itemDetailPath(formData, itemId));
 }

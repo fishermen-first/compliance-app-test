@@ -1,3 +1,4 @@
+import { fetchAllRows } from '@/lib/fetch-all-rows';
 import { redirect } from 'next/navigation';
 import { type ComplianceItem } from '@/lib/compliance';
 import { createClient } from '@/lib/supabase/server';
@@ -35,6 +36,11 @@ export function mapComplianceItem(row: any): ComplianceItem {
     discontinued_at: row.discontinued_at,
     created_by: row.created_by,
     source_row_number: row.source_row_number,
+    snoozed_until: row.snoozed_until,
+    snooze_reason: row.snooze_reason,
+    archived_at: row.archived_at,
+    archive_reason: row.archive_reason,
+    awaiting_schedule: row.awaiting_schedule,
     previous_item_id: row.previous_item_id
   };
 }
@@ -100,15 +106,18 @@ export async function getCustomerContext(options: { allowAppAdmin?: boolean; req
   };
 }
 
-export async function getCustomerItems(companyId: string) {
+export async function getCustomerItems(companyId: string, options: { includeArchived?: boolean } = {}) {
   const supabase = createClient();
-  const { data: rawItems } = await supabase
-    .from('compliance_items')
-    .select('*, vessels(name), compliance_item_owner_codes(owner_code, is_primary)')
-    .eq('company_id', companyId)
-    .order('start_working_on', { ascending: true, nullsFirst: false })
-    .order('expiration_date', { ascending: true, nullsFirst: false });
-
+  const rawItems = await fetchAllRows((from, to) => {
+    let query = supabase.from('compliance_items')
+      .select('*, vessels(name), compliance_item_owner_codes(owner_code, is_primary)', { count: 'exact' })
+      .eq('company_id', companyId)
+      .order('start_working_on', { ascending: true, nullsFirst: false })
+      .order('expiration_date', { ascending: true, nullsFirst: false })
+      .order('id', { ascending: true });
+    if (!options.includeArchived) query = query.is('archived_at', null);
+    return query.range(from, to);
+  });
   return (rawItems ?? []).map(mapComplianceItem);
 }
 

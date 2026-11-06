@@ -104,6 +104,7 @@ function taskPriority(formData: FormData) {
 function refreshTasks() {
   revalidatePath('/');
   revalidatePath('/tasks');
+  revalidatePath('/work');
   revalidatePath('/items/[id]', 'page');
 }
 

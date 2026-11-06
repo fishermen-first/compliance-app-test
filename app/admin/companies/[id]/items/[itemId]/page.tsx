@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { workspaceToday } from '@/lib/compliance';
 import { notFound, redirect } from 'next/navigation';
 import { ArrowLeft, LogOut } from 'lucide-react';
 import { signOut } from '@/app/actions/auth';
@@ -34,7 +35,7 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
       .maybeSingle(),
     supabase
       .from('compliance_item_status_history')
-      .select('from_status, to_status, notes, changed_at, profiles(full_name, email)')
+      .select('event_type, from_status, to_status, notes, changed_at, profiles(full_name, email)')
       .eq('company_id', companyId)
       .eq('item_id', itemId)
       .order('changed_at', { ascending: false }),
@@ -99,6 +100,7 @@ export default async function AdminItemDetailPage({ params }: AdminItemDetailPag
         </header>
 
         <ComplianceItemDetail
+          workspaceDate={workspaceToday(company.timezone || 'America/Los_Angeles')}
           item={mapComplianceItem(rawItem)}
           history={(history ?? []) as any}
           reminderRules={reminderRules ?? []}

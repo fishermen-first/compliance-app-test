@@ -1,11 +1,11 @@
 import { redirect } from 'next/navigation';
 import { AppSidebar } from '@/components/app-sidebar';
-import { CombinedDashboard, type DashboardMember, type DashboardTask } from '@/components/combined-dashboard';
+import { CombinedDashboard } from '@/components/combined-dashboard';
 import { NoAccessScreen } from '@/components/no-access-screen';
 import { WorkspaceBlockedScreen } from '@/components/workspace-blocked-screen';
-import { isWorkQueueItem, itemHasAnyOwnerCode } from '@/lib/compliance';
-import { getCompanyOwnerCodes, getCustomerItems } from '@/lib/customer-data';
-import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
+import { isWorkQueueItem, workspaceToday } from '@/lib/compliance';
+import { getWorkspaceWork } from '@/lib/workspace-work';
+import { accessRoleLabel } from '@/lib/roles';
 import { createClient } from '@/lib/supabase/server';
 
 type HomeProps = { searchParams?: { message?: string; owner?: string } };
@@ -45,42 +45,17 @@ export default async function Home({ searchParams }: HomeProps) {
   if (memberships.length > 1) return <WorkspaceBlockedScreen email={userData.user.email} />;
 
   const membership = memberships[0];
-  const [{ data: company }, { data: profile }, allItems, ownerCodes] = await Promise.all([
+  const [{ data: company }, { data: profile }] = await Promise.all([
     supabase.from('companies').select('name, timezone').eq('id', membership.company_id).single(),
-    supabase.from('profiles').select('full_name, email').eq('id', userData.user.id).maybeSingle(),
-    getCustomerItems(membership.company_id),
-    getCompanyOwnerCodes(membership.company_id)
+    supabase.from('profiles').select('full_name, email').eq('id', userData.user.id).maybeSingle()
   ]);
 
-  const isCustomerOwner = isCustomerOwnerRole(membership.role);
-  const canViewEveryone = isCustomerOwner || membership.role === 'office_admin';
-  const mappedOwnerCodes = ownerCodes.filter((owner) => owner.is_assigned_to_current_user).map((owner) => owner.code);
-  const showEveryone = canViewEveryone && (searchParams?.owner === 'all' || (!searchParams?.owner && mappedOwnerCodes.length === 0));
-  const complianceItems = showEveryone
-    ? allItems
-    : mappedOwnerCodes.length
-      ? allItems.filter((item) => itemHasAnyOwnerCode(item, mappedOwnerCodes))
-      : [];
-
-  let taskQuery = (supabase as any)
-    .from('workspace_tasks')
-    .select('id, title, details, assigned_to, status, priority, due_date, completed_at, archived_at, created_at, compliance_item_id, reminder_at, reminder_dismissed_at, compliance_items!workspace_tasks_compliance_item_id_fkey(id, item_name)')
-    .eq('company_id', membership.company_id)
-    .is('archived_at', null);
-  if (!showEveryone) taskQuery = taskQuery.eq('assigned_to', userData.user.id);
-
-  const [{ data: taskRows, error: taskError }, memberResult] = await Promise.all([
-    taskQuery.order('due_date', { ascending: true, nullsFirst: false }).order('created_at', { ascending: false }),
-    canViewEveryone
-      ? supabase.rpc('get_workspace_task_members', { target_company_id: membership.company_id })
-      : Promise.resolve({ data: [{ user_id: userData.user.id, full_name: profile?.full_name ?? null, email: profile?.email ?? userData.user.email ?? null }], error: null })
-  ]);
-  if (taskError) throw new Error(taskError.message);
-  if (memberResult.error) throw new Error(memberResult.error.message);
-
-  const tasks = (taskRows ?? []) as DashboardTask[];
-  const members = (memberResult.data ?? []) as DashboardMember[];
-  const attentionCount = tasks.filter((task) => task.status === 'open').length + complianceItems.filter(isWorkQueueItem).length;
+  const { complianceItems, tasks, members, ownerCodes, canViewEveryone, showEveryone, manageableItemIds } = await getWorkspaceWork({
+    companyId: membership.company_id, userId: userData.user.id, role: membership.role,
+    requestedOwner: searchParams?.owner, fullName: profile?.full_name, email: profile?.email ?? userData.user.email
+  });
+  const today = workspaceToday(company?.timezone || 'America/Los_Angeles');
+  const attentionCount = tasks.filter((task) => task.status === 'open').length + complianceItems.filter((item) => isWorkQueueItem(item, today)).length;
   const currentUserName = profile?.full_name ?? userData.user.email ?? 'User';
 
   return (
@@ -94,6 +69,7 @@ export default async function Home({ searchParams }: HomeProps) {
         dueLabel="things needing attention"
       />
       <CombinedDashboard
+        manageableItemIds={manageableItemIds}
         greeting={greetingFor(company?.timezone)}
         currentUserId={userData.user.id}
         currentUserName={currentUserName}

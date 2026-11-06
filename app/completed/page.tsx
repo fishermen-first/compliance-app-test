@@ -1,7 +1,8 @@
 import Link from 'next/link';
+import { fetchAllRows } from '@/lib/fetch-all-rows';
 import { Download } from 'lucide-react';
 import { AppSidebar } from '@/components/app-sidebar';
-import { displayState, formatDate, itemIsOverdue } from '@/lib/compliance';
+import { workspaceToday, displayState, formatDate, itemIsOverdue } from '@/lib/compliance';
 import { getCompanyOwnerCodes, getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer-data';
 import { accessRoleLabel } from '@/lib/roles';
 
@@ -59,20 +60,21 @@ function SortHeader({ label, sortKey, searchParams, sort, dir }: { label: string
 
 export default async function CompletedPage({ searchParams }: CompletedPageProps) {
   const { membership, company, profile, user, supabase } = await getCustomerContext();
-  const [items, ownerCodes] = await Promise.all([getCustomerItems(membership.company_id), getCompanyOwnerCodes(membership.company_id)]);
+  const today = workspaceToday(company?.timezone || 'America/Los_Angeles');
+  const [items, ownerCodes] = await Promise.all([getCustomerItems(membership.company_id, { includeArchived: true }), getCompanyOwnerCodes(membership.company_id)]);
   const ownerNames = new Map(ownerCodes.map((owner) => [owner.code, owner.display_name ?? owner.code]));
   const assignedTo = (item: (typeof items)[number]) => item.owner_current ? ownerNames.get(item.owner_current) ?? item.owner_current : 'Unassigned';
   const completedItems = items.filter((item) => item.status === 'complete');
-  const completedIds = completedItems.map((item) => item.id);
-  const { data: completeHistory } = completedIds.length > 0
-    ? await supabase
+  const completeHistory = completedItems.length > 0
+    ? await fetchAllRows((from, to) => supabase
         .from('compliance_item_status_history')
-        .select('item_id, changed_at, notes, profiles(full_name, email)')
+        .select('item_id, changed_at, notes, profiles(full_name, email)', { count: 'exact' })
         .eq('company_id', membership.company_id)
         .eq('to_status', 'complete')
-        .in('item_id', completedIds)
-        .order('changed_at', { ascending: false })
-    : { data: [] as CompleteHistoryRow[] };
+        .eq('event_type', 'status_change')
+        .order('changed_at', { ascending: false }).order('id')
+        .range(from, to))
+    : [] as CompleteHistoryRow[];
   const historyByItem = new Map<string, CompleteHistoryRow>();
   ((completeHistory ?? []) as CompleteHistoryRow[]).forEach((row) => {
     if (!historyByItem.has(row.item_id)) historyByItem.set(row.item_id, row);
@@ -106,7 +108,7 @@ export default async function CompletedPage({ searchParams }: CompletedPageProps
   });
 
   const csv = [
-    ['Item', 'Vessel', 'Assigned to', 'Completed', 'By', 'Final note', 'Proof'].map(csvEscape).join(','),
+    ['Item', 'Vessel', 'Assigned to', 'Completed', 'By', 'Final note', 'Proof', 'Archived', 'Archive reason'].map(csvEscape).join(','),
     ...sorted.map((item) => [
       item.item_name,
       itemVessel(item),
@@ -114,11 +116,13 @@ export default async function CompletedPage({ searchParams }: CompletedPageProps
       item.completed_at ?? '',
       actorLabel(historyByItem.get(item.id)),
       item.status_notes ?? '',
-      item.sharepoint_url ?? ''
+      item.sharepoint_url ?? '',
+      item.archived_at ? 'Yes' : 'No',
+      item.archive_reason ?? ''
     ].map(csvEscape).join(','))
   ].join('\n');
   const csvHref = `data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`;
-  const dueCount = items.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item) === 'Due' || itemIsOverdue(item))).length;
+  const dueCount = items.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item, today) === 'Due' || itemIsOverdue(item, today))).length;
   const userName = profile?.full_name ?? user.email ?? 'User';
 
   return (
@@ -136,7 +140,7 @@ export default async function CompletedPage({ searchParams }: CompletedPageProps
           <div>
             <p className="eyebrow">Completed</p>
             <h1>Completed</h1>
-            <p>Completed records with the final note, proof link, owner, and completion trail.</p>
+            <p>Completed records with the final note, proof link, owner, and completion trail, including archived completed records.</p>
           </div>
           <a className="primary-action" href={csvHref} download="completed-compliance-items.csv">
             <Download aria-hidden="true" />
@@ -185,7 +189,7 @@ export default async function CompletedPage({ searchParams }: CompletedPageProps
                   const history = historyByItem.get(item.id);
                   return (
                     <tr key={item.id}>
-                      <td><Link className="item-link" href={`/items/${item.id}`}>{item.item_name}</Link></td>
+                      <td><Link className="item-link" href={`/items/${item.id}`}>{item.item_name}</Link>{item.archived_at ? <small className="workflow-row-note">Archived · {item.archive_reason}</small> : null}</td>
                       <td>{itemVessel(item)}</td>
                       <td><span className="own-chip">{assignedTo(item)}</span></td>
                       <td>{formatDate(item.completed_at)}</td>

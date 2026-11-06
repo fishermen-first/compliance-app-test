@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Source_Serif_4, Spline_Sans, Spline_Sans_Mono } from 'next/font/google';
 import './globals.css';
+import './workflow.css';
 
 const splineSans = Spline_Sans({
   subsets: ['latin'],

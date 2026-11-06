@@ -12,6 +12,7 @@ const navSections = [
   {
     label: 'Your work',
     items: [
+      { label: 'All work', description: 'Tasks and compliance queue', icon: ClipboardList, href: '/work' },
       { label: 'Tasks', description: 'Personal and assigned to-dos', icon: ListTodo, href: '/tasks' }
     ]
   },

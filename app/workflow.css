@@ -1,0 +1,42 @@
+/* Compliance queue controls, scoped separately from existing workspace changes. */
+.item-queue-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.item-queue-controls form { margin: 0; }
+.item-queue-controls > button, .item-queue-controls > form > button, .workflow-dialog button, .work-scope a { padding: 7px 11px; border: 1px solid var(--line); border-radius: 7px; background: white; color: var(--ink); font: inherit; cursor: pointer; text-decoration: none; }
+.workflow-dialog { width: min(580px, calc(100% - 28px)); max-height: calc(100dvh - 32px); overflow: auto; border: 1px solid var(--line); border-radius: 12px; padding: 22px; color: var(--ink); background: white; box-shadow: 0 18px 60px rgb(18 32 22 / 20%); }
+.workflow-dialog::backdrop { background: rgb(15 28 20 / 45%); }
+.workflow-dialog header, .workflow-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.workflow-dialog header h2 { margin: 0; font-size: 20px; }
+.workflow-dialog header button { flex: 0 0 auto; }
+.workflow-dialog p { font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.workflow-dialog label { display: grid; gap: 7px; margin: 14px 0; font-size: 14px; font-weight: 650; }
+.workflow-dialog input:not([type=radio]), .workflow-dialog select, .workflow-dialog textarea { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 7px; background: white; color: var(--ink); font: inherit; }
+.workflow-dialog footer { justify-content: flex-end; flex-wrap: wrap; margin-top: 22px; }
+.workflow-dialog button.workflow-primary { background: #263f2d; border-color: #263f2d; color: white; }
+.workflow-choices { border: 0; margin: 18px 0; padding: 0; min-width: 0; }
+.workflow-choices legend { font-weight: 750; }
+.workflow-choices label { display: flex; align-items: flex-start; gap: 10px; padding: 11px; border: 1px solid var(--line); border-radius: 7px; font-weight: 650; }
+.workflow-choices label:has(input:checked) { background: #f0f5ef; border-color: #78967d; }
+.workflow-choices input { margin-top: 4px; flex: 0 0 auto; }
+.workflow-choices small { display: block; font-weight: 400; color: var(--muted); margin-top: 4px; }
+.workflow-date-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.workflow-notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0; padding: 15px; border: 1px solid var(--line); border-radius: 9px; background: #f5f7f2; }
+.workflow-notice p { margin: 4px 0; color: var(--muted); }
+.work-scope { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 15px 0; }
+.work-scope a.active { background: #263f2d; color: white; border-color: #263f2d; }
+.workflow-row-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.cdash-work-row { min-width: 0; }
+.cdash-work-row > div { min-width: 0; }
+.cdash-work-row h3 { overflow-wrap: anywhere; }
+.workflow-row-note { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.work-search { display: flex; align-items: flex-end; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+.work-search label { display: grid; gap: 6px; flex: 1; min-width: 150px; }
+.work-search input { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; background: white; color: var(--ink); font: inherit; }
+.work-search button { padding: 9px 12px; border-radius: 7px; border: 1px solid var(--line); background: white; color: var(--ink); }
+@media (max-width: 760px) { .workflow-date-grid { grid-template-columns: 1fr; gap: 0; } .workflow-row-actions { width: 100%; } .workflow-dialog { padding: 16px; } .item-queue-controls button { min-height: 40px; } }
+
+.workflow-dashboard-links { padding: 0 18px; }
+@media (max-width: 700px) {
+  .cdash-work-row > .workflow-row-actions { grid-column: 2; grid-row: 2; width: 100%; }
+  .cdash-work-row > .workflow-row-actions + .cdash-row-link { grid-column: 3; grid-row: 1; }
+  .cdash-work-row > .workflow-row-actions .cdash-state { display: inline-block; }
+}

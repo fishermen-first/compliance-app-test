@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { todayIso } from '@/lib/compliance';
 import { sendQueuedRemindersForCompany } from '@/lib/reminder-sender';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -35,8 +34,7 @@ export async function queueTodaysReminders() {
   const { supabase, membership } = await requireReminderAccess();
 
   const { error } = await supabase.rpc('schedule_due_reminders', {
-    target_company_id: membership.company_id,
-    target_run_date: todayIso()
+    target_company_id: membership.company_id
   });
 
   if (error) throw new Error(error.message);
@@ -57,8 +55,7 @@ export async function queueCompanyReminders(formData: FormData) {
 
   const admin = createAdminClient();
   const { error } = await admin.rpc('schedule_due_reminders', {
-    target_company_id: companyId,
-    target_run_date: todayIso()
+    target_company_id: companyId
   });
 
   if (error) throw new Error(error.message);

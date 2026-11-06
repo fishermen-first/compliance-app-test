@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { AppSidebar } from '@/components/app-sidebar';
 import { StatusBadge } from '@/components/status-badge';
-import { daysUntil, displayState, formatDate, isWorkQueueItem, itemHasAnyOwnerCode, itemOwnerCodes, itemIsOverdue, type ComplianceItem } from '@/lib/compliance';
+import { workspaceToday, daysUntil, displayState, formatDate, isWorkQueueItem, itemHasAnyOwnerCode, itemOwnerCodes, itemIsOverdue, type ComplianceItem } from '@/lib/compliance';
 import { getCompanyOwnerCodes, getCustomerContext, getCustomerItems, itemVessel } from '@/lib/customer-data';
 import { accessRoleLabel, isCustomerOwnerRole } from '@/lib/roles';
 
@@ -17,8 +17,8 @@ function calendarHref(params: { scope?: string; owner?: string }) {
   return query ? `/calendar?${query}` : '/calendar';
 }
 
-function relativeDate(value: string | null) {
-  const days = daysUntil(value);
+function relativeDate(value: string | null, today: string) {
+  const days = daysUntil(value, today);
   if (days === null) return 'No date';
   if (days < 0) return `${Math.abs(days)} days ago`;
   if (days === 0) return 'Today';
@@ -42,19 +42,19 @@ function takeSection(items: ComplianceItem[], assignedIds: Set<string>, predicat
   return sectionItems;
 }
 
-function planningSections(items: ComplianceItem[]) {
+function planningSections(items: ComplianceItem[], today: string) {
   const assignedIds = new Set<string>();
   const needsWorkNow = takeSection(
     items,
     assignedIds,
-    (item) => isWorkQueueItem(item) || (daysUntil(item.start_working_on) ?? 1) <= 0,
+    (item) => isWorkQueueItem(item, today) || (daysUntil(item.start_working_on, today) ?? 1) <= 0,
     byDate('expiration_date')
   );
   const startingSoon = takeSection(
     items,
     assignedIds,
     (item) => {
-      const days = daysUntil(item.start_working_on);
+      const days = daysUntil(item.start_working_on, today);
       return days !== null && days > 0 && days <= 30;
     },
     byDate('start_working_on')
@@ -63,7 +63,7 @@ function planningSections(items: ComplianceItem[]) {
     items,
     assignedIds,
     (item) => {
-      const days = daysUntil(item.expiration_date);
+      const days = daysUntil(item.expiration_date, today);
       return days !== null && days >= 0 && days <= 60;
     },
     byDate('expiration_date')
@@ -98,7 +98,7 @@ function planningSections(items: ComplianceItem[]) {
   ];
 }
 
-function PlanningRow({ item, ownerNames }: { item: ComplianceItem; ownerNames: Map<string, string> }) {
+function PlanningRow({ item, ownerNames, today }: { today: string; item: ComplianceItem; ownerNames: Map<string, string> }) {
   return (
     <Link className="planning-row" href={`/items/${item.id}`}>
       <span className="planning-owner-pill">{item.owner_current ? ownerNames.get(item.owner_current) ?? item.owner_current : 'Unassigned'}</span>
@@ -113,25 +113,26 @@ function PlanningRow({ item, ownerNames }: { item: ComplianceItem; ownerNames: M
       <div className="planning-date-cell">
         <span>Start working on</span>
         <strong>{formatDate(item.start_working_on)}</strong>
-        <small>{relativeDate(item.start_working_on)}</small>
+        <small>{relativeDate(item.start_working_on, today)}</small>
       </div>
       <div className="planning-date-cell">
         <span>Expiration</span>
         <strong>{formatDate(item.expiration_date)}</strong>
-        <small>{relativeDate(item.expiration_date)}</small>
+        <small>{relativeDate(item.expiration_date, today)}</small>
       </div>
-      <StatusBadge item={item} />
+      <StatusBadge item={item} today={today} />
     </Link>
   );
 }
 
 export default async function CalendarPage({ searchParams }: CalendarPageProps) {
   const { membership, company, profile, user } = await getCustomerContext();
+  const today = workspaceToday(company?.timezone || 'America/Los_Angeles');
   const [items, ownerCodes] = await Promise.all([
     getCustomerItems(membership.company_id),
     getCompanyOwnerCodes(membership.company_id)
   ]);
-  const openItems = items.filter((item) => !['complete', 'discontinued'].includes(item.status));
+  const openItems = items.filter((item) => !item.awaiting_schedule && !['complete', 'discontinued'].includes(item.status));
   const ownerNames = new Map(ownerCodes.map((owner) => [owner.code, owner.display_name ?? owner.code]));
   const ownerCodeRows = Array.from(new Set([
     ...ownerCodes.map((owner) => owner.code),
@@ -156,7 +157,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     : selectedOwnerCodes.length > 0
       ? openItems.filter((item) => itemHasAnyOwnerCode(item, selectedOwnerCodes))
       : [];
-  const sections = planningSections(scopedItems);
+  const sections = planningSections(scopedItems, today);
   const needsWorkNow = sections[0]?.items ?? [];
   const startingSoon = sections[1]?.items ?? [];
   const expiringSoon = sections[2]?.items ?? [];
@@ -165,7 +166,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     : selectedOwnerCodes.length
       ? `Owner ${selectedOwnerCodes.join(', ')}`
       : 'Owner setup needed';
-  const dueCount = items.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item) === 'Due' || itemIsOverdue(item))).length;
+  const dueCount = items.filter((item) => !['complete', 'discontinued'].includes(item.status) && (displayState(item, today) === 'Due' || itemIsOverdue(item, today))).length;
 
   return (
     <div className="app-shell">
@@ -261,7 +262,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                       <span>Expiration</span>
                       <span>Status</span>
                     </div>
-                    {section.items.map((item) => <PlanningRow item={item} ownerNames={ownerNames} key={item.id} />)}
+                    {section.items.map((item) => <PlanningRow today={today} item={item} ownerNames={ownerNames} key={item.id} />)}
                   </div>
                 ) : (
                   <p className="planning-empty">{section.empty}</p>
