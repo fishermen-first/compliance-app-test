@@ -14,7 +14,7 @@ All five findings are P2. Four were reproduced against the isolated Postgres fix
 
 ### 1. Snoozing a record changes future workbook update behavior
 
-Locations: `supabase/migrations/20261105234246_compliance_workflow_controls.sql:57`, its queue-action history insert, and `supabase/migrations/20260513000100_import_data_model_v2_phase1.sql:331`.
+Locations: `supabase/migrations/20261106004521_compliance_workflow_controls.sql:57`, its queue-action history insert, and `supabase/migrations/20260513000100_import_data_model_v2_phase1.sql:331`.
 
 Snooze and unsnooze set `last_non_import_activity_at` and create a status-history row. Either makes `compliance_item_has_customer_activity` true. The existing three-argument import apply function in `20260703000100_quarter_period_labels.sql:698` then takes the source-only update branch rather than updating operational dates/status/owners/instructions.
 
@@ -34,7 +34,7 @@ Suggested fix: include archived completed records in the proof archive and expor
 
 ### 3. Restore does not recover an already queued future reminder
 
-Location: `supabase/migrations/20261105234246_compliance_workflow_controls.sql:115` and `:119`, interacting with scheduler deduplication.
+Location: `supabase/migrations/20261106004521_compliance_workflow_controls.sql:115` and `:119`, interacting with scheduler deduplication.
 
 Archive changes pending/queued/failed log rows to skipped. Restore only clears the record's archive fields. A skipped log still occupies `(reminder_rule_id, recipient_email, scheduled_for)`, so rerunning the scheduler cannot recreate it because it uses `on conflict do nothing`.
 

@@ -26,7 +26,7 @@ New files:
 - lib/workspace-work.ts
 - scripts/verify_compliance_workflow.mjs
 - scripts/fixtures/compliance-workflow.sql
-- supabase/migrations/20261105234246_compliance_workflow_controls.sql
+- supabase/migrations/20261106004521_compliance_workflow_controls.sql
 
 Related changes are in the dashboard, completion modal, record details/list, sidebar, customer data helpers, generated database types, reminder sender, task refresh/link behavior, schedule/completed/vessel pages, layout, and package files. The pinned PGlite development dependency runs isolated Postgres tests without external database access.
 
@@ -91,3 +91,14 @@ Local services at /private/tmp/ff-compliance-workflow-integration (API55421/app3
 ## Commit and push authorization — 2026-11-05
 
 User explicitly requested committing and pushing Emma's changes. Push a `codex/emma-workflow-fixes` review branch to fishermen-first/compliance-app-test; do not release to production or apply a hosted migration. The separate workbook-import fixes are deferred. Exclude the pre-existing invitation/settings/global-style/import-test changes and private Word document. Validate the exact staged snapshot before committing. A preview build is not a functional hosted verification until the workflow migration exists in its isolated database.
+
+
+## Authorized production release — 2026-11-05
+
+User explicitly requested "do the migration and push to production". Fresh live inspection confirmed the compliance Supabase project xtjbhqxfzsmokljnzauf and existing function bodies matched repository baseline. Applied compliance_workflow_controls using the Supabase migration tool. The hosted tool assigned version 20261106004521, so the migration file and test references were renamed to match its ledger; SQL content is unchanged.
+
+Post-migration checks: 348 compliance records, 34 history entries, 108 reminder logs and 4 memberships retained; all new queue fields are inactive/null on existing records. All 34 history rows default to status_change. RLS remains enabled; anonymous roles cannot execute new queue/completion RPCs; only service_role can claim reminder sends. No records were completed, snoozed, archived, imported or deleted for verification.
+
+Security advisors ran after DDL. They still flag existing anonymous-executable importer/helper functions, general authenticated security-definer execution, existing role/policy configuration, and leaked-password protection. The new authenticated RPCs intentionally check actor permissions internally, and anonymous execution is denied. No unrelated auth/RLS changes were folded into this release.
+
+Next: push the migration-ledger alignment and Emma implementation to main, wait for production READY, and verify custom domain and authenticated page access where an existing session permits. Unrelated invitation/settings/global-style/import-test changes remain uncommitted.

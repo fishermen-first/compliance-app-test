@@ -26,7 +26,7 @@ The total above is 28 node test results, including the parent Postgres test. Ful
 
 ## Full-schema authenticated integration
 
-A dedicated local Supabase project was created at `/private/tmp/ff-compliance-workflow-integration`, project ID `ff-emma-workflow-local`, API port 55421. All existing repository migrations were applied, followed by `20261105234246_compliance_workflow_controls.sql` through `supabase migration up --local`. No hosted project was linked or modified.
+A dedicated local Supabase project was created at `/private/tmp/ff-compliance-workflow-integration`, project ID `ff-emma-workflow-local`, API port 55421. All existing repository migrations were applied, followed by `20261106004521_compliance_workflow_controls.sql` through `supabase migration up --local`. No hosted project was linked or modified.
 
 The executable harness is `scripts/verify_workflow_local.mjs`. It refuses any API URL except `http://127.0.0.1:55421`, never reads `.env.local`, and accepts an explicit local status JSON path:
 

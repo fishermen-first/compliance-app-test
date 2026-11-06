@@ -38,7 +38,7 @@ test('migration and authorized workflow run against isolated Postgres', async (t
   await db.exec(read('scripts/fixtures/compliance-workflow.sql'));
   const permissions = read('supabase/migrations/20260702000100_arctic_storm_meeting_fixes.sql');
   await db.exec(permissions.slice(permissions.indexOf('create or replace function public.can_edit_compliance_item_core('), permissions.indexOf('create or replace function public.create_compliance_item(')));
-  await db.exec(read('supabase/migrations/20261105234246_compliance_workflow_controls.sql'));
+  await db.exec(read('supabase/migrations/20261106004521_compliance_workflow_controls.sql'));
   await db.exec(`insert into companies values ('${ids.company}', 'America/Los_Angeles'), ('${ids.other}', 'America/Los_Angeles');
     insert into profiles values ('${ids.owner}','owner@example.test'),('${ids.user}','user@example.test'),('${ids.stranger}','stranger@example.test');
     insert into company_memberships values ('${ids.company}','${ids.owner}','owner'),('${ids.company}','${ids.user}','office_user'),('${ids.other}','${ids.stranger}','owner');
